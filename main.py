@@ -31,6 +31,10 @@ from src.utils.config import Config
 from src.parser.java_parser import JavaParser
 from src.engine.qa_generator import QAGenerator
 from src.engine.design_generator import DesignGenerator
+from src.engine.demo_method_understander import DemoMethodUnderstander
+from src.engine.demo_question_generator import DemoQuestionGenerator
+from src.engine.demo_answer_generator import DemoAnswerGenerator
+from src.utils import vector_index
 
 
 logger = get_logger(__name__)
@@ -312,11 +316,18 @@ def main():
         
         try:
             java_parser = JavaParser(cfg)
-            symbols, repo_meta = java_parser.parse_repo(repo_path, repo_commit)
+            symbols = java_parser.parse_repo(repo_path, repo_commit)
             
             # Add license info
             license_info = detect_license(repo_path)
-            repo_meta["license"] = license_info
+            
+            # Build repo_meta
+            repo_meta = {
+                "repo_path": str(repo_path),
+                "repo_commit": repo_commit,
+                "total_symbols": len(symbols),
+                "license": license_info
+            }
             
             # Write outputs
             write_jsonl(symbols_jsonl, [s.model_dump() for s in symbols])
@@ -335,6 +346,79 @@ def main():
             summary["steps"]["parse"] = {"status": "failed", "error": str(e)}
             # Don't exit - continue with existing symbols if available
     
+    # ========== Demo Module: Method-Level RAG Pipeline ==========
+    if cfg.demo.enabled:
+        logger.info("=" * 70)
+        logger.info(" Demo Module: Method-Level Understanding & Question Generation")
+        logger.info("=" * 70)
+        
+        try:
+            # Prepare paths
+            method_profiles_jsonl = cfg.demo.method_profiles
+            method_embeddings_jsonl = cfg.demo.method_embeddings
+            questions_jsonl = cfg.demo.questions
+            demo_qa_jsonl = cfg.demo.demo_qa_raw
+            
+            # Load symbols for demo processing
+            symbols_map = load_symbols_map(symbols_jsonl)
+            if not symbols_map:
+                logger.warning("No symbols found for demo module, skipping")
+                summary["steps"]["demo"] = {"status": "skipped", "reason": "no_symbols"}
+            else:
+                # Step D1: Method Understanding
+                logger.info(f"Step D1: Analyzing methods (max: {cfg.demo.max_methods})")
+                understander = DemoMethodUnderstander(cfg)
+                method_profiles = understander.generate_from_symbols(
+                    symbols_map=symbols_map,
+                    repo_commit=repo_commit
+                )
+                logger.info(f"Generated {len(method_profiles)} method profiles")
+                
+                # Step D2: Build Vector Embeddings
+                logger.info(f"Step D2: Building embeddings (model: {cfg.demo.embedding_model})")
+                vector_index.build_embeddings(
+                    profiles_jsonl=method_profiles_jsonl,
+                    embeddings_jsonl=method_embeddings_jsonl,
+                    embedding_model=cfg.demo.embedding_model
+                )
+                logger.info(f"Embeddings saved to {method_embeddings_jsonl.name}")
+                
+                # Step D3: Generate Questions
+                logger.info(f"Step D3: Generating questions ({cfg.demo.questions_per_method} per method)")
+                question_gen = DemoQuestionGenerator(cfg)
+                questions = question_gen.generate_from_profiles(
+                    profiles_jsonl=method_profiles_jsonl,
+                    repo_commit=repo_commit
+                )
+                logger.info(f"Generated {len(questions)} questions")
+                
+                # Step D4: Generate Answers with Vector Retrieval
+                logger.info(f"Step D4: Generating answers (top_k: {cfg.demo.top_k_context})")
+                answer_gen = DemoAnswerGenerator(cfg)
+                qa_samples = answer_gen.generate_from_questions(
+                    questions_jsonl=questions_jsonl,
+                    embeddings_jsonl=method_embeddings_jsonl,
+                    profiles_jsonl=method_profiles_jsonl,
+                    symbols_map=symbols_map,
+                    repo_commit=repo_commit
+                )
+                logger.info(f"Generated {len(qa_samples)} demo QA samples")
+                
+                summary["steps"]["demo"] = {
+                    "status": "success",
+                    "method_profiles": len(method_profiles),
+                    "questions": len(questions),
+                    "qa_samples": len(qa_samples)
+                }
+                
+        except Exception as e:
+            logger.error(f"Demo module failed: {e}", exc_info=True)
+            summary["steps"]["demo"] = {"status": "failed", "error": str(e)}
+            # Continue pipeline even if demo fails
+    else:
+        logger.info("Demo module disabled (demo.enabled=false)")
+        summary["steps"]["demo"] = {"status": "disabled"}
+    
     # ========== Step 2: Generate QA Samples ==========
     if args.skip_llm or args.skip_qa:
         logger.info("Skipping QA generation")
@@ -347,9 +431,7 @@ def main():
         try:
             qa_gen = QAGenerator(cfg)
             qa_samples = qa_gen.generate_from_repo(
-                symbols_jsonl=symbols_jsonl,
-                output_jsonl=qa_raw_jsonl,
-                rejected_jsonl=qa_rejected_jsonl,
+                symbols_path=symbols_jsonl,
                 repo_commit=repo_commit
             )
             
@@ -374,9 +456,7 @@ def main():
         try:
             design_gen = DesignGenerator(cfg)
             design_samples = design_gen.generate_from_repo(
-                symbols_jsonl=symbols_jsonl,
-                output_jsonl=design_raw_jsonl,
-                rejected_jsonl=design_rejected_jsonl,
+                symbols_path=symbols_jsonl,
                 repo_commit=repo_commit
             )
             

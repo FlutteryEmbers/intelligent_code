@@ -17,6 +17,23 @@ from src.engine.llm_client import LLMClient
 logger = get_logger(__name__)
 
 
+def load_prompt_template(template_name: str) -> str:
+    """加载prompt模板文件
+    
+    Args:
+        template_name: 模板文件名（不含路径）
+        
+    Returns:
+        str: 模板内容
+    """
+    template_path = Path(__file__).parent.parent.parent / "configs" / "prompts" / template_name
+    if not template_path.exists():
+        raise FileNotFoundError(f"Prompt template not found: {template_path}")
+    
+    with open(template_path, 'r', encoding='utf-8') as f:
+        return f.read()
+
+
 class QAGenerator:
     """
     问答对生成器
@@ -46,6 +63,10 @@ class QAGenerator:
         """初始化生成器"""
         self.config = config or Config()
         self.llm_client = LLMClient()
+        
+        # 加载prompt模板
+        self.system_prompt_template = load_prompt_template("qa_system_prompt.txt")
+        self.user_prompt_template = load_prompt_template("qa_user_prompt.txt")
         
         # 从配置读取参数
         self.max_context_chars = self.config.get('qa_generator.max_context_chars', 16000)
@@ -365,39 +386,7 @@ class QAGenerator:
     
     def _build_system_prompt(self) -> str:
         """构造 system prompt"""
-        return """你是一位资深的 Java 架构师和代码审查专家。你的任务是分析给定的 Java 方法，从中识别：
-
-1. **业务规则**：方法实现的业务逻辑、约束条件、处理流程
-2. **一致性保证**：事务管理、数据一致性、并发控制等
-3. **错误处理**：异常处理策略、边界条件、容错机制
-4. **架构模式**：使用的设计模式、架构风格（如 REST、事件驱动等）
-
-你必须输出严格的 JSON 格式，包含以下字段：
-
-- `scenario`: 固定为 "qa_rule"
-- `instruction`: 一个关于该方法业务规则或架构设计的问题（50-150字）
-- `context`: 方法的代码片段（直接使用提供的代码）
-- `answer`: 详细的回答，必须包含：
-  - 结论性陈述
-  - 规则/模式说明（条列式）
-  - 风险点或边界条件（条列式）
-- `thought`: 结构化的推理过程，包含：
-  - `observations`: 从代码中观察到的关键事实（数组）
-  - `inferences`: 基于观察的推断（数组）
-  - `evidence_refs`: 证据引用（必须至少 1 个），每个包含：
-    * `symbol_id`: 符号标识
-    * `file_path`: 文件路径
-    * `start_line`: 起始行号（整数）
-    * `end_line`: 结束行号（整数）
-    * `source_hash`: 源码哈希
-  - `assumptions`: 不确定的假设（数组，可为空）
-- `repo_commit`: 仓库提交哈希
-
-**重要约束**：
-- 不要输出自由文本的长篇思考过程（CoT）
-- 所有推理必须结构化为 observations/inferences/assumptions
-- evidence_refs 必须包含完整字段：symbol_id, file_path, start_line, end_line, source_hash
-- 任何不确定的内容放到 assumptions 中"""
+        return self.system_prompt_template
     
     def _build_user_prompt(self, symbol: CodeSymbol, context_desc: str, context_code: str, repo_commit: str) -> str:
         """构造 user prompt"""
@@ -409,47 +398,18 @@ class QAGenerator:
         
         ann_text = "、".join(key_annotations) if key_annotations else "无特殊注解"
         
-        prompt = f"""请分析以下 Java 方法，生成一个关于其业务规则或架构设计的问答对。
-
-{context_desc}
-
-**分析要点**：
-- 该方法使用了注解：{ann_text}
-- 重点关注：事务边界、API 契约、错误处理、业务约束
-
-请生成 JSON 格式的训练样本，包含 scenario、instruction、context、answer、thought 和 repo_commit。
-
-**示例 JSON 结构**：
-```json
-{{
-  "scenario": "qa_rule",
-  "instruction": "该方法如何保证数据一致性？",
-  "context": "@Transactional\\npublic void method() {{ ... }}",
-  "answer": "该方法通过以下机制保证一致性：\\n1. 使用 @Transactional 注解确保原子性\\n2. ...",
-  "thought": {{
-    "observations": ["方法标注了 @Transactional", "..."],
-    "inferences": ["表明该操作需要事务保证", "..."],
-    "evidence_refs": [{{
-      "symbol_id": "{symbol.symbol_id}",
-      "file_path": "{symbol.file_path}",
-      "start_line": {symbol.start_line},
-      "end_line": {symbol.end_line},
-      "source_hash": "{symbol.source_hash}"
-    }}],
-    "assumptions": []
-  }},
-  "repo_commit": "{repo_commit}"
-}}
-```
-
-**注意**：
-1. context 字段应该包含方法的源码（不是描述）
-2. 直接使用这段源码作为 context：
-```
-{context_code}
-```
-
-现在请输出完整的 JSON（不要包含 Markdown 标记）："""
+        # 使用模板并替换变量
+        prompt = self.user_prompt_template.format(
+            context_desc=context_desc,
+            annotations=ann_text,
+            symbol_id=symbol.symbol_id,
+            file_path=symbol.file_path,
+            start_line=symbol.start_line,
+            end_line=symbol.end_line,
+            source_hash=symbol.source_hash,
+            repo_commit=repo_commit,
+            context_code=context_code
+        )
         
         return prompt
     

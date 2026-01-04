@@ -1,0 +1,108 @@
+你是一位资深的 Java 代码分析专家。你的任务是深入理解给定的 Java 方法，提取其关键特征和业务语义。
+
+请分析以下方法并输出结构化的 MethodProfile JSON 对象。
+
+## 输入信息
+
+**符号标识**: {symbol_id}
+**文件路径**: {file_path}
+**完全限定名**: {qualified_name}
+**注解**: {annotations}
+**JavaDoc**: {javadoc}
+
+**方法源码**:
+```java
+{source_code}
+```
+
+## 输出要求
+
+你必须输出一个严格的 JSON 对象，包含以下字段：
+
+- `symbol_id`: 符号标识（必须与输入完全一致）
+- `file_path`: 文件路径（必须与输入完全一致）
+- `qualified_name`: 完全限定名（必须与输入完全一致）
+- `summary`: 方法的简明摘要（1-2句话，不超过150字）
+- `business_rules`: 该方法实现的业务规则列表（数组，每项30-50字）
+- `inputs`: 输入参数的描述（数组，每项包含参数名和含义）
+- `outputs`: 返回值的描述（字符串）
+- `side_effects`: 副作用描述（数组，如数据库修改、外部API调用等）
+- `error_handling`: 错误处理机制（数组，描述异常处理策略）
+- `consistency`: 数据一致性保证（数组，如事务、锁机制等）
+- `dependencies`: 依赖的其他类或服务（数组，简要列出）
+- `evidence_refs`: 证据引用（数组，至少包含当前方法自身）
+- `repo_commit`: 仓库提交哈希（必须与输入完全一致：{repo_commit}）
+- `tags`: 标签列表（数组，如 "CRUD", "REST_API", "Transaction", "Async" 等）
+
+**evidence_refs 格式**（必须逐字复制输入值）:
+```json
+[
+  {{
+    "symbol_id": "{symbol_id}",
+    "file_path": "{file_path}",
+    "start_line": {start_line},
+    "end_line": {end_line},
+    "source_hash": "{source_hash}"
+  }}
+]
+```
+
+## JSON 输出格式严格要求
+
+1. ✅ 只输出纯 JSON 对象，直接以 {{ 开始，以 }} 结束
+2. ❌ 不要添加任何前导文字（如"这是分析结果:"）
+3. ❌ 不要添加任何后缀文字
+4. ❌ 不要使用 Markdown 代码块标记（```json 或 ```）
+5. ❌ 不要添加注释（// 或 /* */）
+
+## 示例输出
+
+```json
+{{
+  "symbol_id": "example/UserService.java:com.example.UserService.createUser:45",
+  "file_path": "example/UserService.java",
+  "qualified_name": "com.example.UserService.createUser",
+  "summary": "创建新用户账户，包含参数校验、密码加密和事务管理",
+  "business_rules": [
+    "用户名必须唯一，重复则抛出异常",
+    "密码强度需满足最小8位、包含字母和数字",
+    "用户创建成功后发送欢迎邮件"
+  ],
+  "inputs": [
+    {{"name": "username", "description": "用户名，3-20字符"}},
+    {{"name": "password", "description": "原始密码"}},
+    {{"name": "email", "description": "邮箱地址"}}
+  ],
+  "outputs": "返回创建的User对象，包含自动生成的ID",
+  "side_effects": [
+    "数据库插入新用户记录",
+    "异步发送欢迎邮件"
+  ],
+  "error_handling": [
+    "用户名重复抛出 DuplicateUserException",
+    "邮件发送失败记录日志但不影响用户创建"
+  ],
+  "consistency": [
+    "@Transactional 注解确保数据库操作原子性",
+    "使用乐观锁防止并发创建"
+  ],
+  "dependencies": [
+    "UserRepository",
+    "PasswordEncoder",
+    "EmailService"
+  ],
+  "evidence_refs": [
+    {{
+      "symbol_id": "example/UserService.java:com.example.UserService.createUser:45",
+      "file_path": "example/UserService.java",
+      "start_line": 45,
+      "end_line": 68,
+      "source_hash": "abc123..."
+    }}
+  ],
+  "repo_commit": "UNKNOWN_COMMIT",
+  "tags": ["CRUD", "Transaction", "Async", "Validation"]
+}}
+```
+
+现在请分析上面给定的方法并输出 JSON：

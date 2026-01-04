@@ -17,6 +17,23 @@ from src.engine.llm_client import LLMClient
 logger = get_logger(__name__)
 
 
+def load_prompt_template(template_name: str) -> str:
+    """加载prompt模板文件
+    
+    Args:
+        template_name: 模板文件名（不含路径）
+        
+    Returns:
+        str: 模板内容
+    """
+    template_path = Path(__file__).parent.parent.parent / "configs" / "prompts" / template_name
+    if not template_path.exists():
+        raise FileNotFoundError(f"Prompt template not found: {template_path}")
+    
+    with open(template_path, 'r', encoding='utf-8') as f:
+        return f.read()
+
+
 class Requirement:
     """需求模型"""
     def __init__(
@@ -174,6 +191,10 @@ class DesignGenerator:
         """初始化生成器"""
         self.config = config or Config()
         self.llm_client = LLMClient()
+        
+        # 加载prompt模板
+        self.system_prompt_template = load_prompt_template("design_system_prompt.txt")
+        self.user_prompt_template = load_prompt_template("design_user_prompt.txt")
         
         # 从配置读取参数
         self.top_k_context = self.config.get('design_generator.top_k_context', 6)
@@ -588,43 +609,7 @@ class DesignGenerator:
     
     def _build_system_prompt(self) -> str:
         """构造 system prompt"""
-        return """你是一位经验丰富的系统架构师和技术负责人。你的任务是基于现有的 Java 代码架构，为给定的需求设计技术实现方案。
-
-你必须输出严格的 JSON 格式，包含以下字段：
-
-- `scenario`: 固定为 "arch_design"
-- `instruction`: 需求的简要描述（从 goal 提取）
-- `context`: 相关代码上下文（直接使用提供的代码）
-- `answer`: 详细的设计方案，必须包含以下章节：
-  1. **现状画像**：当前架构的关键特征、技术栈、已有能力
-  2. **方案概述**：整体设计思路、核心技术选型、架构变更
-  3. **接口与数据变更**：新增/修改的接口、数据结构、配置项
-  4. **迁移与回滚**：灰度策略、数据迁移方案、回滚预案
-  5. **测试计划**：单元测试、集成测试、性能测试要点
-  6. **风险与权衡**：技术风险、复杂度评估、可能的问题
-- `thought`: 结构化的推理过程，包含：
-  - `observations`: 从现有代码中观察到的事实（数组）
-  - `inferences`: 基于观察的设计推断（数组）
-  - `evidence_refs`: 证据引用（必须至少 2 个：Controller 入口 + Service 核心逻辑），每个包含：
-    * `symbol_id`: 符号标识
-    * `file_path`: 文件路径
-    * `start_line`: 起始行号（整数）
-    * `end_line`: 结束行号（整数）
-    * `source_hash`: 源码哈希
-  - `assumptions`: 设计假设或待验证的点（数组）
-- `repo_commit`: 仓库提交哈希
-
-**设计原则**：
-1. 充分复用现有架构和代码
-2. 最小化改动范围，降低风险
-3. 考虑性能、可维护性、可扩展性
-4. 提供清晰的实施路径
-
-**重要约束**：
-- 不要输出自由文本的长篇思考过程（CoT）
-- 所有推理必须结构化为 observations/inferences/assumptions
-- evidence_refs 必须包含完整字段：symbol_id, file_path, start_line, end_line, source_hash
-- answer 必须严格按照 6 个章节组织"""
+        return self.system_prompt_template
     
     def _build_user_prompt(
         self,
@@ -638,60 +623,22 @@ class DesignGenerator:
         controller_symbol = next((s for s in symbols if self._is_controller(s)), symbols[0])
         service_symbol = next((s for s in symbols if self._is_service(s)), symbols[0] if len(symbols) > 0 else None)
         
-        prompt = f"""请基于现有架构，为以下需求设计技术实现方案。
-
-# 需求详情
-
-**需求ID**: {requirement.id}
-
-**目标**: {requirement.goal}
-
-**约束条件**:
-{chr(10).join([f'- {c}' for c in requirement.constraints])}
-
-**验收标准**:
-{chr(10).join([f'- {a}' for a in requirement.acceptance_criteria])}
-
-**非目标**:
-{chr(10).join([f'- {n}' for n in requirement.non_goals])}
-
-# 现有代码架构
-
-{context}
-
-# 输出要求
-
-请生成 JSON 格式的设计方案，包含 scenario、instruction、context、answer、thought 和 repo_commit。
-
-**示例 JSON 结构**：
-```json
-{{
-  "scenario": "arch_design",
-  "instruction": "{requirement.goal[:50]}...",
-  "context": "// 现有代码上下文\\n...",
-  "answer": "## 1. 现状画像\\n当前系统采用 Spring Boot + MyBatis 架构...\\n\\n## 2. 方案概述\\n引入 Redis 作为缓存层...\\n\\n## 3. 接口与数据变更\\n- 新增配置：redis.host...\\n\\n## 4. 迁移与回滚\\n采用灰度发布...\\n\\n## 5. 测试计划\\n- 单元测试...\\n\\n## 6. 风险与权衡\\n- 缓存一致性风险...",
-  "thought": {{
-    "observations": [
-      "现有系统使用 {controller_symbol.qualified_name} 作为入口",
-      "业务逻辑在 {service_symbol.qualified_name if service_symbol else 'Service'} 层处理",
-      "..."
-    ],
-    "inferences": [
-      "可以在 Service 层添加缓存切面",
-      "需要引入 RedisTemplate 依赖",
-      "..."
-    ],
-    "evidence_refs": [
-      {{
-        "symbol_id": "{controller_symbol.symbol_id}",
-        "file_path": "{controller_symbol.file_path}",
-        "start_line": {controller_symbol.start_line},
-        "end_line": {controller_symbol.end_line},
-        "source_hash": "{controller_symbol.source_hash}"
-      }}"""
+        # 准备约束条件、验收标准和非目标的格式化文本
+        constraints_text = '\n'.join([f'- {c}' for c in requirement.constraints])
+        acceptance_criteria_text = '\n'.join([f'- {a}' for a in requirement.acceptance_criteria])
+        non_goals_text = '\n'.join([f'- {n}' for n in requirement.non_goals])
         
+        # 准备service evidence文本
         if service_symbol:
-            prompt += f""",
+            service_evidence = f"""
+Service 核心逻辑：
+- symbol_id: "{service_symbol.symbol_id}"
+- file_path: "{service_symbol.file_path}"
+- start_line: {service_symbol.start_line}
+- end_line: {service_symbol.end_line}
+- source_hash: "{service_symbol.source_hash}"
+"""
+            service_evidence_json = f""",
       {{
         "symbol_id": "{service_symbol.symbol_id}",
         "file_path": "{service_symbol.file_path}",
@@ -699,21 +646,28 @@ class DesignGenerator:
         "end_line": {service_symbol.end_line},
         "source_hash": "{service_symbol.source_hash}"
       }}"""
+        else:
+            service_evidence = ""
+            service_evidence_json = ""
         
-        prompt += f"""
-    ],
-    "assumptions": [
-      "假设 Redis 已部署并可用",
-      "假设团队熟悉 Spring Cache 注解"
-    ]
-  }},
-  "repo_commit": "{repo_commit}"
-}}
-```
-
-**注意**：context 字段应该包含相关代码片段的精简版本。
-
-现在请输出完整的 JSON（不要包含 Markdown 标记）："""
+        # 使用模板并替换变量
+        prompt = self.user_prompt_template.format(
+            requirement_id=requirement.id,
+            goal=requirement.goal,
+            constraints=constraints_text,
+            acceptance_criteria=acceptance_criteria_text,
+            non_goals=non_goals_text,
+            context=context,
+            controller_symbol_id=controller_symbol.symbol_id,
+            controller_file_path=controller_symbol.file_path,
+            controller_start_line=controller_symbol.start_line,
+            controller_end_line=controller_symbol.end_line,
+            controller_source_hash=controller_symbol.source_hash,
+            service_evidence=service_evidence,
+            service_evidence_json=service_evidence_json,
+            goal_short=requirement.goal[:50] + "..." if len(requirement.goal) > 50 else requirement.goal,
+            repo_commit=repo_commit
+        )
         
         return prompt
     

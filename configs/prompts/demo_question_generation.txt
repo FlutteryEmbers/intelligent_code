@@ -1,0 +1,124 @@
+你是一位资深的业务分析师和技术培训专家。你的任务是基于给定方法的深度理解（MethodProfile），生成多样化的业务问题，用于训练代码理解模型。
+
+## 输入信息
+
+**Method Profile**:
+```json
+{method_profile}
+```
+
+**方法源码**:
+```java
+{source_code}
+```
+
+## 任务要求
+
+生成 **恰好 {questions_per_method} 个** 业务问题，要求：
+
+1. **多样化**: 覆盖不同的问题类型（见下方类型说明）
+2. **针对性**: 每个问题必须针对该方法的具体特征
+3. **深度**: 不要问"这个方法做什么"这种浅层问题
+4. **业务视角**: 关注业务规则、架构设计、风险控制等
+
+## 问题类型（每次生成时尽量覆盖多种）
+
+- `business_rule`: 业务规则和约束条件
+- `consistency`: 数据一致性和事务管理
+- `error_handling`: 异常处理和容错机制
+- `performance`: 性能优化和资源管理
+- `security`: 安全性和权限控制
+- `architecture`: 架构设计和模式使用
+- `integration`: 外部集成和依赖管理
+- `testing`: 测试策略和可测试性
+- `maintenance`: 可维护性和代码质量
+
+## 难度级别
+
+- `easy`: 初级开发者可回答（基础概念）
+- `medium`: 中级开发者可回答（需要一定经验）
+- `hard`: 高级开发者/架构师可回答（深度理解）
+
+## 输出格式
+
+你必须输出一个 JSON 对象，包含 `questions` 数组（长度恰好为 {questions_per_method}）：
+
+```json
+{{
+  "questions": [
+    {{
+      "question": "该方法如何保证用户创建操作的原子性和数据一致性？",
+      "question_type": "consistency",
+      "difficulty": "medium",
+      "evidence_refs": [
+        {{
+          "symbol_id": "{symbol_id}",
+          "file_path": "{file_path}",
+          "start_line": {start_line},
+          "end_line": {end_line},
+          "source_hash": "{source_hash}"
+        }}
+      ],
+      "repo_commit": "{repo_commit}"
+    }},
+    ...
+  ]
+}}
+```
+
+## JSON 输出格式严格要求
+
+1. ✅ 只输出纯 JSON 对象，直接以 {{ 开始，以 }} 结束
+2. ❌ 不要添加任何前导文字或后缀文字
+3. ❌ 不要使用 Markdown 代码块标记（```json 或 ```）
+4. ❌ 不要添加注释
+5. ✅ questions 数组长度必须恰好等于 {questions_per_method}
+6. ✅ 每个问题的 evidence_refs 必须逐字复制上面提供的值
+
+## 问题生成示例
+
+假设 questions_per_method = 5，生成的问题应该类似：
+
+```json
+{{
+  "questions": [
+    {{
+      "question": "该方法的事务边界如何定义？在什么情况下会回滚？",
+      "question_type": "consistency",
+      "difficulty": "medium",
+      "evidence_refs": [{{ "symbol_id": "...", ... }}],
+      "repo_commit": "..."
+    }},
+    {{
+      "question": "该方法如何处理用户名重复的情况？异常处理策略是什么？",
+      "question_type": "error_handling",
+      "difficulty": "easy",
+      "evidence_refs": [{{ "symbol_id": "...", ... }}],
+      "repo_commit": "..."
+    }},
+    {{
+      "question": "邮件发送失败是否会影响用户创建？如何保证核心功能的可靠性？",
+      "question_type": "error_handling",
+      "difficulty": "medium",
+      "evidence_refs": [{{ "symbol_id": "...", ... }}],
+      "repo_commit": "..."
+    }},
+    {{
+      "question": "该方法依赖了哪些外部服务？如何管理这些依赖的生命周期？",
+      "question_type": "integration",
+      "difficulty": "medium",
+      "evidence_refs": [{{ "symbol_id": "...", ... }}],
+      "repo_commit": "..."
+    }},
+    {{
+      "question": "如何测试该方法的事务行为和异常分支？需要哪些 mock 策略？",
+      "question_type": "testing",
+      "difficulty": "hard",
+      "evidence_refs": [{{ "symbol_id": "...", ... }}],
+      "repo_commit": "..."
+    }}
+  ]
+}}
+```
+
+现在请为上面给定的方法生成 {questions_per_method} 个问题：
