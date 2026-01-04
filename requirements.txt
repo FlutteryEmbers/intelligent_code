@@ -1,0 +1,62 @@
+# ==================== 核心依赖 ====================
+# Tree-sitter 用于语法树解析
+tree-sitter==0.21.3
+tree-sitter-java==0.21.0
+
+# Pydantic 用于数据验证和模型定义
+pydantic==2.10.4
+
+# YAML 配置文件解析
+pyyaml==6.0.2
+
+# LangChain 用于 LLM 集成
+langchain-openai==0.2.14
+langchain-core==0.3.28
+
+# Ollama Python 客户端
+ollama==0.4.4
+
+# ==================== 推荐的可选依赖 ====================
+# 以下依赖可根据需要安装（去掉注释即可）
+
+# 环境变量管理
+# python-dotenv==1.0.1
+
+# 高性能 JSON 序列化
+# orjson==3.10.12
+
+# 去重和相似度计算（LSH）
+# datasketch==1.6.5
+
+# 进度条显示
+# tqdm==4.67.1
+
+# 更好的日志格式化
+# colorlog==6.9.0
+
+# 数据分析（用于质量分析）
+# pandas==2.2.3
+# numpy==2.2.1
+
+# 代码格式化（用于生成的代码片段）
+# black==24.10.0
+
+# Git 操作（获取 commit hash）
+# gitpython==3.1.43
+
+# HTTP 请求（如果需要从远程获取数据）
+# httpx==0.28.1
+# requests==2.32.3
+
+# ==================== 开发依赖 ====================
+# 以下是开发时使用的工具（可选）
+
+# 测试框架
+# pytest==8.3.4
+# pytest-cov==6.0.0
+
+# 类型检查
+# mypy==1.13.0
+
+# Linting
+# ruff==0.8.4

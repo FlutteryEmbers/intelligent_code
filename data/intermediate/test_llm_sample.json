@@ -1,0 +1,36 @@
+{
+  "scenario": "qa_rule",
+  "instruction": "这个 Calculator 类提供了哪些数学运算功能？",
+  "context": "public class Calculator {\n    /**\n     * 计算两个整数的和\n     */\n    public int add(int a, int b) {\n        return a + b;\n    }\n\n    /**\n     * 计算两个整数的差\n     */\n    public int subtract(int a, int b) {\n        return a - b;\n    }\n}",
+  "thought": {
+    "observations": [
+      "类中包含 add 方法，用于计算两个整数的和",
+      "类中包含 subtract 方法，用于计算两个整数的差"
+    ],
+    "inferences": [
+      "Calculator 类提供了加法和减法运算功能"
+    ],
+    "evidence_refs": [
+      {
+        "symbol_id": "add",
+        "file_path": "Calculator.java",
+        "start_line": 3,
+        "end_line": 6,
+        "source_hash": "3a4b5c"
+      },
+      {
+        "symbol_id": "subtract",
+        "file_path": "Calculator.java",
+        "start_line": 7,
+        "end_line": 10,
+        "source_hash": "d9e0f1"
+      }
+    ],
+    "assumptions": []
+  },
+  "answer": "这个 Calculator 类提供了加法和减法运算功能，具体包括两个方法：add 方法用于计算两个整数的和；subtract 方法用于计算两个整数的差。",
+  "repo_commit": "123456",
+  "quality": {},
+  "created_at": "2026-01-03T20:45:29.344659+00:00",
+  "sample_id": "73e3a7e599d664b0"
+}

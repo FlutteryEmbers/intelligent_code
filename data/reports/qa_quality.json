@@ -1,0 +1,16 @@
+{
+  "input_file": "data\\intermediate\\qa_raw.jsonl",
+  "symbols_count": 162,
+  "validation_stats": {
+    "total": 5,
+    "passed": 5,
+    "failed": 0,
+    "pass_rate": 1.0
+  },
+  "top_failures": [],
+  "top_warnings": [],
+  "output_files": {
+    "rejected": "data\\intermediate\\qa_validation_rejected.jsonl",
+    "report": "data\\reports\\qa_quality.json"
+  }
+}

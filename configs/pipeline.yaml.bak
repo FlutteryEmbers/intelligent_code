@@ -1,0 +1,108 @@
+# 管道配置文件 - 基于本地 Java 代码仓生成 Qwen2.5 微调训练数据
+
+# ==================== 代码仓库配置 ====================
+repo:
+  path: "./repos/java"  # Java 代码仓库路径（需修改为实际路径）
+  branch: "main"                   # 默认分支
+  commit: ""                       # 留空则自动获取最新 commit
+
+# ==================== 解析配置 ====================
+parser:
+  type: "java"                     # 解析器类型
+  max_chars_per_symbol: 12000      # 单个符号最大字符数（增大以保留更多上下文）
+  include_private: false           # 是否包含私有成员
+  ignore_paths:                    # 忽略的路径模式
+    - "test"
+    - "tests"
+    - ".git"
+    - "target"
+    - "build"
+    - "node_modules"
+    - ".idea"
+    - ".vscode"
+  file_extensions:                 # 要解析的文件扩展名
+    - ".java"
+
+# ==================== 数据生成配置 ====================
+generation:
+  batch_size: 10                   # 每批次处理的符号数量
+  top_k_context: 5                 # 为每个样本选择的上下文数量
+  scenarios:                       # 启用的场景
+    - "qa_rule"
+    - "arch_design"
+  
+  # 场景权重（用于采样）
+  scenario_weights:
+    qa_rule: 0.6
+    arch_design: 0.4
+
+# ==================== QA 生成器配置（场景 1）====================
+qa_generator:
+  max_context_chars: 16000         # 单个上下文最大字符数
+  batch_size: 5                    # 批处理大小（每批同时生成的样本数）
+  max_samples: 50                  # 最大生成样本数（限制总数，避免成本过高）
+  priority_annotations:            # 高优先级注解
+    - "Transactional"
+    - "GetMapping"
+    - "PostMapping"
+    - "RequestMapping"
+    - "Service"
+    - "RestController"
+
+# ==================== 架构设计生成器配置（场景 2）====================
+design_generator:
+  top_k_context: 6                 # RAG 检索返回的 top-k 上下文数量
+  max_context_chars: 20000         # 单个上下文最大字符数
+  max_samples: 10                  # 最大生成样本数（内置需求数量）
+  require_min_evidence: 2          # 最少证据引用数量
+
+# ==================== LLM 配置 ====================
+llm:
+  provider: "ollama"               # LLM 提供商：ollama / openai
+  base_url: "http://localhost:11434/v1"  # Ollama 服务地址（OpenAI 兼容端点）
+  model: "qwen2.5:7b"  # 模型名称
+  temperature: 0.7                 # 温度参数
+  max_tokens: 2000                 # 最大生成 token 数
+  timeout: 60                      # 请求超时（秒）
+
+# ==================== 输出目录配置 ====================
+output:
+  raw_extracted: "data/raw/extracted"          # 解析后的原始符号
+  raw_repo_meta: "data/raw/repo_meta"          # 仓库元数据
+  intermediate: "data/intermediate"             # 中间处理结果
+  final: "data/final"                           # 最终训练数据
+  reports: "data/reports"                       # 解析报告和统计
+
+# ==================== 质量控制配置 ====================
+quality:
+  min_instruction_length: 10       # 指令最小字符数
+  min_answer_length: 20            # 答案最小字符数
+  max_answer_length: 2000          # 答案最大字符数
+  enable_deduplication: true       # 是否启用去重
+  deduplication_threshold: 0.85    # 去重相似度阈值
+
+# ==================== 安全与合规配置 ====================
+safety:
+  mode: "drop"                     # 敏感信息处理模式：drop (丢弃) / sanitize (脱敏)
+  scan_enabled: true               # 是否启用 secrets 扫描
+
+# ==================== 数据集切分配置 ====================
+split:
+  train_ratio: 0.8                 # 训练集比例
+  val_ratio: 0.1                   # 验证集比例
+  test_ratio: 0.1                  # 测试集比例
+  group_by: "package"              # 分组策略：package / path
+  seed: 42                         # 随机种子
+
+# ==================== 日志配置 ====================
+logging:
+  level: "INFO"                    # 日志级别：DEBUG / INFO / WARNING / ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/pipeline.log"        # 日志文件路径
+
+# ==================== 高级配置 ====================
+advanced:
+  enable_cache: true               # 是否启用缓存
+  cache_dir: ".cache"              # 缓存目录
+  parallel_workers: 4              # 并行工作进程数
+  checkpoint_interval: 100         # 每处理多少个样本保存一次检查点
