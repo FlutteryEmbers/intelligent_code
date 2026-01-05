@@ -24,7 +24,12 @@ class MergeStep(BaseStep):
         auto_config = self.config.get("auto", {})
         if auto_config.get("enabled", False):
             auto_outputs = auto_config.get("outputs", {})
-            qa_path = self.paths["intermediate"] / auto_outputs.get("auto_qa_raw_jsonl", "auto_qa_raw.jsonl")
+            # Extract filename from path (in case outputs contains full path)
+            qa_filename = auto_outputs.get("auto_qa_raw_jsonl", "auto_qa_raw.jsonl")
+            if "/" in qa_filename or "\\" in qa_filename:
+                # If full path provided, extract just the filename
+                qa_filename = qa_filename.split("/")[-1].split("\\")[-1]
+            qa_path = self.paths["intermediate"] / qa_filename
             self.logger.info(f"Using auto QA from {qa_path.name}")
         else:
             qa_path = self.paths["qa_raw_jsonl"]

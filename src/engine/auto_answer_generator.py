@@ -10,6 +10,7 @@ from typing import List
 from src.utils.schemas import QuestionSample, TrainingSample, CodeSymbol, EvidenceRef, ReasoningTrace
 from src.utils.config import Config
 from src.utils.logger import get_logger
+from src.utils.language_profile import load_language_profile
 from src.utils import vector_index
 from src.engine.llm_client import LLMClient
 
@@ -33,6 +34,11 @@ class AutoAnswerGenerator:
         """初始化"""
         self.config = config or Config()
         self.llm_client = LLMClient()
+        
+        # Load language profile
+        self.profile = load_language_profile(config=self.config)
+        self.language = self.profile.language
+        logger.info(f"Loaded language profile: {self.language}")
         
         # 从配置读取参数
         self.top_k_context = self.config.get('auto.top_k_context', 6)
@@ -192,16 +198,27 @@ class AutoAnswerGenerator:
         # 3. 格式化可用证据引用
         available_evidence_text = json.dumps(available_evidence, indent=2, ensure_ascii=False)
         
-        # 4. 构造 prompt
+        # 4. 从language profile获取格式约束
+        answer_gen_config = self.profile.get('answer_generation', {})
+        format_constraints = answer_gen_config.get('format_constraints', '')
+        
+        # 5. 格式化常见错误示例
+        common_mistakes = answer_gen_config.get('common_mistakes', [])
+        mistakes_text = self._format_common_mistakes(common_mistakes)
+        
+        # 6. 构造 prompt
         prompt = self.prompt_template.format(
             question=question.question,
             context=context,
             available_evidence_refs=available_evidence_text,
-            repo_commit=question.repo_commit
+            repo_commit=question.repo_commit,
+            format_constraints=format_constraints,
+            common_mistakes_examples=mistakes_text
         )
         
-        # 5. 调用 LLM
-        system_prompt = "你是一位资深的 Java 架构师和代码审查专家，擅长基于代码证据进行深度分析。"
+        # 7. 调用 LLM
+        language_display = self.language.capitalize()
+        system_prompt = f"你是一位资深的 {language_display} 架构师和代码审查专家，擅长基于代码证据进行深度分析。"
         
         try:
             response = self.llm_client.llm.invoke([
@@ -239,6 +256,26 @@ class AutoAnswerGenerator:
         except Exception as e:
             logger.error(f"LLM call failed: {e}")
             raise
+    
+    def _format_common_mistakes(self, mistakes: list) -> str:
+        """格式化常见错误示例"""
+        if not mistakes:
+            return ""
+        
+        parts = []
+        for i, mistake in enumerate(mistakes, 1):
+            parts.append(f"### 错误 {i}: {mistake.get('description', '')}")
+            parts.append("\n❌ **错误示例**:")
+            parts.append("```json")
+            parts.append(mistake.get('wrong', ''))
+            parts.append("```")
+            parts.append("\n✅ **正确示例**:")
+            parts.append("```json")
+            parts.append(mistake.get('correct', ''))
+            parts.append("```")
+            parts.append("")
+        
+        return "\n".join(parts)
     
     def _clean_json_output(self, output: str) -> str:
         """清理 LLM 输出，提取纯 JSON"""

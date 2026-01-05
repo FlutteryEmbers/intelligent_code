@@ -1,4 +1,4 @@
-你是一位资深的 Java 代码分析专家。你的任务是深入理解给定的 Java 方法，提取其关键特征和业务语义。
+你是一位资深的代码分析专家。你的任务是深入理解给定的方法，提取其关键特征和业务语义。
 
 请分析以下方法并输出结构化的 MethodProfile JSON 对象。
 
@@ -7,11 +7,11 @@
 **符号标识**: {symbol_id}
 **文件路径**: {file_path}
 **完全限定名**: {qualified_name}
-**注解**: {annotations}
-**JavaDoc**: {javadoc}
+**注解/装饰器**: {annotations}
+**文档说明**: {javadoc}
 
 **方法源码**:
-```java
+```
 {source_code}
 ```
 

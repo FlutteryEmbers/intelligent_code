@@ -1,4 +1,4 @@
-你是一位资深的 Java 架构师和代码审查专家。你的任务是基于检索到的相关代码上下文，回答给定的业务问题。
+你是一位资深的代码架构师和代码审查专家。你的任务是基于检索到的相关代码上下文，回答给定的业务问题。
 
 ## 问题
 
@@ -13,6 +13,12 @@
 以下是检索到的方法的精确引用信息，你的回答中的 evidence_refs 必须从这些中选择：
 
 {available_evidence_refs}
+
+{format_constraints}
+
+## 常见错误和正确示例
+
+{common_mistakes_examples}
 
 ## 输出要求
 
@@ -52,23 +58,22 @@
 {{
   "scenario": "qa_rule",
   "instruction": "该方法的事务边界如何定义？在什么情况下会回滚？",
-  "context": "@Transactional\\npublic User createUser(...) {{\\n  ...\\n}}",
-  "answer": "该方法通过 @Transactional 注解定义事务边界，具体机制如下：\\n\\n1. **事务范围**: 方法执行期间所有数据库操作都在同一事务内\\n2. **回滚条件**: 遇到 RuntimeException 或 Error 时自动回滚\\n3. **提交时机**: 方法正常返回时提交事务\\n\\n注意事项：\\n- 检查型异常（checked exception）默认不会触发回滚，需显式配置\\n- 事务传播级别为默认 REQUIRED",
+  "context": "def create_user(...):\\n    # Database transaction logic\\n    ...",
+  "answer": "该方法的事务处理机制如下：\\n\\n1. **事务范围**: 方法执行期间所有数据库操作都在同一事务内\\n2. **回滚条件**: 遇到异常时自动回滚\\n3. **提交时机**: 方法正常返回时提交事务\\n\\n注意事项：\\n- 需要确保数据库连接配置正确\\n- 事务隔离级别应根据业务需求设置",
   "thought": {{
     "observations": [
-      "方法标注了 @Transactional 注解",
-      "方法内包含数据库插入操作",
-      "使用了 UserRepository.save() 方法",
-      "没有显式配置 rollbackFor 属性"
+      "方法包含数据库操作",
+      "方法内使用了save()等持久化方法",
+      "没有显式的异常处理"
     ],
     "inferences": [
-      "采用 Spring 默认的事务管理策略",
-      "RuntimeException 会触发回滚，checked exception 不会"
+      "使用框架默认的事务管理策略",
+      "异常会触发事务回滚"
     ],
     "evidence_refs": [
       {{
-        "symbol_id": "example/UserService.java:com.example.UserService.createUser:45",
-        "file_path": "example/UserService.java",
+        "symbol_id": "example/service.py:ServiceClass.create_user:45",
+        "file_path": "example/service.py",
         "start_line": 45,
         "end_line": 68,
         "source_hash": "abc123..."

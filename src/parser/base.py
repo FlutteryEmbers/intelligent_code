@@ -23,6 +23,7 @@ class BaseParser(ABC):
                    解析配置会从language profile中自动加载
         """
         from src.utils.language_profile import load_language_profile
+        from src.utils.config import Config as ConfigClass
         
         self.config = config or {}
         
@@ -38,14 +39,17 @@ class BaseParser(ABC):
         self.include_test = parsing_config.get('include_test', False)
         
         # Allow pipeline.yaml to override (for project-specific customization)
-        if 'parser' in self.config:
-            parser_override = self.config['parser']
+        # Handle both dict and Config object
+        config_dict = self.config._config if isinstance(self.config, ConfigClass) else self.config
+        
+        if 'parser' in config_dict:
+            parser_override = config_dict['parser']
             self.max_chars_per_symbol = parser_override.get('max_chars_per_symbol', self.max_chars_per_symbol)
             self.include_private = parser_override.get('include_private', self.include_private)
             self.include_test = parser_override.get('include_test', self.include_test)
         
-        if 'filter' in self.config:
-            filter_override = self.config['filter']
+        if 'filter' in config_dict:
+            filter_override = config_dict['filter']
             if 'ignore_paths' in filter_override:
                 # Merge ignore paths (profile + pipeline override)
                 self.ignore_paths = list(set(self.ignore_paths + filter_override['ignore_paths']))

@@ -13,6 +13,7 @@ from typing import Generator
 from src.utils.schemas import CodeSymbol
 from src.utils.config import Config
 from src.utils.logger import get_logger
+from src.utils.language_profile import load_language_profile
 from src.engine.llm_client import LLMClient
 
 logger = get_logger(__name__)
@@ -44,20 +45,13 @@ class RequirementGenerator:
     4. 归一化字段，尽量保留有效结果
     """
 
-    # 架构层级注解
-    CONTROLLER_ANNOTATIONS = {'RestController', 'Controller'}
-    SERVICE_ANNOTATIONS = {'Service', 'Component'}
-    REPOSITORY_ANNOTATIONS = {'Repository'}
-
-    # 架构层级关键词
-    CONTROLLER_KEYWORDS = ['controller', 'endpoint', 'api', 'rest']
-    SERVICE_KEYWORDS = ['service', 'manager', 'handler']
-    REPOSITORY_KEYWORDS = ['repository', 'dao', 'mapper']
-
     def __init__(self, config: Config | None = None):
         """初始化生成器"""
         self.config = config or Config()
         self.llm_client = LLMClient()
+        
+        # Load language profile for layer rules
+        self.language_profile = load_language_profile(self.config)
 
         # 加载 prompt 模板
         prompt_path = self.config.get(
@@ -275,20 +269,36 @@ class RequirementGenerator:
         return symbols
 
     def _filter_candidates(self, symbols: list[CodeSymbol]) -> list[CodeSymbol]:
+        """Filter candidate symbols using language profile rules"""
         candidates = []
+        
+        # Collect all layer rules
+        design_layers = self.language_profile.get('design', {}).get('layers', {})
+        all_annotations = set()
+        all_decorators = set()
+        all_keywords = []
+        
+        for layer_name in ['controller', 'service', 'repository']:
+            layer_rules = design_layers.get(layer_name, {})
+            all_annotations.update(layer_rules.get('annotations', []))
+            all_decorators.update(layer_rules.get('decorators', []))
+            all_keywords.extend(layer_rules.get('name_keywords', []))
+            all_keywords.extend(layer_rules.get('path_keywords', []))
+        
         for symbol in symbols:
             if symbol.symbol_type != 'method':
                 continue
 
             annotations = {ann.name for ann in symbol.annotations}
-            if annotations & (self.CONTROLLER_ANNOTATIONS | self.SERVICE_ANNOTATIONS | self.REPOSITORY_ANNOTATIONS):
+            # Check both annotations (Java) and decorators (Python)
+            if annotations & (all_annotations | all_decorators):
                 candidates.append(symbol)
                 continue
 
+            # Check keywords in path and qualified name
             path_lower = symbol.file_path.lower()
             qualified_lower = symbol.qualified_name.lower()
-            if any(kw in path_lower or kw in qualified_lower for kw in
-                   self.CONTROLLER_KEYWORDS + self.SERVICE_KEYWORDS + self.REPOSITORY_KEYWORDS):
+            if any(kw in path_lower or kw in qualified_lower for kw in all_keywords):
                 candidates.append(symbol)
 
         return candidates
@@ -322,34 +332,71 @@ class RequirementGenerator:
         return selected[:k]
 
     def _is_controller(self, symbol: CodeSymbol) -> bool:
+        """Check if symbol is a controller using language profile rules"""
+        layer_rules = self.language_profile.get('design', {}).get('layers', {}).get('controller', {})
+        
+        # Check annotations (Java) or decorators (Python)
         annotations = {ann.name for ann in symbol.annotations}
-        if annotations & self.CONTROLLER_ANNOTATIONS:
+        if annotations & set(layer_rules.get('annotations', [])):
             return True
+        if annotations & set(layer_rules.get('decorators', [])):
+            return True
+        
+        # Check name and path keywords
         path_lower = symbol.file_path.lower()
         name_lower = symbol.qualified_name.lower()
-        return any(kw in path_lower or kw in name_lower for kw in self.CONTROLLER_KEYWORDS)
+        name_keywords = layer_rules.get('name_keywords', [])
+        path_keywords = layer_rules.get('path_keywords', [])
+        
+        return any(kw in name_lower for kw in name_keywords) or any(kw in path_lower for kw in path_keywords)
 
     def _is_service(self, symbol: CodeSymbol) -> bool:
+        """Check if symbol is a service using language profile rules"""
+        layer_rules = self.language_profile.get('design', {}).get('layers', {}).get('service', {})
+        
+        # Check annotations (Java) or decorators (Python)
         annotations = {ann.name for ann in symbol.annotations}
-        if annotations & self.SERVICE_ANNOTATIONS:
+        if annotations & set(layer_rules.get('annotations', [])):
             return True
+        if annotations & set(layer_rules.get('decorators', [])):
+            return True
+        
+        # Check name and path keywords
         path_lower = symbol.file_path.lower()
         name_lower = symbol.qualified_name.lower()
-        return any(kw in path_lower or kw in name_lower for kw in self.SERVICE_KEYWORDS)
+        name_keywords = layer_rules.get('name_keywords', [])
+        path_keywords = layer_rules.get('path_keywords', [])
+        
+        return any(kw in name_lower for kw in name_keywords) or any(kw in path_lower for kw in path_keywords)
 
     def _is_repository(self, symbol: CodeSymbol) -> bool:
+        """Check if symbol is a repository using language profile rules"""
+        layer_rules = self.language_profile.get('design', {}).get('layers', {}).get('repository', {})
+        
+        # Check annotations (Java) or decorators (Python)
         annotations = {ann.name for ann in symbol.annotations}
-        if annotations & self.REPOSITORY_ANNOTATIONS:
+        if annotations & set(layer_rules.get('annotations', [])):
             return True
+        if annotations & set(layer_rules.get('decorators', [])):
+            return True
+        
+        # Check name and path keywords
         path_lower = symbol.file_path.lower()
         name_lower = symbol.qualified_name.lower()
-        return any(kw in path_lower or kw in name_lower for kw in self.REPOSITORY_KEYWORDS)
+        name_keywords = layer_rules.get('name_keywords', [])
+        path_keywords = layer_rules.get('path_keywords', [])
+        
+        return any(kw in name_lower for kw in name_keywords) or any(kw in path_lower for kw in path_keywords)
 
     def _build_context(self, symbols: list[CodeSymbol]) -> str:
+        """Build context string with language-specific code blocks"""
         parts = []
         controllers = [s for s in symbols if self._is_controller(s)]
         services = [s for s in symbols if self._is_service(s)]
         repositories = [s for s in symbols if self._is_repository(s)]
+        
+        # Get language name for code blocks
+        language_name = self.language_profile.get('language', 'java')
 
         if controllers:
             parts.append("# Controller")
@@ -357,7 +404,7 @@ class RequirementGenerator:
                 parts.append(f"\n## {symbol.qualified_name}")
                 if symbol.doc:
                     parts.append(f"Doc: {symbol.doc[:200]}...")
-                parts.append(f"```java\n{symbol.source[:400]}...\n```")
+                parts.append(f"```{language_name}\n{symbol.source[:400]}...\n```")
 
         if services:
             parts.append("\n# Service")
@@ -365,13 +412,13 @@ class RequirementGenerator:
                 parts.append(f"\n## {symbol.qualified_name}")
                 if symbol.doc:
                     parts.append(f"Doc: {symbol.doc[:200]}...")
-                parts.append(f"```java\n{symbol.source[:400]}...\n```")
+                parts.append(f"```{language_name}\n{symbol.source[:400]}...\n```")
 
         if repositories:
             parts.append("\n# Repository")
             for symbol in repositories:
                 parts.append(f"\n## {symbol.qualified_name}")
-                parts.append(f"```java\n{symbol.source[:300]}...\n```")
+                parts.append(f"```{language_name}\n{symbol.source[:300]}...\n```")
 
         context = "\n".join(parts)
         if len(context) > self.max_context_chars:
@@ -436,7 +483,9 @@ class RequirementGenerator:
         return result
 
     def _build_prompt(self, context: str, evidence_pool: str, max_requirements: int) -> str:
+        language_name = self.language_profile.get('language', 'java')
         return self.prompt_template.format(
+            language=language_name.capitalize(),
             max_requirements=max_requirements,
             require_min_evidence=self.require_min_evidence,
             context=context,
@@ -447,8 +496,9 @@ class RequirementGenerator:
         logger.info("Calling LLM to generate requirements...")
         from langchain_core.messages import SystemMessage, HumanMessage
 
+        language_name = self.language_profile.get('language', 'java').capitalize()
         system_prompt = (
-            "You are a software architecture expert. "
+            f"You are a software architecture expert specializing in {language_name} projects. "
             "Return only valid JSON, without markdown or extra text."
         )
         messages = [SystemMessage(content=system_prompt), HumanMessage(content=prompt)]

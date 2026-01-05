@@ -7,7 +7,7 @@
 # ==================== 1. Project & Repository Configuration ====================
 # 项目基本信息和代码仓库配置
 repo:
-  path: "./repos/java/spring-ai"              # Path to Java repository (required)
+  path: "./repos/java/spring-ai"              # Path to Python repository (required)
   commit: ""                        # Git commit hash (empty = auto-detect from git)
 
 # ==================== 2. Global Settings ====================
@@ -158,12 +158,9 @@ safety:
 
 # ==================== Step 8: Export ====================
 # 导出最终数据集
+# Note: system_prompt is now configured in language profiles (configs/language/*.yaml)
 export:
-  system_prompt: |
-    你是一个专业的代码助手，精通 Java 开发和架构设计。
-    你的任务是根据提供的代码上下文，准确回答问题或提供设计方案。
-    你必须基于 evidence（证据）进行推理，确保答案可追溯到具体代码。
-    在回答时，注重实用性和可操作性，避免过于抽象的描述。
+  # No export-specific config needed, uses language profile settings
 
 # ================================================================================================
 # OUTPUT PATHS (输出路径配置)

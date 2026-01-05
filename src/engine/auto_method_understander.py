@@ -11,6 +11,7 @@ from typing import Generator
 from src.utils.schemas import CodeSymbol, MethodProfile, EvidenceRef, sha256_text
 from src.utils.config import Config
 from src.utils.logger import get_logger
+from src.utils.language_profile import load_language_profile
 from src.engine.llm_client import LLMClient
 
 logger = get_logger(__name__)
@@ -29,17 +30,14 @@ def load_prompt_template(template_path: str) -> str:
 class AutoMethodUnderstander:
     """Auto 方法理解器 - 生成 MethodProfile"""
     
-    # 优先业务注解（复用 QAGenerator 的逻辑）
-    BUSINESS_ANNOTATIONS = {
-        'Transactional', 'GetMapping', 'PostMapping', 'PutMapping', 'DeleteMapping',
-        'RequestMapping', 'Service', 'Component', 'Repository', 'RestController',
-        'Controller', 'Scheduled', 'Async',
-    }
-    
     def __init__(self, config: Config | None = None):
         """初始化"""
         self.config = config or Config()
         self.llm_client = LLMClient()
+        
+        # Load language profile for business annotations/decorators
+        self.profile = load_language_profile(config=self.config)
+        logger.info(f"Loaded language profile: {self.profile.language}")
         
         # 从配置读取参数
         self.max_methods = self.config.get('auto.max_methods', 50)
@@ -161,9 +159,14 @@ class AutoMethodUnderstander:
         """计算方法的优先级分数"""
         score = 0
         
-        # 业务注解加分
+        # Get business markers from language profile
+        qa_markers = self.profile.get_qa_markers()
+        business_annotations = set(qa_markers.get('annotations', []))
+        business_decorators = set(qa_markers.get('decorators', []))
+        
+        # 业务注解/装饰器加分
         for ann in symbol.annotations:
-            if ann.name in self.BUSINESS_ANNOTATIONS:
+            if ann.name in business_annotations or ann.name in business_decorators:
                 score += 10
         
         # 有文档加分

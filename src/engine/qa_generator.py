@@ -185,9 +185,9 @@ class QAGenerator:
         选择候选符号
         
         优先级：
-        1. 方法有业务注解（@Transactional, @GetMapping 等）
-        2. 类有业务注解（@Service, @RestController 等）
-        3. 有 JavaDoc 的方法
+        1. 方法有业务注解/装饰器（基于language profile配置）
+        2. 类有业务注解/装饰器
+        3. 有文档字符串的方法
         """
         candidates = []
         
@@ -369,12 +369,13 @@ class QAGenerator:
                 else:
                     parts.append(f"  @{ann.name}")
         
-        # JavaDoc
+        # Documentation
         if symbol.doc:
-            parts.append(f"\nJavaDoc:\n{symbol.doc}")
+            parts.append(f"\n文档说明:\n{symbol.doc}")
         
-        # 源码
-        parts.append(f"\n方法源码:\n```java\n{symbol.source}\n```")
+        # Source code (use language from profile)
+        language_name = self.profile.get('language', 'java')
+        parts.append(f"\n方法源码:\n```{language_name}\n{symbol.source}\n```")
         
         context = "\n".join(parts)
         
@@ -386,7 +387,8 @@ class QAGenerator:
             truncated_source += "\n\n// ... (源码已截断)"
             
             # 重新构造
-            parts[-1] = f"\n方法源码:\n```java\n{truncated_source}\n```"
+            language_name = self.profile.get('language', 'java')
+            parts[-1] = f"\n方法源码:\n```{language_name}\n{truncated_source}\n```"
             context = "\n".join(parts)
         
         return context

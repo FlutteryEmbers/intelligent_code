@@ -3,6 +3,68 @@
 
 language: java
 
+# System prompts for training data export
+system_prompts:
+  default: |
+    你是一个专业的代码助手，精通 Java 开发和架构设计。
+    你的任务是根据提供的代码上下文，准确回答问题或提供设计方案。
+    你必须基于 evidence（证据）进行推理，确保答案可追溯到具体代码。
+    在回答时，注重实用性和可操作性，避免过于抽象的描述。
+  reasoning: |
+    你是一个专业的代码助手，精通 Java 开发和架构设计。
+    你的任务是根据提供的代码上下文，准确回答问题或提供设计方案。
+    在回答时，请先展示你的推理过程，然后给出最终答案。
+
+# Answer Generation Configuration
+answer_generation:
+  # JSON格式约束说明
+  format_constraints: |
+    ## CRITICAL: JSON格式要求
+    
+    1. **context字段必须是字符串（string）**，不能是数组或对象
+       - 使用 \n 表示换行
+       - 所有代码片段合并为一个字符串
+       - 示例: "context": "@Service\\npublic class UserService {...}"
+    
+    2. **字符串转义规则**
+       - 所有字符串用双引号包裹
+       - 字符串内的双引号必须转义：\\"
+       - 换行符使用 \\n 而不是实际换行
+    
+    3. **evidence_refs格式**
+       - 必须是对象数组
+       - 每个对象必须包含全部5个字段：symbol_id, file_path, start_line, end_line, source_hash
+       - 必须从"可用证据引用"列表中精确复制，不要修改任何值
+  
+  # 常见错误示例
+  common_mistakes:
+    - type: "context_as_list"
+      description: "context使用数组而不是字符串"
+      wrong: |
+        "context": [{"symbol_id": "...", "code": "@Service\\npublic void save()"}]
+      correct: |
+        "context": "@Service\\npublic class UserService {\\n    @Transactional\\n    public void save(User user) {\\n        repository.save(user);\\n    }\\n}"
+    
+    - type: "missing_escape"
+      description: "字符串内的双引号未转义"
+      wrong: |
+        "answer": "该方法使用了\"Spring事务管理\"机制"
+      correct: |
+        "answer": "该方法使用了\\\"Spring事务管理\\\"机制"
+    
+    - type: "incomplete_evidence"
+      description: "evidence_refs缺少必需字段"
+      wrong: |
+        "evidence_refs": [{"symbol_id": "com.example.UserService.save:45"}]
+      correct: |
+        "evidence_refs": [{
+          "symbol_id": "com/example/UserService.java:com.example.UserService.save:45",
+          "file_path": "com/example/UserService.java",
+          "start_line": 45,
+          "end_line": 68,
+          "source_hash": "abc123def456..."
+        }]
+
 # Parsing Configuration: File extensions, ignore patterns, and parser settings
 parsing:
   # File extensions to parse

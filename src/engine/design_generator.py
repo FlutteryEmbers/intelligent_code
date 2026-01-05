@@ -517,34 +517,39 @@ class DesignGenerator:
         
         # Controller 层
         if controllers:
+            # Get language name from profile
+            language_name = self.profile.get('language', 'java')
+            
             parts.append("# Controller 层（入口）")
             for symbol in controllers:
                 parts.append(f"\n## {symbol.qualified_name}")
                 if symbol.annotations:
-                    parts.append(f"注解: {', '.join([f'@{a.name}' for a in symbol.annotations])}")
+                    parts.append(f"注解/装饰器: {', '.join([f'@{a.name}' for a in symbol.annotations])}")
                 if symbol.doc:
                     parts.append(f"文档: {symbol.doc[:200]}...")
-                parts.append(f"```java\n{symbol.source[:500]}...\n```")
+                parts.append(f"```{language_name}\n{symbol.source[:500]}...\n```")
         
         # Service 层
         if services:
+            language_name = self.profile.get('language', 'java')
             parts.append("\n# Service 层（业务逻辑）")
             for symbol in services:
                 parts.append(f"\n## {symbol.qualified_name}")
                 if symbol.annotations:
-                    parts.append(f"注解: {', '.join([f'@{a.name}' for a in symbol.annotations])}")
+                    parts.append(f"注解/装饰器: {', '.join([f'@{a.name}' for a in symbol.annotations])}")
                 if symbol.doc:
                     parts.append(f"文档: {symbol.doc[:200]}...")
-                parts.append(f"```java\n{symbol.source[:500]}...\n```")
+                parts.append(f"```{language_name}\n{symbol.source[:500]}...\n```")
         
         # Repository 层
         if repositories:
+            language_name = self.profile.get('language', 'java')
             parts.append("\n# Repository 层（数据访问）")
             for symbol in repositories:
                 parts.append(f"\n## {symbol.qualified_name}")
                 if symbol.annotations:
-                    parts.append(f"注解: {', '.join([f'@{a.name}' for a in symbol.annotations])}")
-                parts.append(f"```java\n{symbol.source[:300]}...\n```")
+                    parts.append(f"注解/装饰器: {', '.join([f'@{a.name}' for a in symbol.annotations])}")
+                parts.append(f"```{language_name}\n{symbol.source[:300]}...\n```")
         
         context = "\n".join(parts)
         

@@ -28,6 +28,17 @@ class LanguageProfile:
         if missing:
             raise ValueError(f"Language profile missing required fields: {missing}")
         
+        # Validate system_prompts (optional but recommended)
+        if "system_prompts" in data:
+            prompts = data["system_prompts"]
+            if not isinstance(prompts, dict):
+                raise ValueError("system_prompts must be a dict")
+            # Check for default and reasoning prompts (recommended)
+            if "default" not in prompts:
+                logger.warning("system_prompts missing 'default' prompt (recommended)")
+            if "reasoning" not in prompts:
+                logger.warning("system_prompts missing 'reasoning' prompt (recommended)")
+        
         # Validate Parsing structure
         parsing = data.get("parsing", {})
         required_parsing_fields = ["file_extensions", "ignore_paths", "max_chars_per_symbol"]
@@ -97,22 +108,46 @@ class LanguageProfile:
     def get_max_chars_per_symbol(self) -> int:
         """Get max characters per symbol"""
         return self.data["parsing"]["max_chars_per_symbol"]
+    
+    def get_system_prompt(self, prompt_type: str = "default") -> str:
+        """Get system prompt for training data export
+        
+        Args:
+            prompt_type: Type of prompt ('default' or 'reasoning')
+            
+        Returns:
+            System prompt string
+        """
+        system_prompts = self.data.get("system_prompts", {})
+        return system_prompts.get(prompt_type, "")
+    
+    def get(self, key: str, default=None):
+        """Get value from profile data with optional default"""
+        return self.data.get(key, default)
+    
+    def __getitem__(self, key: str):
+        """Support dict-style access"""
+        return self.data[key]
+    
+    def __contains__(self, key: str) -> bool:
+        """Support 'in' operator"""
+        return key in self.data
 
 
 def load_language_profile(
+    config = None,
     language_name: Optional[str] = None,
-    profile_dir: Optional[str] = None,
-    config = None
+    profile_dir: Optional[str] = None
 ) -> LanguageProfile:
     """
     Load language profile from YAML file
     
     Args:
+        config: Config instance or dict. If None, creates new Config()
         language_name: Language name (e.g., 'java', 'python'). 
                       If None, reads from config.language.name (default: 'java')
         profile_dir: Directory containing profile YAML files.
                     If None, reads from config.language.profile_dir or defaults to 'configs/language'
-        config: Config instance. If None, creates new Config()
     
     Returns:
         LanguageProfile: Loaded and validated language profile
@@ -126,14 +161,25 @@ def load_language_profile(
         from src.utils.config import Config
         config = Config()
     
+    # Check if config is Config object or dict
+    from src.utils.config import Config as ConfigClass
+    
     # Determine language name
     if language_name is None:
-        language_name = config.get("language.name", "java")
+        if isinstance(config, ConfigClass):
+            # Config object - access internal _config dict
+            language_name = config._config.get("language", {}).get("name", "java")
+        else:
+            # Regular dict
+            language_name = config.get("language", {}).get("name", "java")
         logger.info(f"Using language from config: {language_name}")
     
     # Determine profile directory
     if profile_dir is None:
-        profile_dir = config.get("language.profile_dir", "configs/language")
+        if isinstance(config, ConfigClass):
+            profile_dir = config._config.get("language", {}).get("profile_dir", "configs/language")
+        else:
+            profile_dir = config.get("language", {}).get("profile_dir", "configs/language")
     
     # Check cache
     cache_key = f"{profile_dir}/{language_name}"

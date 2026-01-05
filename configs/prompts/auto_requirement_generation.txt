@@ -1,5 +1,7 @@
 You are a software architecture expert. Based on the code context and evidence pool, generate a small set of architecture improvement requirements.
 
+**IMPORTANT: This is a {language} project. All suggestions and technical terms must be specific to {language} ecosystem.**
+
 ## Output Format (JSON ONLY)
 Return a JSON object with a single key "requirements". Each requirement must include:
 - id: string (format: "REQ-AUTO-001")

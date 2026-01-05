@@ -28,8 +28,12 @@ class PythonParser(BaseParser):
         logger.info(f"File extensions: {self.file_extensions}")
         logger.info(f"Ignore paths: {len(self.ignore_paths)} patterns")
     
-    def parse_file(self, file_path: Path, repo_commit: str = "unknown") -> List[CodeSymbol]:
+    def parse_file(self, file_path: Path, repo_commit: str = "unknown", repo_root: Path = None) -> List[CodeSymbol]:
         """Parse a single Python file"""
+        # Use repo_root for calculating relative paths, fallback to file_path.parent
+        if repo_root is None:
+            repo_root = Path.cwd()
+        
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
@@ -39,11 +43,11 @@ class PythonParser(BaseParser):
             
             for node in ast.walk(tree):
                 if isinstance(node, ast.FunctionDef):
-                    symbol = self._extract_function(node, file_path, content, repo_commit)
+                    symbol = self._extract_function(node, file_path, content, repo_commit, repo_root)
                     if symbol:
                         symbols.append(symbol)
                 elif isinstance(node, ast.ClassDef):
-                    symbol = self._extract_class(node, file_path, content, repo_commit)
+                    symbol = self._extract_class(node, file_path, content, repo_commit, repo_root)
                     if symbol:
                         symbols.append(symbol)
             
@@ -53,7 +57,7 @@ class PythonParser(BaseParser):
             logger.warning(f"Failed to parse {file_path}: {e}")
             return []
     
-    def _extract_function(self, node: ast.FunctionDef, file_path: Path, content: str, repo_commit: str) -> CodeSymbol | None:
+    def _extract_function(self, node: ast.FunctionDef, file_path: Path, content: str, repo_commit: str, repo_root: Path) -> CodeSymbol | None:
         """Extract function symbol"""
         # Skip private functions if configured
         if not self.include_private and node.name.startswith('_') and not node.name.startswith('__'):
@@ -91,8 +95,15 @@ class PythonParser(BaseParser):
         # Build qualified name (simple version)
         qualified_name = f"{file_path.stem}.{node.name}"
         
+        # Calculate relative path with fallback
+        try:
+            relative_path = file_path.relative_to(repo_root)
+        except ValueError:
+            # If file_path is not relative to repo_root, use file name
+            relative_path = file_path.name
+        
         symbol_id = CodeSymbol.make_symbol_id(
-            str(file_path.relative_to(Path.cwd())),
+            str(relative_path),
             qualified_name,
             node.lineno
         )
@@ -104,7 +115,7 @@ class PythonParser(BaseParser):
             symbol_type="method",
             name=node.name,
             qualified_name=qualified_name,
-            file_path=str(file_path.relative_to(Path.cwd())),
+            file_path=str(relative_path),
             start_line=node.lineno,
             end_line=node.end_lineno or node.lineno,
             source=source,
@@ -115,7 +126,7 @@ class PythonParser(BaseParser):
             source_hash=sha256_text(source)
         )
     
-    def _extract_class(self, node: ast.ClassDef, file_path: Path, content: str, repo_commit: str) -> CodeSymbol | None:
+    def _extract_class(self, node: ast.ClassDef, file_path: Path, content: str, repo_commit: str, repo_root: Path) -> CodeSymbol | None:
         """Extract class symbol"""
         # Skip private classes if configured
         if not self.include_private and node.name.startswith('_'):
@@ -148,8 +159,15 @@ class PythonParser(BaseParser):
         
         qualified_name = f"{file_path.stem}.{node.name}"
         
+        # Calculate relative path with fallback
+        try:
+            relative_path = file_path.relative_to(repo_root)
+        except ValueError:
+            # If file_path is not relative to repo_root, use file name
+            relative_path = file_path.name
+        
         symbol_id = CodeSymbol.make_symbol_id(
-            str(file_path.relative_to(Path.cwd())),
+            str(relative_path),
             qualified_name,
             node.lineno
         )
@@ -161,7 +179,7 @@ class PythonParser(BaseParser):
             symbol_type="class",
             name=node.name,
             qualified_name=qualified_name,
-            file_path=str(file_path.relative_to(Path.cwd())),
+            file_path=str(relative_path),
             start_line=node.lineno,
             end_line=node.end_lineno or node.lineno,
             source=source,
@@ -204,7 +222,7 @@ class PythonParser(BaseParser):
         # Iterate all source files based on profile's file_extensions
         for py_file in self.iter_source_files(repo_path_obj):
             try:
-                file_symbols = self.parse_file(py_file, repo_commit)
+                file_symbols = self.parse_file(py_file, repo_commit, repo_root=repo_path_obj)
                 symbols.extend(file_symbols)
                 parsed_files += 1
                 

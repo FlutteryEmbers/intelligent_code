@@ -36,7 +36,14 @@ class ParseStep(BaseStep):
         repo_path = Path(self.config["repo"]["path"])
         
         # Select parser based on language.name
-        language_name = self.config.get("language.name", "java").lower()
+        # Handle both dict and Config object
+        from src.utils.config import Config as ConfigClass
+        if isinstance(self.config, ConfigClass):
+            # Config object - use bracket notation for nested access
+            language_name = self.config["language"]["name"].lower()
+        else:
+            # Plain dict
+            language_name = self.config.get("language", {}).get("name", "java").lower()
         
         if language_name == "java":
             parser = JavaParser(self.config)

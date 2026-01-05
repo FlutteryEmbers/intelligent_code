@@ -41,13 +41,17 @@ def export_sft_jsonl(
     """
     out_path = Path(out_path)
     
-    # Default system prompt
+    # Get system prompt from language profile if not provided
     if system_prompt is None:
-        system_prompt = (
-            "你是一个专业的代码助手，精通 Java 开发和架构设计。"
-            "你的任务是根据提供的代码上下文，准确回答问题或提供设计方案。"
-            "你必须基于 evidence（证据）进行推理，确保答案可追溯到具体代码。"
-        )
+        from src.utils.language_profile import load_language_profile
+        profile = load_language_profile()
+        system_prompt = profile.get_system_prompt('default')
+        if not system_prompt:
+            # Fallback if not configured
+            system_prompt = (
+                "你是一个专业的代码助手。"
+                "你的任务是根据提供的代码上下文，准确回答问题或提供设计方案。"
+            )
     
     # Convert samples to SFT format
     sft_samples = []
@@ -179,11 +183,16 @@ def export_with_reasoning_trace(
     out_path = Path(out_path)
     
     if system_prompt is None:
-        system_prompt = (
-            "你是一个专业的代码助手，精通 Java 开发和架构设计。"
-            "你的任务是根据提供的代码上下文，准确回答问题或提供设计方案。"
-            "在回答时，请先展示你的推理过程，然后给出最终答案。"
-        )
+        from src.utils.language_profile import load_language_profile
+        profile = load_language_profile()
+        system_prompt = profile.get_system_prompt('reasoning')
+        if not system_prompt:
+            # Fallback if not configured
+            system_prompt = (
+                "你是一个专业的代码助手。"
+                "你的任务是根据提供的代码上下文，准确回答问题或提供设计方案。"
+                "在回答时，请先展示你的推理过程，然后给出最终答案。"
+            )
     
     sft_samples = []
     
