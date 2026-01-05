@@ -174,14 +174,25 @@ def group_split_samples(
     train_groups = int(num_groups * train_ratio)
     val_groups = int(num_groups * val_ratio)
     
-    # Ensure at least 1 group in val and test if possible
-    if num_groups >= 3:
-        if train_groups == num_groups:
-            train_groups = num_groups - 2
+    # Ensure at least 1 group in each split if possible
+    if num_groups == 1:
+        # Only 1 group - put everything in train
+        train_groups = 1
+        val_groups = 0
+    elif num_groups == 2:
+        # 2 groups - split between train and test
+        train_groups = 1
+        val_groups = 0
+    elif num_groups >= 3:
+        # 3+ groups - ensure at least 1 in each split
+        if train_groups == 0:
+            train_groups = 1
+        if val_groups == 0:
             val_groups = 1
-        elif train_groups + val_groups == num_groups:
-            train_groups = max(1, train_groups - 1)
-            val_groups = max(1, val_groups)
+        if train_groups + val_groups >= num_groups:
+            # Adjust to ensure test gets at least 1 group
+            train_groups = max(1, num_groups - 2)
+            val_groups = 1
     
     # Split groups
     train_group_list = group_list[:train_groups]

@@ -1,5 +1,5 @@
 """
-Demo 模块 - 问题生成器
+Auto 模块 - 问题生成器
 
 基于 MethodProfile 自动生成多样化的业务问题。
 """
@@ -31,8 +31,8 @@ def simple_hash(text: str) -> str:
     return hashlib.md5(text.lower().encode('utf-8')).hexdigest()[:16]
 
 
-class DemoQuestionGenerator:
-    """Demo 问题生成器"""
+class AutoQuestionGenerator:
+    """Auto 问题生成器"""
     
     def __init__(self, config: Config | None = None):
         """初始化"""
@@ -40,18 +40,18 @@ class DemoQuestionGenerator:
         self.llm_client = LLMClient()
         
         # 从配置读取参数
-        self.questions_per_method = self.config.get('demo.questions_per_method', 5)
+        self.questions_per_method = self.config.get('auto.questions_per_method', 5)
         
         # 加载 prompt 模板
         template_path = self.config.get(
-            'demo.prompts.question_generation',
-            'configs/prompts/demo_question_generation.txt'
+            'auto.prompts.question_generation',
+            'configs/prompts/auto_question_generation.txt'
         )
         self.prompt_template = load_prompt_template(template_path)
         
         # 输出路径
         self.output_jsonl = Path(self.config.get(
-            'demo.outputs.questions_jsonl',
+            'auto.outputs.questions_jsonl',
             'data/intermediate/questions.jsonl'
         ))
         self.output_jsonl.parent.mkdir(parents=True, exist_ok=True)
@@ -66,13 +66,15 @@ class DemoQuestionGenerator:
     def generate_from_profiles(
         self,
         profiles_jsonl: Path,
-        symbols_map: dict[str, CodeSymbol]
+        symbols_map: dict[str, CodeSymbol],
+        repo_commit: str = "UNKNOWN_COMMIT"
     ) -> List[QuestionSample]:
         """从 method profiles 生成问题
         
         Args:
             profiles_jsonl: method_profiles.jsonl 文件路径
             symbols_map: symbol_id -> CodeSymbol 映射
+            repo_commit: 仓库 commit hash
             
         Returns:
             List[QuestionSample]: 生成的问题列表
@@ -204,6 +206,10 @@ class DemoQuestionGenerator:
                 for ref in q_data.get('evidence_refs', []):
                     evidence_refs.append(EvidenceRef(**ref))
                 q_data['evidence_refs'] = evidence_refs
+                
+                # 确保 repo_commit 存在
+                if 'repo_commit' not in q_data:
+                    q_data['repo_commit'] = profile.repo_commit
                 
                 question = QuestionSample(**q_data)
                 questions.append(question)

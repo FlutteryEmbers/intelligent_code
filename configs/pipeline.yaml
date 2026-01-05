@@ -156,21 +156,21 @@ advanced:
   parallel_workers: 4
   checkpoint_interval: 100
 
-# ==================== Demo Module Configuration ====================
-demo:
-  enabled: false                                      # Enable demo module (default: disabled)
-  max_methods: 50                                     # Maximum methods to process (cost control)
+# ==================== Auto Module Configuration ====================
+auto:
+  enabled: true                                       # Enable auto module (default: disabled)
+  max_methods: 30                                     # Maximum methods to process (cost control)
   questions_per_method: 5                             # Number of questions per method
   top_k_context: 6                                    # Top-K methods for context retrieval
   embedding_model: "nomic-embed-text"                 # Ollama embedding model
   prompts:
-    method_understanding: "configs/prompts/demo_method_understanding.txt"
-    question_generation: "configs/prompts/demo_question_generation.txt"
-    answer_generation: "configs/prompts/demo_answer_generation.txt"
+    method_understanding: "configs/prompts/auto_method_understanding.txt"
+    question_generation: "configs/prompts/auto_question_generation.txt"
+    answer_generation: "configs/prompts/auto_answer_generation.txt"
   outputs:
     method_profiles_jsonl: "data/intermediate/method_profiles.jsonl"
-    method_understanding_rejected_jsonl: "data/intermediate/demo_method_understanding_rejected.jsonl"
+    method_understanding_rejected_jsonl: "data/intermediate/auto_method_understanding_rejected.jsonl"
     questions_jsonl: "data/intermediate/questions.jsonl"
     embeddings_jsonl: "data/intermediate/method_embeddings.jsonl"
-    demo_qa_raw_jsonl: "data/intermediate/demo_qa_raw.jsonl"
-    demo_answer_rejected_jsonl: "data/intermediate/demo_answer_rejected.jsonl"
+    auto_qa_raw_jsonl: "data/intermediate/auto_qa_raw.jsonl"
+    auto_answer_rejected_jsonl: "data/intermediate/auto_answer_rejected.jsonl"

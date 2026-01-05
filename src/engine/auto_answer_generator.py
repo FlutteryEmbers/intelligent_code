@@ -1,5 +1,5 @@
 """
-Demo 模块 - 答案生成器
+Auto 模块 - 答案生成器
 
 基于问题和检索的上下文生成最终的 TrainingSample。
 """
@@ -26,8 +26,8 @@ def load_prompt_template(template_path: str) -> str:
         return f.read()
 
 
-class DemoAnswerGenerator:
-    """Demo 答案生成器"""
+class AutoAnswerGenerator:
+    """Auto 答案生成器"""
     
     def __init__(self, config: Config | None = None):
         """初始化"""
@@ -35,28 +35,28 @@ class DemoAnswerGenerator:
         self.llm_client = LLMClient()
         
         # 从配置读取参数
-        self.top_k_context = self.config.get('demo.top_k_context', 6)
+        self.top_k_context = self.config.get('auto.top_k_context', 6)
         self.max_context_chars = self.config.get('generation.max_context_chars', 16000)
-        self.embedding_model = self.config.get('demo.embedding_model', 'nomic-embed-text')
+        self.embedding_model = self.config.get('auto.embedding_model', 'nomic-embed-text')
         
         # 加载 prompt 模板
         template_path = self.config.get(
-            'demo.prompts.answer_generation',
-            'configs/prompts/demo_answer_generation.txt'
+            'auto.prompts.answer_generation',
+            'configs/prompts/auto_answer_generation.txt'
         )
         self.prompt_template = load_prompt_template(template_path)
         
         # 输出路径
         self.output_jsonl = Path(self.config.get(
-            'demo.outputs.demo_qa_raw_jsonl',
-            'data/intermediate/demo_qa_raw.jsonl'
+            'auto.outputs.auto_qa_raw_jsonl',
+            'data/intermediate/auto_qa_raw.jsonl'
         ))
         self.rejected_jsonl = Path(self.config.get(
-            'demo.outputs.demo_answer_rejected_jsonl',
-            'data/intermediate/demo_answer_rejected.jsonl'
+            'auto.outputs.auto_answer_rejected_jsonl',
+            'data/intermediate/auto_answer_rejected.jsonl'
         ))
         self.embeddings_jsonl = Path(self.config.get(
-            'demo.outputs.embeddings_jsonl',
+            'auto.outputs.embeddings_jsonl',
             'data/intermediate/method_embeddings.jsonl'
         ))
         
@@ -72,13 +72,15 @@ class DemoAnswerGenerator:
     def generate_from_questions(
         self,
         questions_jsonl: Path,
-        symbols_map: dict[str, CodeSymbol]
+        symbols_map: dict[str, CodeSymbol],
+        repo_commit: str = "UNKNOWN_COMMIT"
     ) -> List[TrainingSample]:
         """从问题生成答案
         
         Args:
             questions_jsonl: questions.jsonl 文件路径
             symbols_map: symbol_id -> CodeSymbol 映射
+            repo_commit: 仓库 commit hash
             
         Returns:
             List[TrainingSample]: 生成的训练样本列表
@@ -224,6 +226,10 @@ class DemoAnswerGenerator:
             
             reasoning_trace = ReasoningTrace(**thought_dict)
             sample_dict['thought'] = reasoning_trace
+            
+            # 确保 repo_commit 存在
+            if 'repo_commit' not in sample_dict:
+                sample_dict['repo_commit'] = question.repo_commit
             
             # 创建 TrainingSample
             sample = TrainingSample(**sample_dict)

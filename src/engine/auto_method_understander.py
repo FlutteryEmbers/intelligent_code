@@ -1,5 +1,5 @@
 """
-Demo 模块 - 方法级理解生成器
+Auto 模块 - 方法级理解生成器
 
 为候选方法生成深度理解的 MethodProfile。
 """
@@ -26,8 +26,8 @@ def load_prompt_template(template_path: str) -> str:
         return f.read()
 
 
-class DemoMethodUnderstander:
-    """Demo 方法理解器 - 生成 MethodProfile"""
+class AutoMethodUnderstander:
+    """Auto 方法理解器 - 生成 MethodProfile"""
     
     # 优先业务注解（复用 QAGenerator 的逻辑）
     BUSINESS_ANNOTATIONS = {
@@ -42,24 +42,24 @@ class DemoMethodUnderstander:
         self.llm_client = LLMClient()
         
         # 从配置读取参数
-        self.max_methods = self.config.get('demo.max_methods', 50)
+        self.max_methods = self.config.get('auto.max_methods', 50)
         self.max_context_chars = self.config.get('generation.max_context_chars', 16000)
         
         # 加载 prompt 模板
         template_path = self.config.get(
-            'demo.prompts.method_understanding',
-            'configs/prompts/demo_method_understanding.txt'
+            'auto.prompts.method_understanding',
+            'configs/prompts/auto_method_understanding.txt'
         )
         self.prompt_template = load_prompt_template(template_path)
         
         # 输出路径
         self.output_jsonl = Path(self.config.get(
-            'demo.outputs.method_profiles_jsonl',
+            'auto.outputs.method_profiles_jsonl',
             'data/intermediate/method_profiles.jsonl'
         ))
         self.rejected_jsonl = Path(self.config.get(
-            'demo.outputs.method_understanding_rejected_jsonl',
-            'data/intermediate/demo_method_understanding_rejected.jsonl'
+            'auto.outputs.method_understanding_rejected_jsonl',
+            'data/intermediate/auto_method_understanding_rejected.jsonl'
         ))
         
         self.output_jsonl.parent.mkdir(parents=True, exist_ok=True)

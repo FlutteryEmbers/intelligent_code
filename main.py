@@ -31,9 +31,9 @@ from src.utils.config import Config
 from src.parser.java_parser import JavaParser
 from src.engine.qa_generator import QAGenerator
 from src.engine.design_generator import DesignGenerator
-from src.engine.demo_method_understander import DemoMethodUnderstander
-from src.engine.demo_question_generator import DemoQuestionGenerator
-from src.engine.demo_answer_generator import DemoAnswerGenerator
+from src.engine.auto_method_understander import AutoMethodUnderstander
+from src.engine.auto_question_generator import AutoQuestionGenerator
+from src.engine.auto_answer_generator import AutoAnswerGenerator
 from src.utils import vector_index
 
 
@@ -346,65 +346,72 @@ def main():
             summary["steps"]["parse"] = {"status": "failed", "error": str(e)}
             # Don't exit - continue with existing symbols if available
     
-    # ========== Demo Module: Method-Level RAG Pipeline ==========
-    if cfg.demo.enabled:
+    # ========== Auto Module: Method-Level RAG Pipeline ==========
+    auto_config = cfg.get("auto", {})
+    if auto_config.get("enabled", False):
         logger.info("=" * 70)
-        logger.info(" Demo Module: Method-Level Understanding & Question Generation")
+        logger.info(" Auto Module: Method-Level Understanding & Question Generation")
         logger.info("=" * 70)
         
         try:
             # Prepare paths
-            method_profiles_jsonl = cfg.demo.method_profiles
-            method_embeddings_jsonl = cfg.demo.method_embeddings
-            questions_jsonl = cfg.demo.questions
-            demo_qa_jsonl = cfg.demo.demo_qa_raw
+            auto_outputs = auto_config.get("outputs", {})
+            method_profiles_jsonl = Path(auto_outputs.get("method_profiles_jsonl", "data/intermediate/method_profiles.jsonl"))
+            method_embeddings_jsonl = Path(auto_outputs.get("embeddings_jsonl", "data/intermediate/method_embeddings.jsonl"))
+            questions_jsonl = Path(auto_outputs.get("questions_jsonl", "data/intermediate/questions.jsonl"))
+            auto_qa_jsonl = Path(auto_outputs.get("auto_qa_raw_jsonl", "data/intermediate/auto_qa_raw.jsonl"))
             
-            # Load symbols for demo processing
-            symbols_map = load_symbols_map(symbols_jsonl)
-            if not symbols_map:
-                logger.warning("No symbols found for demo module, skipping")
+            # Check if symbols file exists
+            if not symbols_jsonl.exists():
+                logger.warning("symbols.jsonl not found for demo module, skipping")
                 summary["steps"]["demo"] = {"status": "skipped", "reason": "no_symbols"}
             else:
-                # Step D1: Method Understanding
-                logger.info(f"Step D1: Analyzing methods (max: {cfg.demo.max_methods})")
-                understander = DemoMethodUnderstander(cfg)
+                # Step A1: Method Understanding
+                max_methods = auto_config.get("max_methods", 50)
+                logger.info(f"Step A1: Analyzing methods (max: {max_methods})")
+                understander = AutoMethodUnderstander(config_instance)
                 method_profiles = understander.generate_from_symbols(
-                    symbols_map=symbols_map,
+                    symbols_path=symbols_jsonl,
                     repo_commit=repo_commit
                 )
                 logger.info(f"Generated {len(method_profiles)} method profiles")
                 
-                # Step D2: Build Vector Embeddings
-                logger.info(f"Step D2: Building embeddings (model: {cfg.demo.embedding_model})")
+                # Load symbols_map for Step A4 (needed for answer generation)
+                symbols_map = load_symbols_map(symbols_jsonl)
+                
+                # Step A2: Build Vector Embeddings
+                embedding_model = auto_config.get("embedding_model", "nomic-embed-text")
+                logger.info(f"Step A2: Building embeddings (model: {embedding_model})")
                 vector_index.build_embeddings(
                     profiles_jsonl=method_profiles_jsonl,
                     embeddings_jsonl=method_embeddings_jsonl,
-                    embedding_model=cfg.demo.embedding_model
+                    embedding_model=embedding_model
                 )
                 logger.info(f"Embeddings saved to {method_embeddings_jsonl.name}")
                 
-                # Step D3: Generate Questions
-                logger.info(f"Step D3: Generating questions ({cfg.demo.questions_per_method} per method)")
-                question_gen = DemoQuestionGenerator(cfg)
+                # Step A3: Generate Questions
+                questions_per_method = auto_config.get("questions_per_method", 5)
+                logger.info(f"Step A3: Generating questions ({questions_per_method} per method)")
+                question_gen = AutoQuestionGenerator(config_instance)
                 questions = question_gen.generate_from_profiles(
-                    profiles_jsonl=method_profiles_jsonl,
-                    repo_commit=repo_commit
-                )
-                logger.info(f"Generated {len(questions)} questions")
-                
-                # Step D4: Generate Answers with Vector Retrieval
-                logger.info(f"Step D4: Generating answers (top_k: {cfg.demo.top_k_context})")
-                answer_gen = DemoAnswerGenerator(cfg)
-                qa_samples = answer_gen.generate_from_questions(
-                    questions_jsonl=questions_jsonl,
-                    embeddings_jsonl=method_embeddings_jsonl,
                     profiles_jsonl=method_profiles_jsonl,
                     symbols_map=symbols_map,
                     repo_commit=repo_commit
                 )
-                logger.info(f"Generated {len(qa_samples)} demo QA samples")
+                logger.info(f"Generated {len(questions)} questions")
                 
-                summary["steps"]["demo"] = {
+                # Step A4: Generate Answers with Vector Retrieval
+                top_k_context = auto_config.get("top_k_context", 6)
+                logger.info(f"Step A4: Generating answers (top_k: {top_k_context})")
+                answer_gen = AutoAnswerGenerator(config_instance)
+                qa_samples = answer_gen.generate_from_questions(
+                    questions_jsonl=questions_jsonl,
+                    symbols_map=symbols_map,
+                    repo_commit=repo_commit
+                )
+                logger.info(f"Generated {len(qa_samples)} auto QA samples")
+                
+                summary["steps"]["auto"] = {
                     "status": "success",
                     "method_profiles": len(method_profiles),
                     "questions": len(questions),
@@ -412,15 +419,18 @@ def main():
                 }
                 
         except Exception as e:
-            logger.error(f"Demo module failed: {e}", exc_info=True)
-            summary["steps"]["demo"] = {"status": "failed", "error": str(e)}
-            # Continue pipeline even if demo fails
+            logger.error(f"Auto module failed: {e}", exc_info=True)
+            summary["steps"]["auto"] = {"status": "failed", "error": str(e)}
+            # Continue pipeline even if auto fails
     else:
-        logger.info("Demo module disabled (demo.enabled=false)")
-        summary["steps"]["demo"] = {"status": "disabled"}
+        logger.info("Auto module disabled (auto.enabled=false)")
+        summary["steps"]["auto"] = {"status": "disabled"}
     
     # ========== Step 2: Generate QA Samples ==========
-    if args.skip_llm or args.skip_qa:
+    if auto_config.get("enabled", False):
+        logger.info("Skipping traditional QA generation (using auto module instead)")
+        summary["steps"]["qa_generation"] = {"status": "skipped", "reason": "auto_enabled"}
+    elif args.skip_llm or args.skip_qa:
         logger.info("Skipping QA generation")
         summary["steps"]["qa_generation"] = {"status": "skipped"}
     else:
@@ -508,7 +518,15 @@ def main():
     logger.info("=" * 70)
     
     try:
-        total_samples = merge_samples(qa_raw_jsonl, design_raw_jsonl, all_raw_jsonl)
+        # Use auto QA if enabled, otherwise use traditional QA
+        if auto_config.get("enabled", False):
+            auto_outputs = auto_config.get("outputs", {})
+            auto_qa_path = Path(auto_outputs.get("auto_qa_raw_jsonl", "data/intermediate/auto_qa_raw.jsonl"))
+            logger.info(f"Using auto QA from {auto_qa_path.name}")
+            total_samples = merge_samples(auto_qa_path, design_raw_jsonl, all_raw_jsonl)
+        else:
+            total_samples = merge_samples(qa_raw_jsonl, design_raw_jsonl, all_raw_jsonl)
+        
         summary["steps"]["merge"] = {
             "status": "success",
             "total_samples": total_samples
