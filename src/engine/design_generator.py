@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Generator
 from collections import Counter
 
+import yaml
+
 from src.utils.schemas import CodeSymbol, TrainingSample, ReasoningTrace, EvidenceRef, sha256_text
 from src.utils.config import Config
 from src.utils.logger import get_logger
@@ -32,6 +34,47 @@ def load_prompt_template(template_name: str) -> str:
     
     with open(template_path, 'r', encoding='utf-8') as f:
         return f.read()
+
+
+def load_requirements_config(config_path: str | Path | None = None) -> list['Requirement']:
+    """从 YAML 配置文件加载需求定义
+    
+    Args:
+        config_path: 配置文件路径，默认为 configs/requirements.yaml
+        
+    Returns:
+        list[Requirement]: 需求对象列表
+    """
+    if config_path is None:
+        config_path = Path(__file__).parent.parent.parent / "configs" / "requirements.yaml"
+    else:
+        config_path = Path(config_path)
+    
+    if not config_path.exists():
+        logger.warning(f"Requirements config not found: {config_path}, using empty list")
+        return []
+    
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+        
+        requirements = []
+        for req_data in data.get('requirements', []):
+            req = Requirement(
+                id=req_data['id'],
+                goal=req_data['goal'],
+                constraints=req_data.get('constraints', []),
+                acceptance_criteria=req_data.get('acceptance_criteria', []),
+                non_goals=req_data.get('non_goals', [])
+            )
+            requirements.append(req)
+        
+        logger.info(f"Loaded {len(requirements)} requirements from {config_path}")
+        return requirements
+        
+    except Exception as e:
+        logger.error(f"Failed to load requirements config: {e}")
+        return []
 
 
 class Requirement:
@@ -58,111 +101,6 @@ class Requirement:
             'acceptance_criteria': self.acceptance_criteria,
             'non_goals': self.non_goals
         }
-
-
-# 内置需求库
-BUILT_IN_REQUIREMENTS = [
-    Requirement(
-        id="REQ-001",
-        goal="为用户登录接口添加 Redis 缓存层，提升高并发场景下的性能",
-        constraints=[
-            "使用 Redis 作为缓存存储",
-            "缓存有效期为 30 分钟",
-            "需要保证缓存与数据库数据一致性",
-            "需要支持缓存预热和失效策略"
-        ],
-        acceptance_criteria=[
-            "登录 QPS 提升 5 倍以上",
-            "缓存命中率 > 90%",
-            "缓存穿透/雪崩有防护机制",
-            "支持缓存手动刷新"
-        ],
-        non_goals=[
-            "不改变现有登录业务逻辑",
-            "不引入分布式锁（MVP 阶段）"
-        ]
-    ),
-    Requirement(
-        id="REQ-002",
-        goal="为订单创建接口实现幂等性保证，防止重复下单",
-        constraints=[
-            "使用唯一业务流水号作为幂等标识",
-            "幂等信息需要持久化",
-            "幂等检查失败时返回明确错误",
-            "支持幂等信息过期清理"
-        ],
-        acceptance_criteria=[
-            "相同流水号的重复请求返回相同结果",
-            "幂等检查响应时间 < 10ms",
-            "幂等信息保留 24 小时",
-            "支持幂等状态查询接口"
-        ],
-        non_goals=[
-            "不处理分布式事务回滚",
-            "不实现全局唯一 ID 生成器"
-        ]
-    ),
-    Requirement(
-        id="REQ-003",
-        goal="为产品查询接口实现读写分离，提升查询性能",
-        constraints=[
-            "主库负责写操作，从库负责读操作",
-            "需要处理主从延迟问题",
-            "从库故障时自动切换到主库",
-            "支持手动指定读主库"
-        ],
-        acceptance_criteria=[
-            "读请求 > 95% 走从库",
-            "主从延迟 < 1 秒",
-            "从库故障切换时间 < 3 秒",
-            "提供监控指标（主从延迟、读写比例）"
-        ],
-        non_goals=[
-            "不实现自动主从切换（依赖 DBA）",
-            "不支持多从库负载均衡（MVP 阶段）"
-        ]
-    ),
-    Requirement(
-        id="REQ-004",
-        goal="为商品搜索接口添加限流保护，防止恶意刷单",
-        constraints=[
-            "基于用户 ID 和 IP 的双重限流",
-            "使用令牌桶算法",
-            "限流阈值可配置",
-            "限流触发时返回 429 状态码"
-        ],
-        acceptance_criteria=[
-            "单用户 QPS 限制在 10 次/秒",
-            "单 IP QPS 限制在 100 次/秒",
-            "限流信息存储在 Redis",
-            "提供限流白名单功能"
-        ],
-        non_goals=[
-            "不实现分布式限流（单机版）",
-            "不记录限流日志到数据库"
-        ]
-    ),
-    Requirement(
-        id="REQ-005",
-        goal="为用户收藏夹功能添加异步处理，优化响应时间",
-        constraints=[
-            "使用消息队列（RabbitMQ/Kafka）",
-            "收藏操作立即返回，后台异步处理",
-            "需要保证最终一致性",
-            "失败重试 3 次"
-        ],
-        acceptance_criteria=[
-            "接口响应时间 < 100ms",
-            "消息处理成功率 > 99.9%",
-            "失败消息进入死信队列",
-            "提供收藏状态查询接口"
-        ],
-        non_goals=[
-            "不实现消息顺序保证",
-            "不支持事务消息（MVP 阶段）"
-        ]
-    ),
-]
 
 
 class DesignGenerator:
@@ -251,9 +189,9 @@ class DesignGenerator:
             repo_commit = symbols[0].repo_commit
             logger.info(f"Using repo_commit from symbols: {repo_commit}")
         
-        # 使用内置需求或自定义需求
+        # 使用自定义需求或从配置文件加载
         if requirements is None:
-            requirements = BUILT_IN_REQUIREMENTS
+            requirements = load_requirements_config()
         
         self.stats['total_requirements'] = len(requirements)
         
