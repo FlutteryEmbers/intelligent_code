@@ -1,11 +1,38 @@
+# ================================================================================================
 # Pipeline Configuration - Intelligent Training Data Generation
+# ================================================================================================
+# 业务流程：Parse → Auto Module → QA Gen → Design Gen → Quality → Dedup → Split → Export
+# ================================================================================================
 
-# ==================== Repository Configuration ====================
+# ==================== 1. Project & Repository Configuration ====================
+# 项目基本信息和代码仓库配置
 repo:
   path: "./repos/java/online_shopping_be"              # Path to Java repository (required)
   commit: ""                        # Git commit hash (empty = auto-detect from git)
 
-# ==================== Filter Configuration ====================
+# ==================== 2. Global Settings ====================
+# 全局配置：随机种子、批处理大小等
+global:
+  seed: 42                          # Random seed for reproducibility (used by dedup, split, auto_requirements)
+  batch_size: 5                     # Default batch size for generation
+  top_k_context: 6                  # Default Top-K context selection for RAG
+
+# ==================== 3. LLM Configuration (Core Dependency) ====================
+# LLM是整个pipeline的核心依赖，所有生成步骤都依赖此配置
+llm:
+  provider: "ollama"
+  base_url: "http://localhost:11434/v1"
+  model: "qwen2.5:7b"
+  temperature: 0.2  # 降低 temperature 以提高格式稳定性
+  max_tokens: 10000  # 优化后：6个需求约需8000 tokens，留有余量
+  timeout: 120  # 增加超时时间以适应更长的生成
+
+# ================================================================================================
+# PIPELINE STEPS (按执行顺序排列)
+# ================================================================================================
+
+# ==================== Step 1: Code Parsing ====================
+# 解析代码仓库，提取符号信息
 filter:
   ignore_paths:
     - "test"
@@ -21,22 +48,57 @@ filter:
   file_extensions:
     - ".java"
 
-# ==================== Parser Configuration ====================
 parser:
   type: "java"
   max_chars_per_symbol: 12000       # Maximum characters per symbol (truncation threshold)
   include_private: false
   include_test: false
 
-# ==================== Generation Configuration ====================
-generation:
-  run_llm: true                     # Enable/disable LLM calls (false = dry run)
-  max_context_chars: 16000          # Maximum context characters for LLM
-  batch_size: 5                     # Batch size for generation
-  top_k_context: 6                  # Top-K context selection for RAG
-  temperature: 0.7                  # LLM temperature (0.0-1.0)
+# ==================== Step 2: Auto Module (Method Understanding & QA) ====================
+# 自动理解方法并生成问答对
+auto:
+  enabled: true                                       # Enable auto module
+  max_methods: 5                                     # Maximum methods to process (cost control)
+  questions_per_method: 5                             # Number of questions per method
+  top_k_context: 6                                    # Top-K methods for context retrieval
+  embedding_model: "nomic-embed-text"                 # Ollama embedding model
+  prompts:
+    method_understanding: "configs/prompts/auto_method_understanding.txt"
+    question_generation: "configs/prompts/auto_question_generation.txt"
+    answer_generation: "configs/prompts/auto_answer_generation.txt"
+  outputs:
+    method_profiles_jsonl: "data/intermediate/method_profiles.jsonl"
+    method_understanding_rejected_jsonl: "data/intermediate/auto_method_understanding_rejected.jsonl"
+    questions_jsonl: "data/intermediate/questions.jsonl"
+    embeddings_jsonl: "data/intermediate/method_embeddings.jsonl"
+    auto_qa_raw_jsonl: "data/intermediate/auto_qa_raw.jsonl"
+    auto_answer_rejected_jsonl: "data/intermediate/auto_answer_rejected.jsonl"
 
-# ==================== QA Generator Configuration ====================
+# ==================== Step 3a: Auto Requirements Generation ====================
+# 基于代码自动生成架构改进需求
+auto_requirements:
+  enabled: true                    # true = auto-generate requirements, false = use configs/requirements.yaml
+  max_requirements: 6               # Maximum requirements to generate (reduced for token efficiency)
+  top_k_symbols: 12                 # Top-K symbols for context
+  require_min_evidence: 2           # Minimum evidence_refs per requirement
+  max_context_chars: 18000          # Maximum characters for context (prompt size control)
+  use_method_profiles: true        # Use method profiles to enhance requirement generation
+  method_profiles_jsonl: "data/intermediate/method_profiles.jsonl"  # Method profiles file path
+  profiles_top_k: 20                # Top-K profiles for semantic enhancement
+  profiles_max_chars: 6000          # Max characters for profiles context to prevent context explosion
+  batching:                         # Batch generation to reduce JSON truncation risk
+    enabled: true                   # Enable batch generation (false = single-shot like before)
+    batch_size: 2                   # Generate N requirements per batch (smaller = safer)
+    max_batches: 5                  # Maximum batch iterations (safety limit)
+    diversity_hint: true            # Provide existing requirements to avoid duplicates
+  prompts:
+    requirement_generation: "configs/prompts/auto_requirement_generation.txt"
+  outputs:
+    requirements_jsonl: "data/intermediate/requirements_auto.jsonl"
+    rejected_jsonl: "data/intermediate/requirements_auto_rejected.jsonl"
+
+# ==================== Step 3b: QA Generation ====================
+# 基于代码符号生成问答对
 qa_generator:
   max_context_chars: 16000
   batch_size: 5
@@ -52,49 +114,48 @@ qa_generator:
     - "RestController"
     - "Controller"
 
-# ==================== Design Generator Configuration ====================
+# ==================== Step 3c: Design Generation ====================
+# 基于需求生成设计方案
 design_generator:
   top_k_context: 6
   max_context_chars: 20000
   max_samples: 10
   require_min_evidence: 2
 
-# ==================== LLM Configuration ====================
-llm:
-  provider: "ollama"
-  base_url: "http://localhost:11434/v1"
-  model: "qwen2.5:7b"
-  temperature: 0.7
-  max_tokens: 2000
-  timeout: 60
+# ================================================================================================
+# DATA QUALITY & PROCESSING (数据质量控制和后处理)
+# ================================================================================================
 
-# ==================== Quality Control Configuration ====================
+# ==================== Step 4: Quality Control ====================
+# 数据质量检查和过滤
 quality:
   min_instruction_length: 10
   min_answer_length: 20
-  max_answer_length: 2000
+  max_answer_length: 6000           # Match llm.max_tokens for consistency
   enable_deduplication: true
 
-# ==================== Deduplication Configuration ====================
+# ==================== Step 5: Deduplication ====================
+# 去重处理，移除相似样本
 dedup:
   simhash_bits: 64                  # Simhash fingerprint bits
   max_hamming: 3                    # Maximum hamming distance for near-duplicates
-  seed: 42
 
-# ==================== Split Configuration ====================
+# ==================== Step 6: Train/Val/Test Split ====================
+# 数据集划分
 split:
   train_ratio: 0.8                  # Training set ratio
   val_ratio: 0.1                    # Validation set ratio
   test_ratio: 0.1                   # Test set ratio
-  seed: 42                          # Random seed for reproducibility
   group_by: "package"               # Grouping strategy: "package" or "path"
 
-# ==================== Safety & Compliance Configuration ====================
+# ==================== Step 7: Safety Scan ====================
+# 安全扫描，检测敏感信息
 safety:
   mode: "drop"                      # Mode: "drop" (remove samples) or "sanitize" (redact secrets)
   scan_enabled: true
 
-# ==================== Export Configuration ====================
+# ==================== Step 8: Export ====================
+# 导出最终数据集
 export:
   system_prompt: |
     你是一个专业的代码助手，精通 Java 开发和架构设计。
@@ -102,75 +163,44 @@ export:
     你必须基于 evidence（证据）进行推理，确保答案可追溯到具体代码。
     在回答时，注重实用性和可操作性，避免过于抽象的描述。
 
-# ==================== Output Paths Configuration ====================
-paths:
-  # Raw outputs
-  symbols_jsonl: "data/raw/extracted/symbols.jsonl"
-  repo_meta_json: "data/raw/repo_meta/repo_meta.json"
-  
-  # Intermediate outputs
-  intermediate_dir: "data/intermediate"
-  qa_raw_jsonl: "data/intermediate/qa_raw.jsonl"
-  qa_rejected_jsonl: "data/intermediate/qa_rejected.jsonl"
-  design_raw_jsonl: "data/intermediate/design_raw.jsonl"
-  design_rejected_jsonl: "data/intermediate/design_rejected.jsonl"
-  all_raw_jsonl: "data/intermediate/all_raw.jsonl"
-  all_dedup_jsonl: "data/intermediate/all_dedup.jsonl"
-  
-  # Final outputs
-  final_dir: "data/final"
-  train_jsonl: "data/final/train.jsonl"
-  val_jsonl: "data/final/val.jsonl"
-  test_jsonl: "data/final/test.jsonl"
-  train_sft_jsonl: "data/final/train_sft.jsonl"
-  val_sft_jsonl: "data/final/val_sft.jsonl"
-  test_sft_jsonl: "data/final/test_sft.jsonl"
-  
-  # Reports
-  reports_dir: "data/reports"
-  qa_quality_json: "data/reports/qa_quality.json"
-  design_quality_json: "data/reports/design_quality.json"
-  dedup_mapping_json: "data/reports/dedup_mapping.json"
-  secrets_dropped_jsonl: "data/reports/secrets_dropped.jsonl"
-  pipeline_summary_json: "data/reports/pipeline_summary.json"
-  dataset_stats_json: "data/reports/dataset_stats.json"
+# ================================================================================================
+# OUTPUT PATHS (输出路径配置)
+# ================================================================================================
 
-# ==================== Output Directory Configuration (Backward Compatibility) ====================
+# ==================== QA Output Paths ====================
+paths:
+  # QA数据输出（问答对）
+  qa_final_dir: "data/final/qa"
+  qa_train_jsonl: "data/final/qa/train.jsonl"
+  qa_val_jsonl: "data/final/qa/val.jsonl"
+  qa_test_jsonl: "data/final/qa/test.jsonl"
+  qa_train_sft_jsonl: "data/final/qa/train_sft.jsonl"
+  qa_val_sft_jsonl: "data/final/qa/val_sft.jsonl"
+  qa_test_sft_jsonl: "data/final/qa/test_sft.jsonl"
+  
+  # Design数据输出（设计方案）
+  design_final_dir: "data/final/design"
+  design_train_jsonl: "data/final/design/train.jsonl"
+  design_val_jsonl: "data/final/design/val.jsonl"
+  design_test_jsonl: "data/final/design/test.jsonl"
+  design_train_sft_jsonl: "data/final/design/train_sft.jsonl"
+  design_val_sft_jsonl: "data/final/design/val_sft.jsonl"
+  design_test_sft_jsonl: "data/final/design/test_sft.jsonl"
+
+# ==================== Directory Structure ====================
 output:
-  raw_extracted: "data/raw/extracted"
-  raw_repo_meta: "data/raw/repo_meta"
-  intermediate: "data/intermediate"
-  final: "data/final"
-  reports: "data/reports"
+  raw_extracted: "data/raw/extracted"           # 原始提取的符号数据
+  raw_repo_meta: "data/raw/repo_meta"           # 仓库元数据
+  intermediate: "data/intermediate"             # 中间处理结果
+  final: "data/final"                           # 最终输出数据
+  reports: "data/reports"                       # 分析报告
+
+# ================================================================================================
+# SYSTEM CONFIGURATION (系统配置)
+# ================================================================================================
 
 # ==================== Logging Configuration ====================
 logging:
   level: "INFO"
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
   file: "logs/pipeline.log"
-
-# ==================== Advanced Configuration ====================
-advanced:
-  enable_cache: true
-  cache_dir: ".cache"
-  parallel_workers: 4
-  checkpoint_interval: 100
-
-# ==================== Auto Module Configuration ====================
-auto:
-  enabled: true                                       # Enable auto module (default: disabled)
-  max_methods: 30                                     # Maximum methods to process (cost control)
-  questions_per_method: 5                             # Number of questions per method
-  top_k_context: 6                                    # Top-K methods for context retrieval
-  embedding_model: "nomic-embed-text"                 # Ollama embedding model
-  prompts:
-    method_understanding: "configs/prompts/auto_method_understanding.txt"
-    question_generation: "configs/prompts/auto_question_generation.txt"
-    answer_generation: "configs/prompts/auto_answer_generation.txt"
-  outputs:
-    method_profiles_jsonl: "data/intermediate/method_profiles.jsonl"
-    method_understanding_rejected_jsonl: "data/intermediate/auto_method_understanding_rejected.jsonl"
-    questions_jsonl: "data/intermediate/questions.jsonl"
-    embeddings_jsonl: "data/intermediate/method_embeddings.jsonl"
-    auto_qa_raw_jsonl: "data/intermediate/auto_qa_raw.jsonl"
-    auto_answer_rejected_jsonl: "data/intermediate/auto_answer_rejected.jsonl"

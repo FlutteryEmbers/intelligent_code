@@ -36,7 +36,7 @@ class AutoAnswerGenerator:
         
         # 从配置读取参数
         self.top_k_context = self.config.get('auto.top_k_context', 6)
-        self.max_context_chars = self.config.get('generation.max_context_chars', 16000)
+        self.max_context_chars = 16000  # Auto answer generation uses fixed context limit
         self.embedding_model = self.config.get('auto.embedding_model', 'nomic-embed-text')
         
         # 加载 prompt 模板

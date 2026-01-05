@@ -101,6 +101,17 @@ class Requirement:
             'acceptance_criteria': self.acceptance_criteria,
             'non_goals': self.non_goals
         }
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> 'Requirement':
+        """从字典创建 Requirement 对象"""
+        return cls(
+            id=data['id'],
+            goal=data['goal'],
+            constraints=data.get('constraints', []),
+            acceptance_criteria=data.get('acceptance_criteria', []),
+            non_goals=data.get('non_goals', [])
+        )
 
 
 class DesignGenerator:

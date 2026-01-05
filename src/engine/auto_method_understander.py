@@ -43,7 +43,7 @@ class AutoMethodUnderstander:
         
         # 从配置读取参数
         self.max_methods = self.config.get('auto.max_methods', 50)
-        self.max_context_chars = self.config.get('generation.max_context_chars', 16000)
+        self.max_context_chars = 16000  # Auto method understanding uses fixed context limit
         
         # 加载 prompt 模板
         template_path = self.config.get(

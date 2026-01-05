@@ -178,12 +178,12 @@ class Config:
     @property
     def batch_size(self) -> int:
         """批次大小"""
-        return self.get('generation.batch_size', 10)
+        return self.get('global.batch_size', 5)
     
     @property
     def top_k_context(self) -> int:
         """上下文数量"""
-        return self.get('generation.top_k_context', 5)
+        return self.get('global.top_k_context', 6)
     
     @property
     def ignore_paths(self) -> list[str]:
