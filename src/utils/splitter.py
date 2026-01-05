@@ -128,7 +128,8 @@ def group_split_samples(
     val_ratio: float = 0.1,
     test_ratio: float = 0.1,
     seed: int = 42,
-    group_by: str = "package"
+    group_by: str = "package",
+    min_groups_for_grouping: int = 5
 ) -> tuple[list[dict], list[dict], list[dict]]:
     """
     Split samples into train/val/test sets with group-based stratification.
@@ -164,6 +165,43 @@ def group_split_samples(
     
     # Convert to list of (group_key, samples) tuples
     group_list = list(groups.items())
+
+    # Fallback to sample-level split when groups are too few
+    if len(group_list) < min_groups_for_grouping:
+        random.seed(seed)
+        shuffled = list(samples)
+        random.shuffle(shuffled)
+
+        n = len(shuffled)
+        train_count = int(n * train_ratio)
+        val_count = int(n * val_ratio)
+
+        # Ensure at least 1 sample in each split if possible
+        if n >= 3:
+            if train_count == 0:
+                train_count = 1
+            if val_count == 0:
+                val_count = 1
+            if train_count + val_count >= n:
+                train_count = max(1, n - 2)
+                val_count = 1
+
+        train_samples = shuffled[:train_count]
+        val_samples = shuffled[train_count:train_count + val_count]
+        test_samples = shuffled[train_count + val_count:]
+
+        print("=" * 70)
+        print(" Dataset Split Summary")
+        print("=" * 70)
+        print(f"Split strategy: sample-level fallback (groups={len(group_list)}, threshold={min_groups_for_grouping})")
+        print(f"Total samples: {len(samples)}")
+        print()
+        print(f"Train: {len(train_samples)} samples ({len(train_samples)/len(samples):.2%})")
+        print(f"Val:   {len(val_samples)} samples ({len(val_samples)/len(samples):.2%})")
+        print(f"Test:  {len(test_samples)} samples ({len(test_samples)/len(samples):.2%})")
+        print("=" * 70)
+
+        return train_samples, val_samples, test_samples
     
     # Shuffle groups
     random.seed(seed)

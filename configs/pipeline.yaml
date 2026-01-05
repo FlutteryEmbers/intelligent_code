@@ -7,7 +7,7 @@
 # ==================== 1. Project & Repository Configuration ====================
 # 项目基本信息和代码仓库配置
 repo:
-  path: "./repos/java/online_shopping_be"              # Path to Java repository (required)
+  path: "./repos/java/spring-ai"              # Path to Java repository (required)
   commit: ""                        # Git commit hash (empty = auto-detect from git)
 
 # ==================== 2. Global Settings ====================
