@@ -1,0 +1,142 @@
+# Python Language Profile
+# QA/Design generation rules and parsing configuration for Python projects
+
+language: python
+
+# Parsing Configuration: File extensions, ignore patterns, and parser settings
+parsing:
+  # File extensions to parse
+  file_extensions:
+    - ".py"
+    - ".pyi"   # Type stub files
+  
+  # Paths to ignore during parsing
+  ignore_paths:
+    - "test"
+    - "tests"
+    - ".git"
+    - "venv"          # Virtual environment
+    - "env"
+    - ".venv"
+    - "__pycache__"   # Python cache
+    - ".pytest_cache"
+    - ".tox"
+    - "dist"          # Distribution builds
+    - "build"
+    - "*.egg-info"
+    - ".idea"
+    - ".vscode"
+    - "node_modules"
+  
+  # Parser-specific settings
+  max_chars_per_symbol: 8000    # Python code is typically more concise
+  include_private: false          # Skip methods starting with _
+  include_test: false
+
+# QA Generation: Candidate selection and scoring rules
+qa:
+  markers:
+    # Java annotations (not used in Python)
+    annotations: []
+    # Python decorators that indicate business logic
+    decorators:
+      - route
+      - get
+      - post
+      - put
+      - delete
+      - patch
+      - api_view
+      - action
+      - task
+      - cached_property
+      - transaction
+      - atomic
+    # Keywords in function/class names
+    name_keywords:
+      - process
+      - handle
+      - execute
+      - validate
+      - calculate
+      - transform
+      - create
+      - update
+      - delete
+    # Keywords in file paths
+    path_keywords:
+      - views
+      - routers
+      - handlers
+      - services
+      - controllers
+  
+  scoring:
+    # Weight for Java annotations (not applicable)
+    annotation_weight: 0
+    # Weight for having decorators
+    decorator_weight: 10
+    # Weight for having documentation
+    doc_weight: 5
+    # Weight for matching name keywords
+    name_keyword_weight: 1
+
+# Design Generation: Layer identification rules
+design:
+  layers:
+    controller:
+      annotations: []
+      decorators:
+        - route
+        - get
+        - post
+        - put
+        - delete
+        - patch
+        - api_view
+        - action
+      name_keywords:
+        - view
+        - router
+        - controller
+        - endpoint
+        - api
+      path_keywords:
+        - views
+        - routers
+        - controllers
+        - api
+        - endpoints
+    
+    service:
+      annotations: []
+      decorators:
+        - transaction
+        - atomic
+        - cached_property
+      name_keywords:
+        - service
+        - manager
+        - handler
+        - processor
+        - usecase
+      path_keywords:
+        - services
+        - business
+        - logic
+        - usecases
+    
+    repository:
+      annotations: []
+      decorators: []
+      name_keywords:
+        - repository
+        - dao
+        - store
+        - model
+      path_keywords:
+        - repositories
+        - models
+        - dao
+        - database
+        - persistence

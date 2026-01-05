@@ -19,15 +19,38 @@ class BaseParser(ABC):
         初始化解析器
         
         Args:
-            config: 解析器配置字典，可包含：
-                - max_chars_per_symbol: 单个符号最大字符数
-                - ignore_paths: 忽略的路径模式列表
-                - include_private: 是否包含私有成员
-                等
+            config: 解析器配置字典（通常是整个pipeline config）
+                   解析配置会从language profile中自动加载
         """
+        from src.utils.language_profile import load_language_profile
+        
         self.config = config or {}
-        self.max_chars_per_symbol = self.config.get('max_chars_per_symbol', 5000)
-        self.ignore_paths = self.config.get('ignore_paths', [])
+        
+        # Load language profile to get parsing configuration
+        self.profile = load_language_profile(config=self.config)
+        parsing_config = self.profile.get_parsing_config()
+        
+        # Extract parsing settings from profile
+        self.max_chars_per_symbol = parsing_config.get('max_chars_per_symbol', 5000)
+        self.ignore_paths = parsing_config.get('ignore_paths', [])
+        self.file_extensions = parsing_config.get('file_extensions', [])
+        self.include_private = parsing_config.get('include_private', False)
+        self.include_test = parsing_config.get('include_test', False)
+        
+        # Allow pipeline.yaml to override (for project-specific customization)
+        if 'parser' in self.config:
+            parser_override = self.config['parser']
+            self.max_chars_per_symbol = parser_override.get('max_chars_per_symbol', self.max_chars_per_symbol)
+            self.include_private = parser_override.get('include_private', self.include_private)
+            self.include_test = parser_override.get('include_test', self.include_test)
+        
+        if 'filter' in self.config:
+            filter_override = self.config['filter']
+            if 'ignore_paths' in filter_override:
+                # Merge ignore paths (profile + pipeline override)
+                self.ignore_paths = list(set(self.ignore_paths + filter_override['ignore_paths']))
+            if 'file_extensions' in filter_override:
+                self.file_extensions = filter_override['file_extensions']
 
     @abstractmethod
     def parse_repo(self, repo_path: str, repo_commit: str) -> list[CodeSymbol]:

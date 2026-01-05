@@ -17,6 +17,12 @@ global:
   batch_size: 5                     # Default batch size for generation
   top_k_context: 6                  # Default Top-K context selection for RAG
 
+# ==================== Language Configuration ====================
+# Language-specific rules for QA/Design generation and parser selection
+language:
+  name: "java"                      # Language name: java, python (determines parser and rules)
+  profile_dir: "configs/language"   # Directory containing language profile YAML files
+
 # ==================== 3. LLM Configuration (Core Dependency) ====================
 # LLM是整个pipeline的核心依赖，所有生成步骤都依赖此配置
 llm:
@@ -32,27 +38,23 @@ llm:
 # ================================================================================================
 
 # ==================== Step 1: Code Parsing ====================
-# 解析代码仓库，提取符号信息
-filter:
-  ignore_paths:
-    - "test"
-    - "tests"
-    - ".git"
-    - "target"
-    - "build"
-    - "node_modules"
-    - ".idea"
-    - ".vscode"
-    - "bin"
-    - "out"
-  file_extensions:
-    - ".java"
+# Code parsing configuration (now in language profile configs/language/{language}.yaml)
+# You can override these settings here for project-specific customization
 
-parser:
-  type: "java"
-  max_chars_per_symbol: 12000       # Maximum characters per symbol (truncation threshold)
-  include_private: false
-  include_test: false
+# Optional: Override language profile's parsing defaults
+# filter:
+#   ignore_paths:
+#     - "custom_path"  # Additional paths to ignore (merged with profile)
+#   file_extensions:
+#     - ".java"  # Override profile's file extensions
+
+# Optional: Override parser settings from profile
+# parser:
+#   max_chars_per_symbol: 15000  # Override profile's default
+#   include_private: true        # Override profile's default
+#   include_test: true           # Override profile's default
+
+# Note: If not specified, all settings come from configs/language/{language}.yaml
 
 # ==================== Step 2: Auto Module (Method Understanding & QA) ====================
 # 自动理解方法并生成问答对

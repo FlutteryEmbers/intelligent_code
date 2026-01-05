@@ -12,6 +12,7 @@ from collections import Counter
 from src.utils.schemas import CodeSymbol, TrainingSample, ReasoningTrace, EvidenceRef, sha256_text
 from src.utils.config import Config
 from src.utils.logger import get_logger
+from src.utils.language_profile import load_language_profile
 from src.engine.llm_client import LLMClient
 
 logger = get_logger(__name__)
@@ -43,26 +44,18 @@ class QAGenerator:
     2. 构造上下文（控制长度）
     3. 调用 LLM 生成结构化问答
     4. 校验质量并保存
-    """
     
-    # 业务相关注解
-    BUSINESS_ANNOTATIONS = {
-        # 事务管理
-        'Transactional',
-        # REST 端点
-        'GetMapping', 'PostMapping', 'PutMapping', 'DeleteMapping', 'RequestMapping',
-        # 服务层
-        'Service', 'Component', 'Repository',
-        # 控制器
-        'RestController', 'Controller',
-        # 调度任务
-        'Scheduled', 'Async',
-    }
+    Note: Rules are now loaded from language profile (configs/language/*.yaml)
+    """
     
     def __init__(self, config: Config | None = None):
         """初始化生成器"""
         self.config = config or Config()
         self.llm_client = LLMClient()
+        
+        # Load language profile for rules
+        self.profile = load_language_profile(config=self.config)
+        logger.info(f"Loaded language profile: {self.profile.language}")
         
         # 加载prompt模板
         self.system_prompt_template = load_prompt_template("qa_system_prompt.txt")
@@ -210,44 +203,58 @@ class QAGenerator:
         # 按优先级排序（分数高的在前）
         candidates.sort(key=lambda s: self._calculate_priority_score(s), reverse=True)
         
-        # 记录统计
+        # Record statistics
         if candidates:
             ann_counter = Counter()
+            markers = self.profile.get_qa_markers()
+            profile_markers = set(markers.get('annotations', [])) | set(markers.get('decorators', []))
+            
             for c in candidates:
                 for ann in c.annotations:
-                    if ann.name in self.BUSINESS_ANNOTATIONS:
+                    if ann.name in profile_markers:
                         ann_counter[ann.name] += 1
             
-            logger.info(f"Candidate annotation distribution: {dict(ann_counter.most_common(5))}")
+            logger.info(f"Candidate marker distribution: {dict(ann_counter.most_common(5))}")
         
         return candidates
     
     def _calculate_priority_score(self, symbol: CodeSymbol) -> int:
-        """计算优先级分数"""
+        """Calculate priority score based on language profile rules"""
         score = 0
         
-        # 方法注解
-        method_annotations = {ann.name for ann in symbol.annotations}
+        # Get rules from profile
+        markers = self.profile.get_qa_markers()
+        scoring = self.profile.get_qa_scoring()
         
-        if 'Transactional' in method_annotations:
-            score += 10
-        if method_annotations & {'GetMapping', 'PostMapping', 'PutMapping', 'DeleteMapping', 'RequestMapping'}:
-            score += 8
-        if 'Scheduled' in method_annotations:
-            score += 6
-        if 'Async' in method_annotations:
-            score += 5
+        # Check annotations/decorators (both stored in symbol.annotations)
+        symbol_annotations = {ann.name for ann in symbol.annotations}
+        profile_annotations = set(markers.get('annotations', []))
+        profile_decorators = set(markers.get('decorators', []))
         
-        # 类注解（从 metadata 或 qualified_name 推断）
-        # 简化：假设类注解信息在 metadata 中
-        class_name = symbol.metadata.get('class_name', '')
+        # Match annotations (Java)
+        if symbol_annotations & profile_annotations:
+            score += scoring.get('annotation_weight', 10)
         
-        # 检查是否为服务类/控制器（通过类名或注解）
-        if any(keyword in class_name for keyword in ['Service', 'Controller', 'Repository']):
-            score += 3
+        # Match decorators (Python, stored as annotations)
+        if symbol_annotations & profile_decorators:
+            score += scoring.get('decorator_weight', 10)
         
-        # 有 JavaDoc
+        # Check name keywords
+        name_keywords = markers.get('name_keywords', [])
+        name_lower = symbol.name.lower()
+        qualified_lower = symbol.qualified_name.lower()
+        if any(kw in name_lower or kw in qualified_lower for kw in name_keywords):
+            score += scoring.get('name_keyword_weight', 1)
+        
+        # Check path keywords
+        path_keywords = markers.get('path_keywords', [])
+        path_lower = symbol.file_path.lower()
+        if any(kw in path_lower for kw in path_keywords):
+            score += scoring.get('name_keyword_weight', 1)
+        
+        # Has documentation
         if symbol.doc:
+            score += scoring.get('doc_weight', 5)
             score += 2
         
         # 方法名暗示业务逻辑

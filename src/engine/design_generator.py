@@ -14,6 +14,7 @@ import yaml
 from src.utils.schemas import CodeSymbol, TrainingSample, ReasoningTrace, EvidenceRef, sha256_text
 from src.utils.config import Config
 from src.utils.logger import get_logger
+from src.utils.language_profile import load_language_profile
 from src.engine.llm_client import LLMClient
 
 logger = get_logger(__name__)
@@ -123,23 +124,18 @@ class DesignGenerator:
     2. 轻量级 RAG（过滤 + 检索）
     3. LLM 生成设计方案
     4. 质量校验并保存
+    
+    Note: Layer identification rules now loaded from language profile (configs/language/*.yaml)
     """
-    
-    # 架构层级注解
-    CONTROLLER_ANNOTATIONS = {'RestController', 'Controller'}
-    SERVICE_ANNOTATIONS = {'Service', 'Component'}
-    REPOSITORY_ANNOTATIONS = {'Repository'}
-    
-    # 架构层级关键词
-    CONTROLLER_KEYWORDS = ['controller', 'endpoint', 'api', 'rest']
-    SERVICE_KEYWORDS = ['service', 'manager', 'handler']
-    REPOSITORY_KEYWORDS = ['repository', 'dao', 'mapper']
-    ENTITY_KEYWORDS = ['entity', 'model', 'dto', 'vo']
     
     def __init__(self, config: Config | None = None):
         """初始化生成器"""
         self.config = config or Config()
         self.llm_client = LLMClient()
+        
+        # Load language profile for layer identification
+        self.profile = load_language_profile(config=self.config)
+        logger.info(f"Loaded language profile: {self.profile.language}")
         
         # 加载prompt模板
         self.system_prompt_template = load_prompt_template("design_system_prompt.txt")
@@ -378,26 +374,17 @@ class DesignGenerator:
         return top_symbols
     
     def _filter_candidates(self, symbols: list[CodeSymbol]) -> list[CodeSymbol]:
-        """过滤候选符号：优先 Controller/Service/Repository"""
+        """Filter candidate symbols (any layer from profile)"""
         candidates = []
         
         for symbol in symbols:
             if symbol.symbol_type != 'method':
                 continue
             
-            # 检查注解
-            annotations = {ann.name for ann in symbol.annotations}
-            
-            if annotations & (self.CONTROLLER_ANNOTATIONS | self.SERVICE_ANNOTATIONS | self.REPOSITORY_ANNOTATIONS):
-                candidates.append(symbol)
-                continue
-            
-            # 检查路径
-            path_lower = symbol.file_path.lower()
-            qualified_lower = symbol.qualified_name.lower()
-            
-            if any(kw in path_lower or kw in qualified_lower for kw in 
-                   self.CONTROLLER_KEYWORDS + self.SERVICE_KEYWORDS + self.REPOSITORY_KEYWORDS):
+            # Check if symbol belongs to any design layer
+            if (self._is_controller(symbol) or 
+                self._is_service(symbol) or 
+                self._is_repository(symbol)):
                 candidates.append(symbol)
         
         return candidates
@@ -417,25 +404,26 @@ class DesignGenerator:
         return keywords
     
     def _calculate_relevance_score(self, symbol: CodeSymbol, req_keywords: list[str]) -> int:
-        """计算符号与需求的相关性分数"""
+        """Calculate relevance score between symbol and requirement keywords"""
         score = 0
         
-        # 搜索范围：qualified_name + doc + source
+        # Search in qualified_name + doc + source
         search_text = f"{symbol.qualified_name} {symbol.doc or ''} {symbol.source}".lower()
         
-        # 关键词匹配
+        # Keyword matching
         for keyword in req_keywords:
             if keyword in search_text:
                 score += 1
         
-        # 注解加分
-        annotations = {ann.name for ann in symbol.annotations}
-        if annotations & self.CONTROLLER_ANNOTATIONS:
-            score += 3  # Controller 是入口，加分
-        if annotations & self.SERVICE_ANNOTATIONS:
-            score += 2  # Service 是核心逻辑
+        # Layer-based scoring
+        if self._is_controller(symbol):
+            score += 3  # Controllers are entry points
+        elif self._is_service(symbol):
+            score += 2  # Services are core logic
+        elif self._is_repository(symbol):
+            score += 1  # Repositories are data access
         
-        # 有文档加分
+        # Documentation bonus
         if symbol.doc:
             score += 1
         
@@ -475,34 +463,44 @@ class DesignGenerator:
         return selected
     
     def _is_controller(self, symbol: CodeSymbol) -> bool:
-        """判断是否为 Controller"""
-        annotations = {ann.name for ann in symbol.annotations}
-        if annotations & self.CONTROLLER_ANNOTATIONS:
-            return True
-        
-        path_lower = symbol.file_path.lower()
-        name_lower = symbol.qualified_name.lower()
-        return any(kw in path_lower or kw in name_lower for kw in self.CONTROLLER_KEYWORDS)
+        """Check if symbol is a controller using language profile rules"""
+        layer_rules = self.profile.get_design_layer('controller')
+        return self._matches_layer_rules(symbol, layer_rules)
     
     def _is_service(self, symbol: CodeSymbol) -> bool:
-        """判断是否为 Service"""
-        annotations = {ann.name for ann in symbol.annotations}
-        if annotations & self.SERVICE_ANNOTATIONS:
-            return True
-        
-        path_lower = symbol.file_path.lower()
-        name_lower = symbol.qualified_name.lower()
-        return any(kw in path_lower or kw in name_lower for kw in self.SERVICE_KEYWORDS)
+        """Check if symbol is a service using language profile rules"""
+        layer_rules = self.profile.get_design_layer('service')
+        return self._matches_layer_rules(symbol, layer_rules)
     
     def _is_repository(self, symbol: CodeSymbol) -> bool:
-        """判断是否为 Repository"""
-        annotations = {ann.name for ann in symbol.annotations}
-        if annotations & self.REPOSITORY_ANNOTATIONS:
+        """Check if symbol is a repository using language profile rules"""
+        layer_rules = self.profile.get_design_layer('repository')
+        return self._matches_layer_rules(symbol, layer_rules)
+    
+    def _matches_layer_rules(self, symbol: CodeSymbol, layer_rules: dict) -> bool:
+        """Generic layer matching based on profile rules"""
+        # Check annotations/decorators (both in symbol.annotations)
+        symbol_annotations = {ann.name for ann in symbol.annotations}
+        profile_annotations = set(layer_rules.get('annotations', []))
+        profile_decorators = set(layer_rules.get('decorators', []))
+        
+        if symbol_annotations & (profile_annotations | profile_decorators):
             return True
         
+        # Check name keywords
+        name_keywords = layer_rules.get('name_keywords', [])
+        name_lower = symbol.name.lower()
+        qualified_lower = symbol.qualified_name.lower()
+        if any(kw in name_lower or kw in qualified_lower for kw in name_keywords):
+            return True
+        
+        # Check path keywords
+        path_keywords = layer_rules.get('path_keywords', [])
         path_lower = symbol.file_path.lower()
-        name_lower = symbol.qualified_name.lower()
-        return any(kw in path_lower or kw in name_lower for kw in self.REPOSITORY_KEYWORDS)
+        if any(kw in path_lower for kw in path_keywords):
+            return True
+        
+        return False
     
     def _build_context(
         self,

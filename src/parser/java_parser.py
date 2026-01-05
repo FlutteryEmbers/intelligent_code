@@ -48,14 +48,13 @@ class JavaParser(BaseParser):
         self.parser = Parser()
         self.parser.set_language(self.java_language)
         
-        # 字符预算（从配置读取）
-        self.max_chars_per_symbol = self.config.get('max_chars_per_symbol', 12000)
-        
         # 解析跳过记录路径
         self.skip_log_path = Path('data/raw/extracted/parse_skipped.jsonl')
         self.skip_log_path.parent.mkdir(parents=True, exist_ok=True)
         
         logger.info(f"JavaParser initialized with max_chars_per_symbol={self.max_chars_per_symbol}")
+        logger.info(f"File extensions: {self.file_extensions}")
+        logger.info(f"Ignore paths: {len(self.ignore_paths)} patterns")
     
     def parse_repo(self, repo_path: str, repo_commit: str) -> list[CodeSymbol]:
         """
@@ -81,7 +80,7 @@ class JavaParser(BaseParser):
         parsed_files = 0
         failed_files = 0
         
-        # 遍历所有 Java 文件
+        # 遍历所有源文件（根据 profile 的 file_extensions）
         for java_file in self.iter_source_files(repo_path_obj):
             try:
                 # 解析单个文件
@@ -464,14 +463,17 @@ class JavaParser(BaseParser):
                         yield body_child
     
     def iter_source_files(self, repo_path: Path) -> Generator[Path, None, None]:
-        """迭代仓库中的所有 Java 文件"""
-        for java_file in repo_path.rglob('*.java'):
-            # 检查是否应该忽略
-            if self.should_ignore(java_file):
-                logger.debug(f"Ignoring file: {java_file}")
-                continue
-            
-            yield java_file
+        """迭代仓库中的所有源文件（根据profile的file_extensions）"""
+        for ext in self.file_extensions:
+            # Remove leading dot if present
+            pattern = f"*{ext}" if ext.startswith('.') else f"*.{ext}"
+            for source_file in repo_path.rglob(pattern):
+                # 检查是否应该忽略
+                if self.should_ignore(source_file):
+                    logger.debug(f"Ignoring file: {source_file}")
+                    continue
+                
+                yield source_file
     
     def _save_symbols(self, symbols: list[CodeSymbol], report: ParsingReport):
         """保存解析结果"""

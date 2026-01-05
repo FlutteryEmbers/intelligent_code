@@ -4,6 +4,7 @@ Step 1: Parse Repository
 from pathlib import Path
 
 from src.parser.java_parser import JavaParser
+from src.parser.python_parser import PythonParser
 from src.utils import write_json, write_jsonl, detect_license
 from src.pipeline.base_step import BaseStep
 from src.pipeline.helpers import should_skip_parse
@@ -34,9 +35,20 @@ class ParseStep(BaseStep):
         """Execute parsing."""
         repo_path = Path(self.config["repo"]["path"])
         
+        # Select parser based on language.name
+        language_name = self.config.get("language.name", "java").lower()
+        
+        if language_name == "java":
+            parser = JavaParser(self.config)
+        elif language_name == "python":
+            parser = PythonParser(self.config)
+        else:
+            raise ValueError(f"Unsupported language: {language_name}. Supported: java, python")
+        
+        self.logger.info(f"Using {language_name} parser")
+        
         # Parse repository
-        java_parser = JavaParser(self.config)
-        symbols = java_parser.parse_repo(repo_path, self.repo_commit)
+        symbols = parser.parse_repo(repo_path, self.repo_commit)
         
         # Add license info
         license_info = detect_license(repo_path)

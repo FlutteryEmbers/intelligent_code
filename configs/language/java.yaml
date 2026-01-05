@@ -1,0 +1,122 @@
+# Java Language Profile
+# QA/Design generation rules and parsing configuration for Java projects
+
+language: java
+
+# Parsing Configuration: File extensions, ignore patterns, and parser settings
+parsing:
+  # File extensions to parse
+  file_extensions:
+    - ".java"
+  
+  # Paths to ignore during parsing
+  ignore_paths:
+    - "test"
+    - "tests"
+    - ".git"
+    - "target"        # Maven build output
+    - "build"         # Gradle build output
+    - ".gradle"
+    - "node_modules"
+    - ".idea"         # IntelliJ IDEA
+    - ".vscode"
+    - "bin"
+    - "out"
+  
+  # Parser-specific settings
+  max_chars_per_symbol: 12000
+  include_private: false
+  include_test: false
+
+# QA Generation: Candidate selection and scoring rules
+qa:
+  markers:
+    # Java annotations that indicate business logic
+    annotations:
+      - Transactional
+      - GetMapping
+      - PostMapping
+      - PutMapping
+      - DeleteMapping
+      - RequestMapping
+      - PatchMapping
+      - Service
+      - Component
+      - Repository
+      - RestController
+      - Controller
+      - Scheduled
+      - Async
+    # Python decorators (not used in Java)
+    decorators: []
+    # Keywords in method/class names
+    name_keywords:
+      - process
+      - handle
+      - execute
+      - validate
+      - calculate
+      - transform
+    # Keywords in file paths
+    path_keywords:
+      - service
+      - controller
+      - handler
+      - processor
+  
+  scoring:
+    # Weight for having business annotations
+    annotation_weight: 10
+    # Weight for Python decorators (not applicable)
+    decorator_weight: 0
+    # Weight for having documentation
+    doc_weight: 5
+    # Weight for matching name keywords
+    name_keyword_weight: 1
+
+# Design Generation: Layer identification rules
+design:
+  layers:
+    controller:
+      annotations:
+        - RestController
+        - Controller
+      decorators: []
+      name_keywords:
+        - controller
+        - endpoint
+        - api
+        - rest
+      path_keywords:
+        - controller
+        - api
+        - rest
+    
+    service:
+      annotations:
+        - Service
+        - Component
+      decorators: []
+      name_keywords:
+        - service
+        - manager
+        - handler
+        - facade
+      path_keywords:
+        - service
+        - business
+        - logic
+    
+    repository:
+      annotations:
+        - Repository
+      decorators: []
+      name_keywords:
+        - repository
+        - dao
+        - mapper
+      path_keywords:
+        - repository
+        - dao
+        - persistence
+        - data
