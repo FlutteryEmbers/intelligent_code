@@ -28,6 +28,7 @@
 ```bash
 ollama serve
 ollama pull qwen2.5:7b
+ollama pull nomic-embed-text
 ```
 
 在 `configs/pipeline.yaml` 中配置：
