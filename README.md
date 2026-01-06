@@ -1,30 +1,23 @@
 # Intelligent Training Data Generation System
 
-A training data pipeline for local code repositories: parse code, build structured context, generate QA/architecture design data using RAG and local LLM, with validation, deduplication, splitting, and export capabilities.
+一句话杀手锏：**把本地代码仓自动解析为可验证证据（`symbol_id/source_hash/line`），再用本地 Ollama 生成“业务规则 QA + 架构设计方案”两类 SFT 训练数据。**
 
-## ✨ Key Features
+## What You Get
 
-- **Multi-Language Support**: Java (tree-sitter) and Python (AST-based)
-- **Flexible Language Rules**: Layer/marker recognition rules in YAML (configs/language/*.yaml)
-- Data Modeling: Pydantic structured samples (traceable and verifiable)
-- QA Generation: With code understanding (Auto QA) or standard mode
-- Design Generation: With code understanding (Auto Requirements) or fixed requirements
-- Quality Control: Field completeness, evidence validation, deduplication, and splitting
-- Local LLM: Ollama + LangChain with structured output and retry support
+- **Two Scenarios**
+  - 场景 1：`qa_rule`（基于业务流程/规则的问答对）
+  - 场景 2：`arch_design`（基于仓库架构的设计方案）
+- **Evidence-first**：样本通过 `thought.evidence_refs` 回指 `data/raw/extracted/symbols.jsonl`，支持一致性校验与审计
+- **Auto RAG Mode（可选）**：方法画像 → embedding → 检索 → 生成问题与答案（质量与可控性更强）
+- **Config-driven**：语言规则/分层识别通过 `configs/language/*.yaml` 扩展
+- **Offline Pipeline**：Parse → (Auto/QA/Design) → Validation → Merge → Dedup → Safety → Split → Export
 
-## 🔧 Key Dependencies
+## Getting Started
 
-- tree-sitter / tree-sitter-java: Java syntax tree parsing
-- pydantic: Data models and validation
-- pyyaml: Configuration file parsing
-- langchain-openai / langchain-core: LLM integration with structured output
-- ollama: Local model service
+### Prerequisites
 
-See `requirements.txt` for complete dependencies.
-
-## 🧠 本地模型与配置（必须）
-
-本项目依赖本地 Ollama 模型服务，需提前安装并拉取模型。
+- Python 3.10+
+- 本地 Ollama（用于 LLM 与 embedding）
 
 ```bash
 ollama serve
@@ -32,13 +25,38 @@ ollama pull qwen2.5:7b
 ollama pull nomic-embed-text
 ```
 
-在 `configs/pipeline.yaml` 中配置：
+### Install
+
+```bash
+python3 -m venv venv
+source venv/bin/activate  # Linux/Mac
+# venv\Scripts\activate   # Windows
+pip install -r requirements.txt
+```
+
+### Core Configuration（最重要的几项）
+
+编辑 `configs/pipeline.yaml`：
+
+1) 目标仓库与语言
+
+```yaml
+repo:
+  path: "./repos/java/spring-ai"  # 改成你的仓库路径
+  commit: ""                      # 可留空（自动从 git 取 HEAD）
+
+language:
+  name: "java"                    # java | python
+  profile_dir: "configs/language"
+```
+
+2) 本地 LLM（Ollama）
 
 ```yaml
 llm:
   base_url: "http://localhost:11434/v1"
   model: "qwen2.5:7b"
-  temperature: 0.7
+  temperature: 0.2
   max_tokens: 10000
   timeout: 120
 ```
@@ -47,235 +65,64 @@ llm:
 
 ```bash
 # Windows
-set REPO_PATH=D:\path\to\java\repo
+set REPO_PATH=D:\path\to\repo
 set OLLAMA_BASE_URL=http://localhost:11434
 set OLLAMA_MODEL=qwen2.5:7b
 
 # Linux/Mac
-export REPO_PATH=/path/to/java/repo
+export REPO_PATH=/path/to/repo
 export OLLAMA_BASE_URL=http://localhost:11434
 export OLLAMA_MODEL=qwen2.5:7b
 ```
 
-自动需求生成与自动 QA 使用同一套本地模型配置，具体以 `configs/pipeline.yaml` 中 `llm.*` 为准。
-
-## 📁 Directory Structure
-
-```
-intelligent_code_generator/
-├── configs/                    # Configuration files
-│   ├── pipeline.yaml          # Pipeline configuration
-│   ├── language/              # Language-specific rules
-│   │   ├── java.yaml         # Java QA/Design markers
-│   │   └── python.yaml       # Python QA/Design markers
-│   └── prompts/              # LLM prompt templates
-├── src/                       # Source code
-│   ├── parser/               # Code parsers (Java, Python)
-│   ├── engine/              # Data generation engines
-│   ├── pipeline/            # Pipeline orchestration and steps
-│   └── utils/               # Utility modules
-├── tests/                    # Test scripts
-├── data/                     # Output directory
-│   ├── raw/                  # Raw parsing results
-│   ├── intermediate/         # Intermediate results
-│   ├── final/                # Final training data
-│   └── reports/              # Statistics and reports
-├── logs/                     # Logs
-├── requirements.txt
-└── README.md
-```
-
-## 🌐 Language Support
-
-The system supports multiple programming languages via YAML-based language profiles.
-
-### Supported Languages
-
-| Language | Parser | QA Markers | Design Layers | Config File |
-|----------|--------|------------|---------------|-------------|
-| Java | tree-sitter | @Transactional, @Service, etc. | Controller/Service/Repository | configs/language/java.yaml |
-| Python | AST (tree-sitter planned) | @route, @task, etc. | Views/Services/Repositories | configs/language/python.yaml |
-
-### Switching Languages
-
-Edit `configs/pipeline.yaml`:
+3) 选择生成模式（Auto 或标准）
 
 ```yaml
-language:
-  name: "java"  # or "python" - automatically selects parser
-  profile_dir: "configs/language"
+auto:
+  enabled: true                    # Auto QA（建议先开）
+  embedding_model: "nomic-embed-text"
+  max_methods: 50
+  questions_per_method: 5
+
+auto_requirements:
+  enabled: true                    # 设计方案用自动需求（可选）
+  use_method_profiles: true
 ```
 
-### Customizing Language Rules
-
-Language profiles define:
-- **Parsing Configuration**: File extensions, ignore patterns, max chars per symbol
-- **QA Markers**: Annotations/decorators indicating business logic candidates
-- **QA Scoring Weights**: How to prioritize methods for QA generation
-- **Design Layers**: Patterns for controller/service/repository identification
-
-Example structure (configs/language/java.yaml):
-
-```yaml
-language: java
-
-# Parsing configuration (auto-applied when language is selected)
-parsing:
-  file_extensions: [".java"]
-  ignore_paths: ["target", "build", ".gradle", ".idea"]
-  max_chars_per_symbol: 12000
-  include_private: false
-  include_test: false
-
-qa:
-  markers:
-    annotations: [Transactional, Service, GetMapping, PostMapping]
-    decorators: []
-    name_keywords: [handler, processor, manager]
-    path_keywords: [controller, service]
-  scoring:
-    annotation_weight: 10
-    doc_weight: 5
-    name_keyword_weight: 1
-
-design:
-  layers:
-    controller:
-      annotations: [RestController, Controller]
-      name_keywords: [controller, endpoint, api]
-      path_keywords: [controller]
-    service:
-      annotations: [Service, Component]
-      name_keywords: [service, manager, handler]
-      path_keywords: [service]
-    repository:
-      annotations: [Repository]
-      name_keywords: [repository, dao, mapper]
-      path_keywords: [repository, dao]
-```
-
-#### Override for Project-Specific Needs
-
-You can override profile defaults in `pipeline.yaml`:
-
-```yaml
-# Optional: Override language profile's parsing defaults
-parser:
-  max_chars_per_symbol: 20000  # Project needs longer symbols
-  include_private: true         # Include private methods
-
-filter:
-  ignore_paths:
-    - "custom_vendor"  # Additional project-specific ignore (merged with profile)
-```
-
-See `docs/LANGUAGE_EXTENSION.md` for detailed customization guide.
-
-## 🚀 快速开始
-
-### 1) 安装依赖
+### Run
 
 ```bash
-python -m venv venv
-venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Linux/Mac
-
-pip install -r requirements.txt
+python3 main.py
 ```
 
-### 2) Configure Repository Path
-
-Edit `configs/pipeline.yaml`:
-
-```yaml
-repo:
-  path: "./repos/java/your_repo"  # or "./repos/python/your_repo"
-  
-language:
-  name: "java"  # or "python" - automatically selects parser and rules
-```
-
-### 3) Parse Repository
+常用跳过项：
 
 ```bash
-python tests/test_java_parser.py
+python3 main.py --skip-parse --skip-llm --skip-export
 ```
 
-输出：
-- `data/raw/extracted/symbols.jsonl`
-- `data/raw/repo_meta/repo_meta.json`
+### Outputs（你应该看到）
 
-### 4) 生成 QA 数据（场景 1）
+- Parse：`data/raw/extracted/symbols.jsonl`、`data/raw/repo_meta/repo_meta.json`
+- Intermediate：`data/intermediate/*.jsonl`
+- Final SFT：`data/final/{train,val,test}_sft.jsonl`（以及 `data/final/qa/*`、`data/final/design/*`）
+- Reports：`data/reports/pipeline_summary.json`、`data/reports/dataset_stats.json`
 
-**两种模式**：\n- **带代码理解（Auto 模式）**：先生成方法画像与问题，再做检索式回答\n- **不带代码理解（标准模式）**：直接从符号抽取候选方法生成 QA
+## Deep Dive（Design Docs）
 
-```bash
-python tests/test_qa_generator.py
-python -m src.engine.qa_generator --max-samples 50
-```
+基于 `src/pipeline` 的 step 拆分设计文档：
 
-输出：
-- `data/intermediate/qa_raw.jsonl`
-- `data/intermediate/qa_rejected.jsonl`
+- 索引：`docs/pipeline/README.md`
+- 编排与 Step API：`docs/pipeline/00-orchestrator-and-step-api.md`
+- 各步骤：`docs/pipeline/01-parse-step.md` → `docs/pipeline/10-export-step.md`
 
-### 5) 生成设计方案数据（场景 2）
 
-**两种模式**：\n- **带代码理解（Auto 需求）**：先从代码自动生成需求，再生成设计方案\n- **不带代码理解（固定需求）**：使用 `configs/requirements.yaml` 的需求
+## Roadmap
 
-```bash
-python tests/test_design_generator.py
-python -m src.engine.design_generator --max-samples 5
-```
-
-输出：
-- `data/intermediate/requirements.jsonl`
-- `data/intermediate/design_raw.jsonl`
-- `data/intermediate/design_rejected.jsonl`
-
-### 6) 运行完整管道
-
-```bash
-python main.py
-```
-
-支持跳过步骤：
-
-```bash
-python main.py --skip-parse --skip-qa --skip-design --skip-export
-```
-
-## 🧪 产物与格式
-
-- 原始符号：`data/raw/extracted/symbols.jsonl`
-- 中间结果：`data/intermediate/*.jsonl`
-- 最终数据：`data/final/{train,val,test}_sft.jsonl`
-- 报告汇总：`data/reports/pipeline_summary.json`
-
-## ⚙️ Common Configuration Options (pipeline.yaml)
-
-- `repo.path`: Repository path (Java or Python)
-- `language.name`: Language name ("java" or "python") - selects parser and rules from configs/language/{name}.yaml
-- `language.profile_dir`: Directory containing language YAML profiles
-- `llm.*`: Local Ollama model configuration
-- `auto.enabled`: Auto question generation switch (true = enable Auto QA)
-- `auto_requirements.enabled`: Auto requirement generation switch (true = generate from code)
-- `qa_generator.*`: QA generation parameters
-- `design_generator.*`: Design generation parameters
-- `auto_requirements.*`: Automatic requirement generation parameters
-- `split.*`: Train/validation/test split ratios
-
-## 🩺 Troubleshooting
-
-- **LLM output parsing error**: Check Ollama service status and model availability.
-- **Insufficient data for splitting**: Increase sample count or adjust `split.group_by`.
-- **Slow generation**: Reduce `max_samples` or adjust batch parameters.
-- **No candidates found**: Check language profile rules match your codebase patterns.
-
-## 📚 Documentation
-
-- `docs/PIPELINE_ARCHITECTURE.md` - Overall architecture
-- `docs/QA_GENERATOR_GUIDE.md` - QA generation workflow
-- `docs/DESIGN_GENERATOR_GUIDE.md` - Design generation workflow
-- `docs/LANGUAGE_EXTENSION.md` - How to add new languages or customize rules
-- `docs/java_parser/JAVA_PARSER_GUIDE.md` - Java parser details
-- `docs/llm_client/LLM_CLIENT_GUIDE.md` - LLM client usage
+- **Quality Gate**：Validation 产出 `*_clean.jsonl`，让 Merge/后处理优先消费（从 report-only 升级为可训练强保证）
+- **Artifact Contract Unification**：统一 step 与 engine 的输出路径/契约（由 Orchestrator `paths` 注入，消除默认路径漂移）
+- **Scalable Retrieval**：把 JSONL embedding 索引升级为可选 FAISS/向量库，支撑大仓库
+- **Dedup Upgrade**：引入 LSH/MinHash 并提供可解释的保留策略与评估
+- **Parallel Generation**：LLM/embedding 阶段并发与重试、成本控制（batch/timeout/backoff）
+- **More Languages**：扩展 JS/TS/Go 等语言（parser + language profile）
+- **Evaluation Harness**：质量回归（schema pass rate、evidence 命中率、覆盖与多样性指标、泄漏风险评估）
