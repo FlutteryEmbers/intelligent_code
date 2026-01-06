@@ -43,7 +43,7 @@ answer_generation:
       wrong: |
         "context": [{"symbol_id": "...", "code": "@Service\\npublic void save()"}]
       correct: |
-        "context": "@Service\\npublic class UserService {\\n    @Transactional\\n    public void save(User user) {\\n        repository.save(user);\\n    }\\n}"
+        "context": "<代码上下文字符串，使用\\n转义换行>"
     
     - type: "missing_escape"
       description: "字符串内的双引号未转义"

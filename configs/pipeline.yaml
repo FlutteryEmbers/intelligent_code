@@ -61,7 +61,7 @@ llm:
 auto:
   enabled: true                                       # Enable auto module
   max_methods: 5                                     # Maximum methods to process (cost control)
-  questions_per_method: 5                             # Number of questions per method
+  questions_per_method: 1                             # Number of questions per method
   top_k_context: 6                                    # Top-K methods for context retrieval
   embedding_model: "nomic-embed-text"                 # Ollama embedding model
   prompts:

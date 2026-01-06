@@ -1,7 +1,5 @@
 # Intelligent Training Data Generation System
 
-一句话杀手锏：**把本地代码仓自动解析为可验证证据（`symbol_id/source_hash/line`），再用本地 Ollama 生成“业务规则 QA + 架构设计方案”两类 SFT 训练数据。**
-
 ## What You Get
 
 - **Two Scenarios**

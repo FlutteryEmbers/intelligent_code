@@ -130,12 +130,15 @@ class AutoAnswerGenerator:
                     
                 except Exception as e:
                     logger.error(f"Failed to generate answer for question {question.question_id}: {e}")
+                    logger.error(f"Exception type: {type(e).__name__}")
+                    logger.error(f"Full traceback:", exc_info=True)
                     
                     # 写入失败记录
                     rejected_entry = {
                         'question_id': question.question_id,
                         'question': question.question,
                         'error': str(e),
+                        'error_type': type(e).__name__,
                         'timestamp': question.created_at
                     }
                     f_rej.write(json.dumps(rejected_entry, ensure_ascii=False) + '\n')
@@ -152,46 +155,70 @@ class AutoAnswerGenerator:
         symbols_map: dict[str, CodeSymbol]
     ) -> TrainingSample:
         """为单个问题生成答案"""
-        # 1. 使用向量检索获取相关方法
-        search_results = vector_index.search(
-            query_text=question.question,
-            embeddings_jsonl=self.embeddings_jsonl,
-            embedding_model=self.embedding_model,
-            top_k=self.top_k_context
-        )
-        
-        if not search_results:
-            raise ValueError("No relevant methods found in vector search")
-        
-        # 2. 构造上下文
+        # 1. 构造上下文（优先使用问题自带的 evidence_refs）
         context_parts = []
         available_evidence = []
         total_chars = 0
-        
-        for symbol_id, score in search_results:
-            symbol = symbols_map.get(symbol_id)
-            if not symbol:
-                continue
-            
-            # 检查是否超过最大长度
-            if total_chars + len(symbol.source) > self.max_context_chars:
-                break
-            
-            context_parts.append(f"// Method: {symbol.qualified_name}")
-            context_parts.append(f"// Relevance Score: {score:.4f}")
-            context_parts.append(symbol.source)
-            context_parts.append("")  # 空行分隔
-            
-            total_chars += len(symbol.source)
-            
-            # 添加到可用证据列表
-            available_evidence.append({
-                'symbol_id': symbol.symbol_id,
-                'file_path': symbol.file_path,
-                'start_line': symbol.start_line,
-                'end_line': symbol.end_line,
-                'source_hash': symbol.source_hash
-            })
+
+        if question.evidence_refs:
+            for ref in question.evidence_refs:
+                symbol = symbols_map.get(ref.symbol_id)
+                if not symbol:
+                    continue
+
+                if total_chars + len(symbol.source) > self.max_context_chars:
+                    break
+
+                context_parts.append(f"// Method: {symbol.qualified_name}")
+                context_parts.append(symbol.source)
+                context_parts.append("")  # 空行分隔
+
+                total_chars += len(symbol.source)
+
+                available_evidence.append({
+                    'symbol_id': symbol.symbol_id,
+                    'file_path': symbol.file_path,
+                    'start_line': symbol.start_line,
+                    'end_line': symbol.end_line,
+                    'source_hash': symbol.source_hash
+                })
+
+        # 2. 如果缺少 evidence_refs 或未找到上下文，回退到向量检索
+        if not context_parts:
+            search_results = vector_index.search(
+                query_text=question.question,
+                embeddings_jsonl=self.embeddings_jsonl,
+                embedding_model=self.embedding_model,
+                top_k=self.top_k_context
+            )
+
+            if not search_results:
+                raise ValueError("No relevant methods found in vector search")
+
+            for symbol_id, score in search_results:
+                symbol = symbols_map.get(symbol_id)
+                if not symbol:
+                    continue
+
+                # 检查是否超过最大长度
+                if total_chars + len(symbol.source) > self.max_context_chars:
+                    break
+
+                context_parts.append(f"// Method: {symbol.qualified_name}")
+                context_parts.append(f"// Relevance Score: {score:.4f}")
+                context_parts.append(symbol.source)
+                context_parts.append("")  # 空行分隔
+
+                total_chars += len(symbol.source)
+
+                # 添加到可用证据列表
+                available_evidence.append({
+                    'symbol_id': symbol.symbol_id,
+                    'file_path': symbol.file_path,
+                    'start_line': symbol.start_line,
+                    'end_line': symbol.end_line,
+                    'source_hash': symbol.source_hash
+                })
         
         context = "\n".join(context_parts)
         
@@ -228,11 +255,69 @@ class AutoAnswerGenerator:
             
             raw_output = response.content.strip()
             
+            # 调试：保存原始输出到文件
+            debug_file = Path("data/intermediate/llm_raw_output_debug.txt")
+            with open(debug_file, 'a', encoding='utf-8') as f:
+                f.write(f"\n{'='*80}\n")
+                f.write(f"Question: {question.question[:80]}\n")
+                f.write(f"Raw Output:\n{raw_output}\n")
+            
             # 清理输出
             cleaned_output = self._clean_json_output(raw_output)
             
+            # 调试：保存清理后的输出
+            with open(debug_file, 'a', encoding='utf-8') as f:
+                f.write(f"Cleaned Output:\n{cleaned_output}\n")
+            
             # 解析为字典
-            sample_dict = json.loads(cleaned_output)
+            try:
+                sample_dict = json.loads(cleaned_output)
+            except json.JSONDecodeError as json_err:
+                logger.error(f"JSON parsing failed: {json_err}")
+                logger.error(f"Cleaned output that failed to parse: {cleaned_output[:500]}")
+                raise ValueError(f"Invalid JSON from LLM: {json_err}") from json_err
+            
+            # 修复answer字段：如果是字典，转换为字符串
+            if 'answer' in sample_dict:
+                if isinstance(sample_dict['answer'], dict):
+                    logger.warning(f"Answer field is dict with keys: {list(sample_dict['answer'].keys())}, converting to string")
+                    answer_dict = sample_dict['answer']
+                    answer_parts = []
+                    
+                    # 常见的中文键
+                    key_order = ['结论', '结论性陈述', '机制', '机制说明', '规则说明', '注意事项', '风险点']
+                    
+                    # 按顺序处理已知键
+                    for key in key_order:
+                        if key in answer_dict:
+                            value = answer_dict[key]
+                            if isinstance(value, list):
+                                value = '\n'.join(f"- {item}" for item in value)
+                            answer_parts.append(f"**{key}**:\n{value}")
+                    
+                    # 处理其他未知键
+                    for key, value in answer_dict.items():
+                        if key not in key_order:
+                            if isinstance(value, list):
+                                value = '\n'.join(f"- {item}" for item in value)
+                            answer_parts.append(f"**{key}**:\n{value}")
+                    
+                    sample_dict['answer'] = '\n\n'.join(answer_parts)
+                    logger.info(f"Converted answer to string, length: {len(sample_dict['answer'])}")
+                elif not isinstance(sample_dict['answer'], str):
+                    # 其他非字符串类型，强制转换
+                    logger.warning(f"Answer field is {type(sample_dict['answer'])}, converting to string")
+                    sample_dict['answer'] = str(sample_dict['answer'])
+            else:
+                # answer字段缺失
+                logger.error("Answer field is missing from LLM output!")
+                raise ValueError("LLM output missing 'answer' field")
+
+            # 强制对齐关键字段，避免模板/示例污染
+            sample_dict['instruction'] = question.question
+            sample_dict['context'] = context
+            sample_dict['scenario'] = "qa_rule"
+            sample_dict['repo_commit'] = question.repo_commit
             
             # 转换 thought
             thought_dict = sample_dict.get('thought', {})
@@ -243,10 +328,6 @@ class AutoAnswerGenerator:
             
             reasoning_trace = ReasoningTrace(**thought_dict)
             sample_dict['thought'] = reasoning_trace
-            
-            # 确保 repo_commit 存在
-            if 'repo_commit' not in sample_dict:
-                sample_dict['repo_commit'] = question.repo_commit
             
             # 创建 TrainingSample
             sample = TrainingSample(**sample_dict)
