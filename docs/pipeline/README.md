@@ -23,3 +23,6 @@
 - **Artifact（工件）**：step 间共享的文件（例如 `symbols.jsonl`、`qa_raw.jsonl`、`all_dedup.jsonl`）。
 - **Contract（契约）**：后续 step 对前置 artifact 的字段/路径/存在性假设（最关键的是 `TrainingSample` schema 与 `thought.evidence_refs`）。
 
+## Related Docs
+
+- `docs/SCHEMAS.md`：本项目所有核心 Pydantic schema 的设计说明与字段注解（理解 evidence_refs、split、validation 的基础）。
