@@ -1,0 +1,84 @@
+# QLoRA 训练配置 - Qwen2.5-Coder-7B-Instruct
+# 适合：质量更高但显存受限，4bit 量化训练约需 18-24GB
+
+# ==================== 模型配置 ====================
+base_model: "../models/Qwen2.5-Coder-7B-Instruct"
+model_type: "qwen2.5-coder"
+trust_remote_code: true
+
+# ==================== 数据配置 ====================
+train_data: "../data/final/train_sft.jsonl"
+val_data: "../data/final/val_sft.jsonl"
+test_data: "../data/final/test_sft.jsonl"
+
+max_seq_length: 4096
+train_on_inputs: false
+
+# ==================== LoRA 配置 ====================
+use_lora: true
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+lora_target_modules:
+  - q_proj
+  - k_proj
+  - v_proj
+  - o_proj
+  - gate_proj
+  - up_proj
+  - down_proj
+
+# ==================== 量化配置（QLoRA 核心）====================
+use_qlora: true
+load_in_4bit: true
+bnb_4bit_compute_dtype: "bfloat16"
+bnb_4bit_quant_type: "nf4"
+bnb_4bit_use_double_quant: true
+
+# ==================== 训练超参 ====================
+output_dir: "../checkpoints/qlora-qwen2.5-coder-7b"
+num_train_epochs: 3
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 16  # QLoRA 显存受限，增大梯度累积
+
+learning_rate: 5.0e-5  # 7B 模型学习率更低
+lr_scheduler_type: "cosine"
+warmup_ratio: 0.1
+
+optim: "paged_adamw_8bit"  # QLoRA 推荐使用 8bit 优化器
+weight_decay: 0.01
+adam_beta1: 0.9
+adam_beta2: 0.999
+max_grad_norm: 1.0
+
+# ==================== 保存和评估 ====================
+save_strategy: "steps"
+save_steps: 100
+save_total_limit: 2  # QLoRA checkpoint 较大，少保存一些
+
+eval_strategy: "steps"
+eval_steps: 100
+eval_accumulation_steps: 8
+
+logging_steps: 10
+logging_first_step: true
+
+# ==================== 其他配置 ====================
+seed: 42
+dataloader_num_workers: 2  # QLoRA 减少 worker 避免显存不足
+dataloader_pin_memory: true
+
+bf16: false  # GTX系列GPU不支持，改用fp16
+fp16: true   # 启用fp16混合精度训练
+
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: false
+
+# ==================== 监控配置 ====================
+report_to:
+  - tensorboard
+
+generation_max_length: 2048
+generation_num_beams: 1

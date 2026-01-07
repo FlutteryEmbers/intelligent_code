@@ -1,0 +1,93 @@
+# LoRA 训练配置 - Qwen2.5-Coder-1.5B-Instruct
+# 适合：快速验证，显存需求约 6-10GB
+
+# ==================== 模型配置 ====================
+base_model: "../models/Qwen2.5-Coder-1.5B-Instruct"
+model_type: "qwen2.5-coder"
+trust_remote_code: true
+
+# ==================== 数据配置 ====================
+train_data: "../data/final/train_sft.jsonl"
+val_data: "../data/final/val_sft.jsonl"
+test_data: "../data/final/test_sft.jsonl"
+
+# 数据处理
+max_seq_length: 4096  # 代码上下文较长，建议 4k+
+train_on_inputs: false  # 只训练 assistant 回复
+
+# ==================== LoRA 配置 ====================
+use_lora: true
+lora_r: 8
+lora_alpha: 16
+lora_dropout: 0.05
+lora_target_modules:
+  - q_proj
+  - k_proj
+  - v_proj
+  - o_proj
+  - gate_proj
+  - up_proj
+  - down_proj
+
+# ==================== 量化配置 ====================
+use_qlora: false  # 此配置使用标准 LoRA，不量化
+load_in_4bit: false
+load_in_8bit: false
+
+# ==================== 训练超参 ====================
+output_dir: "../checkpoints/lora-qwen2.5-coder-1.5b"
+num_train_epochs: 3
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 2
+gradient_accumulation_steps: 8  # 有效 batch size = 1 * 8 = 8
+
+# 学习率
+learning_rate: 1.0e-4
+lr_scheduler_type: "cosine"
+warmup_ratio: 0.1
+
+# 优化器
+optim: "adamw_torch"
+weight_decay: 0.01
+adam_beta1: 0.9
+adam_beta2: 0.999
+max_grad_norm: 1.0
+
+# ==================== 保存和评估 ====================
+save_strategy: "steps"
+save_steps: 100
+save_total_limit: 3  # 只保留最近 3 个 checkpoint
+
+eval_strategy: "steps"
+eval_steps: 50
+eval_accumulation_steps: 4
+
+logging_steps: 10
+logging_first_step: true
+
+# ==================== 其他配置 ====================
+seed: 42
+dataloader_num_workers: 4
+dataloader_pin_memory: true
+
+# 混合精度
+bf16: false  # GTX系列GPU不支持，改用fp16
+fp16: true   # 启用fp16混合精度训练
+
+# 梯度检查点（节省显存）
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: false
+
+# ==================== 监控配置 ====================
+report_to:
+  - tensorboard
+  # - wandb  # 取消注释启用 wandb
+
+# wandb 配置（如果启用）
+# wandb_project: "qwen-coder-finetune"
+# wandb_run_name: "lora-1.5b-run1"
+
+# ==================== 推理配置 ====================
+generation_max_length: 2048
+generation_num_beams: 1

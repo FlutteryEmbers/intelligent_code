@@ -1,0 +1,52 @@
+# ==================== 训练核心依赖 ====================
+# PyTorch（根据 CUDA 版本选择，这里使用通用版本）
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Hugging Face 生态
+transformers>=4.40.0
+datasets>=2.18.0
+accelerate>=0.27.0
+peft>=0.10.0
+safetensors>=0.4.2
+
+# QLoRA 量化训练
+bitsandbytes>=0.43.0
+
+# Tokenizer 和工具
+tiktoken>=0.6.0
+sentencepiece>=0.2.0
+
+# ==================== 评测依赖 ====================
+# 评测指标
+scikit-learn>=1.4.0
+nltk>=3.8.1
+rouge-score>=0.1.2
+
+# 数据处理
+numpy>=1.26.0
+pandas>=2.2.0
+
+# ==================== 训练监控 ====================
+# 实验跟踪（可选）
+wandb>=0.16.0
+tensorboard>=2.16.0
+
+# ==================== 模型下载工具 ====================
+huggingface-hub>=0.21.0
+hf-transfer>=0.1.5
+
+# ==================== 可选加速 ====================
+# Flash Attention（需要编译，取决于 GPU 架构）
+# flash-attn>=2.5.0
+
+# Memory efficient attention
+# xformers>=0.0.24
+
+# 多卡训练加速
+# deepspeed>=0.13.0
+
+# ==================== 工具依赖 ====================
+pyyaml>=6.0
+tqdm>=4.66.0
+colorama>=0.4.6

@@ -209,3 +209,6 @@ __marimo__/
 data
 logs
 repos
+models
+docs/guides
+checkpoints
