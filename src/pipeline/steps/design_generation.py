@@ -26,8 +26,7 @@ class DesignGenerationStep(BaseStep):
     
     def execute(self) -> dict:
         """Execute design generation with optional auto requirements."""
-        auto_req_config = self.config.get("auto_requirements", {})
-        use_auto_requirements = auto_req_config.get("enabled", False)
+        use_auto_requirements = not self.args.skip_auto_requirements
         
         custom_requirements = None
         

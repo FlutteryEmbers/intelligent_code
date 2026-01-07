@@ -142,12 +142,12 @@ class DesignGenerator:
         self.user_prompt_template = load_prompt_template("design_user_prompt.txt")
         
         # 从配置读取参数
-        self.top_k_context = self.config.get('design_generator.top_k_context', 6)
-        self.max_context_chars = self.config.get('design_generator.max_context_chars', 20000)
-        self.max_samples = self.config.get('design_generator.max_samples', 10)
+        self.top_k_context = self.config.get('generation.retrieval_top_k', 6)
+        self.max_context_chars = self.config.get('generation.max_context_chars', 16000)
+        self.max_samples = self.config.get('generation.max_items', 50)
         
         # 输出路径
-        self.output_dir = Path('data/intermediate')
+        self.output_dir = Path(self.config.get('output.intermediate_dir', 'data/intermediate'))
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
         self.requirements_path = self.output_dir / 'requirements.jsonl'
@@ -765,8 +765,8 @@ def main():
     
     # 覆盖配置
     if args.max_samples:
-        config._config['design_generator'] = config._config.get('design_generator', {})
-        config._config['design_generator']['max_samples'] = args.max_samples
+        config._config['generation'] = config._config.get('generation', {})
+        config._config['generation']['max_items'] = args.max_samples
     
     # 初始化生成器
     generator = DesignGenerator(config=config)

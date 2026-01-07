@@ -38,23 +38,20 @@ class BaseParser(ABC):
         self.include_private = parsing_config.get('include_private', False)
         self.include_test = parsing_config.get('include_test', False)
         
-        # Allow pipeline.yaml to override (for project-specific customization)
+        # Allow config file to override (for project-specific customization)
         # Handle both dict and Config object
         config_dict = self.config._config if isinstance(self.config, ConfigClass) else self.config
         
-        if 'parser' in config_dict:
-            parser_override = config_dict['parser']
-            self.max_chars_per_symbol = parser_override.get('max_chars_per_symbol', self.max_chars_per_symbol)
-            self.include_private = parser_override.get('include_private', self.include_private)
-            self.include_test = parser_override.get('include_test', self.include_test)
-        
-        if 'filter' in config_dict:
-            filter_override = config_dict['filter']
-            if 'ignore_paths' in filter_override:
-                # Merge ignore paths (profile + pipeline override)
-                self.ignore_paths = list(set(self.ignore_paths + filter_override['ignore_paths']))
-            if 'file_extensions' in filter_override:
-                self.file_extensions = filter_override['file_extensions']
+        if 'parsing' in config_dict:
+            parsing_override = config_dict['parsing']
+            self.max_chars_per_symbol = parsing_override.get('max_chars_per_symbol', self.max_chars_per_symbol)
+            self.include_private = parsing_override.get('include_private', self.include_private)
+            self.include_test = parsing_override.get('include_test', self.include_test)
+            if 'ignore_paths' in parsing_override:
+                # Merge ignore paths (profile + override)
+                self.ignore_paths = list(set(self.ignore_paths + parsing_override['ignore_paths']))
+            if 'file_extensions' in parsing_override:
+                self.file_extensions = parsing_override['file_extensions']
 
     @abstractmethod
     def parse_repo(self, repo_path: str, repo_commit: str) -> list[CodeSymbol]:

@@ -15,6 +15,14 @@ class SecretsScanStep(BaseStep):
     @property
     def display_name(self) -> str:
         return "Step 7: Scanning for Secrets"
+
+    def should_skip(self) -> tuple[bool, str]:
+        """Check if secrets scan should be skipped."""
+        if self.args.skip_safety:
+            return True, "skip_flag"
+        if not self.paths["all_dedup_jsonl"].exists():
+            return True, "no_samples"
+        return False, ""
     
     def execute(self) -> dict:
         """Execute secrets scanning."""

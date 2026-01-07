@@ -19,10 +19,8 @@ class QAGenerationStep(BaseStep):
     
     def should_skip(self) -> tuple[bool, str]:
         """Check if QA generation should be skipped."""
-        auto_config = self.config.get("auto", {})
-        
         # Skip if using auto module instead
-        if auto_config.get("enabled", False) and not (self.args.skip_llm or self.args.skip_qa):
+        if not self.args.skip_auto and not (self.args.skip_llm or self.args.skip_qa):
             return True, "auto_enabled"
         
         # Skip if flags set

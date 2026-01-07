@@ -55,40 +55,40 @@ class RequirementGenerator:
 
         # 加载 prompt 模板
         prompt_path = self.config.get(
-            'auto_requirements.prompts.requirement_generation',
+            'prompts.requirements_generation',
             'configs/prompts/auto_requirement_generation.txt'
         )
         self.prompt_template = load_prompt_template(prompt_path)
 
         # 从配置读取参数
-        self.max_requirements = self.config.get('auto_requirements.max_requirements', 6)
-        self.top_k_symbols = self.config.get('auto_requirements.top_k_symbols', 12)
-        self.require_min_evidence = self.config.get('auto_requirements.require_min_evidence', 1)
-        self.max_context_chars = self.config.get('auto_requirements.max_context_chars', 16000)
-        self.seed = self.config.get('global.seed', 42)
+        self.max_requirements = self.config.get('generation.max_items', 50)
+        self.top_k_symbols = self.config.get('generation.retrieval_top_k', 6)
+        self.require_min_evidence = self.config.get('requirements.min_evidence_refs', 1)
+        self.max_context_chars = self.config.get('generation.max_context_chars', 16000)
+        self.seed = self.config.get('generation.seed', 42)
 
         # Method profiles 配置（可选增强）
-        self.use_method_profiles = self.config.get('auto_requirements.use_method_profiles', False)
+        self.use_method_profiles = self.config.get('requirements.use_method_profiles', False)
         self.method_profiles_jsonl = Path(self.config.get(
-            'auto_requirements.method_profiles_jsonl',
+            'artifacts.method_profiles_jsonl',
             'data/intermediate/method_profiles.jsonl'
         ))
-        self.profiles_top_k = self.config.get('auto_requirements.profiles_top_k', 10)
-        self.profiles_max_chars = self.config.get('auto_requirements.profiles_max_chars', 4000)
+        self.profiles_top_k = self.config.get('requirements.profiles_top_k', 10)
+        self.profiles_max_chars = self.config.get('requirements.profiles_max_chars', 4000)
 
         # Batching 配置（可选）
-        batching_config = self.config.get('auto_requirements.batching', {})
+        batching_config = self.config.get('requirements.batching', {})
         self.batching_enabled = batching_config.get('enabled', False)
-        self.batch_size = batching_config.get('batch_size', 2)
+        self.batch_size = self.config.get('generation.batch_size', 5)
         self.max_batches = batching_config.get('max_batches', 5)
 
         # 输出路径
         self.output_jsonl = Path(self.config.get(
-            'auto_requirements.outputs.requirements_jsonl',
+            'artifacts.requirements_jsonl',
             'data/intermediate/requirements_auto.jsonl'
         ))
         self.rejected_jsonl = Path(self.config.get(
-            'auto_requirements.outputs.rejected_jsonl',
+            'artifacts.requirements_rejected_jsonl',
             'data/intermediate/requirements_auto_rejected.jsonl'
         ))
 
@@ -749,11 +749,9 @@ def main():
     config = Config()
 
     if args.out:
-        if 'auto_requirements' not in config._config:
-            config._config['auto_requirements'] = {}
-        if 'outputs' not in config._config['auto_requirements']:
-            config._config['auto_requirements']['outputs'] = {}
-        config._config['auto_requirements']['outputs']['requirements_jsonl'] = args.out
+        if 'artifacts' not in config._config:
+            config._config['artifacts'] = {}
+        config._config['artifacts']['requirements_jsonl'] = args.out
 
     generator = RequirementGenerator(config=config)
 

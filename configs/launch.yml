@@ -1,0 +1,86 @@
+repo:
+  path: "./repos/java/spring-ai"
+  commit: ""
+
+language:
+  name: "java"
+  profile_dir: "configs/language"
+
+llm:
+  provider: "ollama"
+  base_url: "http://localhost:11434/v1"
+  model: "qwen2.5:7b"
+  temperature: 0.2
+  max_tokens: 10000
+  timeout_sec: 180
+
+generation:
+  seed: 42
+  batch_size: 5
+  retrieval_top_k: 6
+  max_context_chars: 16000
+  max_items: 50
+
+auto:
+  max_methods: 5
+  questions_per_method: 3
+  embedding_model: "nomic-embed-text"
+
+requirements:
+  min_evidence_refs: 2
+  use_method_profiles: true
+  profiles_top_k: 20
+  profiles_max_chars: 6000
+  batching:
+    enabled: true
+    max_batches: 5
+    diversity_hint: true
+
+prompts:
+  auto:
+    method_understanding: "configs/prompts/auto_method_understanding.txt"
+    question_generation: "configs/prompts/auto_question_generation.txt"
+    answer_generation: "configs/prompts/auto_answer_generation.txt"
+  requirements_generation: "configs/prompts/auto_requirement_generation.txt"
+
+artifacts:
+  method_profiles_jsonl: "data/intermediate/method_profiles.jsonl"
+  auto_method_understanding_rejected_jsonl: "data/intermediate/auto_method_understanding_rejected.jsonl"
+  questions_jsonl: "data/intermediate/questions.jsonl"
+  method_embeddings_jsonl: "data/intermediate/method_embeddings.jsonl"
+  auto_qa_raw_jsonl: "data/intermediate/auto_qa_raw.jsonl"
+  auto_answer_rejected_jsonl: "data/intermediate/auto_answer_rejected.jsonl"
+  requirements_jsonl: "data/intermediate/requirements_auto.jsonl"
+  requirements_rejected_jsonl: "data/intermediate/requirements_auto_rejected.jsonl"
+
+quality:
+  min_instruction_length: 10
+  min_answer_length: 20
+  max_answer_length: 6000
+
+dedup:
+  simhash_bits: 64
+  max_hamming: 3
+
+split:
+  train_ratio: 0.8
+  val_ratio: 0.1
+  test_ratio: 0.1
+  group_by: "package"
+
+safety:
+  mode: "drop"
+
+output:
+  raw_dir: "data/raw/extracted"
+  repo_meta_dir: "data/raw/repo_meta"
+  intermediate_dir: "data/intermediate"
+  final_dir: "data/final"
+  reports_dir: "data/reports"
+  qa_final_dir: "data/final/qa"
+  design_final_dir: "data/final/design"
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/pipeline.log"

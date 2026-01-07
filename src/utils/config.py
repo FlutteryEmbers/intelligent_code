@@ -29,12 +29,12 @@ class Config:
         重新加载配置文件
         
         Args:
-            config_path: 配置文件路径，默认为 configs/pipeline.yaml
+            config_path: 配置文件路径，默认为 configs/launch.yml
         """
         if config_path is None:
             # 默认配置文件路径
             project_root = Path(__file__).parent.parent.parent
-            config_path = project_root / "configs" / "pipeline.yaml"
+            config_path = project_root / "configs" / "launch.yml"
         else:
             config_path = Path(config_path)
         
@@ -68,7 +68,7 @@ class Config:
             self._set_nested('llm.max_tokens', int(os.environ['LLM_MAX_TOKENS']))
         
         if 'LLM_TIMEOUT' in os.environ:
-            self._set_nested('llm.timeout', int(os.environ['LLM_TIMEOUT']))
+            self._set_nested('llm.timeout_sec', int(os.environ['LLM_TIMEOUT']))
         
         # 仓库配置覆盖
         if 'REPO_PATH' in os.environ:
@@ -173,22 +173,22 @@ class Config:
     @property
     def max_chars_per_symbol(self) -> int:
         """单个符号最大字符数"""
-        return self.get('parser.max_chars_per_symbol', 5000)
+        return self.get('parsing.max_chars_per_symbol', 5000)
     
     @property
     def batch_size(self) -> int:
         """批次大小"""
-        return self.get('global.batch_size', 5)
+        return self.get('generation.batch_size', 5)
     
     @property
     def top_k_context(self) -> int:
         """上下文数量"""
-        return self.get('global.top_k_context', 6)
+        return self.get('generation.retrieval_top_k', 6)
     
     @property
     def ignore_paths(self) -> list[str]:
         """忽略的路径模式"""
-        return self.get('parser.ignore_paths', [])
+        return self.get('parsing.ignore_paths', [])
     
     @property
     def output_dirs(self) -> dict[str, str]:

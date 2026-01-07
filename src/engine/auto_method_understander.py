@@ -41,22 +41,22 @@ class AutoMethodUnderstander:
         
         # 从配置读取参数
         self.max_methods = self.config.get('auto.max_methods', 50)
-        self.max_context_chars = 16000  # Auto method understanding uses fixed context limit
+        self.max_context_chars = self.config.get('generation.max_context_chars', 16000)
         
         # 加载 prompt 模板
         template_path = self.config.get(
-            'auto.prompts.method_understanding',
+            'prompts.auto.method_understanding',
             'configs/prompts/auto_method_understanding.txt'
         )
         self.prompt_template = load_prompt_template(template_path)
         
         # 输出路径
         self.output_jsonl = Path(self.config.get(
-            'auto.outputs.method_profiles_jsonl',
+            'artifacts.method_profiles_jsonl',
             'data/intermediate/method_profiles.jsonl'
         ))
         self.rejected_jsonl = Path(self.config.get(
-            'auto.outputs.method_understanding_rejected_jsonl',
+            'artifacts.auto_method_understanding_rejected_jsonl',
             'data/intermediate/auto_method_understanding_rejected.jsonl'
         ))
         

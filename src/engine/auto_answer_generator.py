@@ -41,28 +41,28 @@ class AutoAnswerGenerator:
         logger.info(f"Loaded language profile: {self.language}")
         
         # 从配置读取参数
-        self.top_k_context = self.config.get('auto.top_k_context', 6)
-        self.max_context_chars = 16000  # Auto answer generation uses fixed context limit
+        self.top_k_context = self.config.get('generation.retrieval_top_k', 6)
+        self.max_context_chars = self.config.get('generation.max_context_chars', 16000)
         self.embedding_model = self.config.get('auto.embedding_model', 'nomic-embed-text')
         
         # 加载 prompt 模板
         template_path = self.config.get(
-            'auto.prompts.answer_generation',
+            'prompts.auto.answer_generation',
             'configs/prompts/auto_answer_generation.txt'
         )
         self.prompt_template = load_prompt_template(template_path)
         
         # 输出路径
         self.output_jsonl = Path(self.config.get(
-            'auto.outputs.auto_qa_raw_jsonl',
+            'artifacts.auto_qa_raw_jsonl',
             'data/intermediate/auto_qa_raw.jsonl'
         ))
         self.rejected_jsonl = Path(self.config.get(
-            'auto.outputs.auto_answer_rejected_jsonl',
+            'artifacts.auto_answer_rejected_jsonl',
             'data/intermediate/auto_answer_rejected.jsonl'
         ))
         self.embeddings_jsonl = Path(self.config.get(
-            'auto.outputs.embeddings_jsonl',
+            'artifacts.method_embeddings_jsonl',
             'data/intermediate/method_embeddings.jsonl'
         ))
         

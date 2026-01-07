@@ -32,26 +32,25 @@ class AutoModuleStep(BaseStep):
         
         # Determine execution needs
         auto_config = config.get("auto", {})
-        auto_req_config = config.get("auto_requirements", {})
+        requirements_config = config.get("requirements", {})
         
-        # Condition 1: Auto QA enabled and not skipping QA
-        self.need_auto_qa = auto_config.get("enabled", False) and not (args.skip_llm or args.skip_qa)
+        # Condition 1: Auto QA is enabled via CLI and not skipping QA
+        self.need_auto_qa = not args.skip_auto and not (args.skip_llm or args.skip_qa)
         
         # Condition 2: Auto Requirements needs profiles
         self.need_profiles_for_requirements = (
-            auto_req_config.get("enabled", False) and 
-            auto_req_config.get("use_method_profiles", False) and 
+            not args.skip_auto and
+            not args.skip_auto_requirements and
+            requirements_config.get("use_method_profiles", False) and
             not (args.skip_llm or args.skip_design)
         )
     
     def should_skip(self) -> tuple[bool, str]:
         """Check if auto module should run."""
         if not (self.need_auto_qa or self.need_profiles_for_requirements):
-            auto_config = self.config.get("auto", {})
-            if auto_config.get("enabled", False):
+            if self.args.skip_auto:
                 return True, "skip_flag"
-            else:
-                return True, "disabled"
+            return True, "disabled"
         
         # Check if symbols file exists
         if not self.paths["symbols_jsonl"].exists():
@@ -66,12 +65,12 @@ class AutoModuleStep(BaseStep):
         config_instance.reload(self.args.config)
         
         auto_config = self.config.get("auto", {})
-        auto_outputs = auto_config.get("outputs", {})
+        artifacts = self.config.get("artifacts", {})
         
         # Prepare paths
-        method_profiles_jsonl = Path(auto_outputs.get("method_profiles_jsonl", "data/intermediate/method_profiles.jsonl"))
-        method_embeddings_jsonl = Path(auto_outputs.get("embeddings_jsonl", "data/intermediate/method_embeddings.jsonl"))
-        questions_jsonl = Path(auto_outputs.get("questions_jsonl", "data/intermediate/questions.jsonl"))
+        method_profiles_jsonl = Path(artifacts.get("method_profiles_jsonl", "data/intermediate/method_profiles.jsonl"))
+        method_embeddings_jsonl = Path(artifacts.get("method_embeddings_jsonl", "data/intermediate/method_embeddings.jsonl"))
+        questions_jsonl = Path(artifacts.get("questions_jsonl", "data/intermediate/questions.jsonl"))
         
         # Step A1: Method Understanding (always needed)
         max_methods = auto_config.get("max_methods", 50)
@@ -110,7 +109,7 @@ class AutoModuleStep(BaseStep):
             self.logger.info(f"Generated {len(questions)} questions")
             
             # Step A4: Generate Answers with Vector Retrieval
-            top_k_context = auto_config.get("top_k_context", 6)
+            top_k_context = self.config.get("generation", {}).get("retrieval_top_k", 6)
             self.logger.info(f"Step A4: Generating answers (top_k: {top_k_context})")
             answer_gen = AutoAnswerGenerator(config_instance)
             qa_samples = answer_gen.generate_from_questions(

@@ -62,12 +62,12 @@ class QAGenerator:
         self.user_prompt_template = load_prompt_template("qa_user_prompt.txt")
         
         # 从配置读取参数
-        self.max_context_chars = self.config.get('qa_generator.max_context_chars', 16000)
-        self.batch_size = self.config.get('qa_generator.batch_size', 10)
-        self.max_samples = self.config.get('qa_generator.max_samples', 100)
+        self.max_context_chars = self.config.get('generation.max_context_chars', 16000)
+        self.batch_size = self.config.get('generation.batch_size', 5)
+        self.max_samples = self.config.get('generation.max_items', 50)
         
         # 输出路径
-        self.output_dir = Path('data/intermediate')
+        self.output_dir = Path(self.config.get('output.intermediate_dir', 'data/intermediate'))
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
         self.raw_output_path = self.output_dir / 'qa_raw.jsonl'
@@ -568,12 +568,12 @@ def main():
     
     # 覆盖配置
     if args.max_samples:
-        config._config['qa_generator'] = config._config.get('qa_generator', {})
-        config._config['qa_generator']['max_samples'] = args.max_samples
+        config._config['generation'] = config._config.get('generation', {})
+        config._config['generation']['max_items'] = args.max_samples
     
     if args.batch_size:
-        config._config['qa_generator'] = config._config.get('qa_generator', {})
-        config._config['qa_generator']['batch_size'] = args.batch_size
+        config._config['generation'] = config._config.get('generation', {})
+        config._config['generation']['batch_size'] = args.batch_size
     
     # 初始化生成器
     generator = QAGenerator(config=config)

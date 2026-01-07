@@ -54,13 +54,15 @@ class LLMClient:
         self.model = model or config.get('llm.model', 'qwen2.5-coder-3b-instruct')
         self.temperature = temperature if temperature is not None else config.get('llm.temperature', 0.7)
         self.max_tokens = max_tokens or config.get('llm.max_tokens', 2000)
-        self.timeout = timeout or config.get('llm.timeout', 60)
+        self.timeout = timeout or config.get('llm.timeout_sec', 60)
         
         # 最大重试次数
         self.max_retries = 2
         
         # 拒绝样本输出路径
-        self.rejected_log_path = Path(config.get('output.intermediate', 'data/intermediate')) / 'rejected_llm.jsonl'
+        self.rejected_log_path = (
+            Path(config.get('output.intermediate_dir', 'data/intermediate')) / 'rejected_llm.jsonl'
+        )
         self.rejected_log_path.parent.mkdir(parents=True, exist_ok=True)
         
         # 初始化 ChatOpenAI 客户端
@@ -330,7 +332,7 @@ if __name__ == "__main__":
     运行前请确保：
     1. Ollama 服务已启动：ollama serve
     2. 已拉取模型：ollama pull qwen2.5-coder-3b-instruct
-    3. 配置文件正确：configs/pipeline.yaml
+    3. 配置文件正确：configs/launch.yml
     """
     import sys
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))

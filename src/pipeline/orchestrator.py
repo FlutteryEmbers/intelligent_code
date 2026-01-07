@@ -61,15 +61,15 @@ class Pipeline:
         cfg = self.config
         
         # Base directories
-        raw_extracted = Path(cfg["output"]["raw_extracted"])
-        raw_repo_meta = Path(cfg["output"]["raw_repo_meta"])
-        intermediate = Path(cfg["output"]["intermediate"])
-        final = Path(cfg["output"]["final"])
-        reports = Path(cfg["output"]["reports"])
+        raw_extracted = Path(cfg["output"]["raw_dir"])
+        raw_repo_meta = Path(cfg["output"]["repo_meta_dir"])
+        intermediate = Path(cfg["output"]["intermediate_dir"])
+        final = Path(cfg["output"]["final_dir"])
+        reports = Path(cfg["output"]["reports_dir"])
         
         # Separate QA and Design directories
-        qa_final = Path(cfg["paths"].get("qa_final_dir", "data/final/qa"))
-        design_final = Path(cfg["paths"].get("design_final_dir", "data/final/design"))
+        qa_final = Path(cfg["output"]["qa_final_dir"])
+        design_final = Path(cfg["output"]["design_final_dir"])
         
         # Create all directories
         for directory in [raw_extracted, raw_repo_meta, intermediate, final, reports, qa_final, design_final]:

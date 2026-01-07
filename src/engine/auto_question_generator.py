@@ -44,14 +44,14 @@ class AutoQuestionGenerator:
         
         # 加载 prompt 模板
         template_path = self.config.get(
-            'auto.prompts.question_generation',
+            'prompts.auto.question_generation',
             'configs/prompts/auto_question_generation.txt'
         )
         self.prompt_template = load_prompt_template(template_path)
         
         # 输出路径
         self.output_jsonl = Path(self.config.get(
-            'auto.outputs.questions_jsonl',
+            'artifacts.questions_jsonl',
             'data/intermediate/questions.jsonl'
         ))
         self.output_jsonl.parent.mkdir(parents=True, exist_ok=True)

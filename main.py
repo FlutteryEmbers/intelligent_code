@@ -22,13 +22,23 @@ def main():
     parser.add_argument(
         "--config",
         type=str,
-        default="configs/pipeline.yaml",
+        default="configs/launch.yml",
         help="Path to configuration file"
     )
     parser.add_argument(
         "--skip-parse",
         action="store_true",
         help="Skip parsing step (use existing symbols.jsonl)"
+    )
+    parser.add_argument(
+        "--skip-auto",
+        action="store_true",
+        help="Skip auto module (method profiles + auto QA)"
+    )
+    parser.add_argument(
+        "--skip-auto-requirements",
+        action="store_true",
+        help="Skip auto requirements generation"
     )
     parser.add_argument(
         "--skip-llm",
@@ -44,6 +54,16 @@ def main():
         "--skip-design",
         action="store_true",
         help="Skip design generation"
+    )
+    parser.add_argument(
+        "--skip-dedup",
+        action="store_true",
+        help="Skip deduplication step"
+    )
+    parser.add_argument(
+        "--skip-safety",
+        action="store_true",
+        help="Skip safety scan step"
     )
     parser.add_argument(
         "--skip-export",

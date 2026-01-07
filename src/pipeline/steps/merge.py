@@ -1,6 +1,8 @@
 """
 Step 5: Merge Samples
 """
+from pathlib import Path
+
 from src.utils import read_jsonl, write_jsonl
 from src.pipeline.base_step import BaseStep
 
@@ -21,15 +23,9 @@ class MergeStep(BaseStep):
         all_samples = []
         
         # Determine which QA source to use
-        auto_config = self.config.get("auto", {})
-        if auto_config.get("enabled", False):
-            auto_outputs = auto_config.get("outputs", {})
-            # Extract filename from path (in case outputs contains full path)
-            qa_filename = auto_outputs.get("auto_qa_raw_jsonl", "auto_qa_raw.jsonl")
-            if "/" in qa_filename or "\\" in qa_filename:
-                # If full path provided, extract just the filename
-                qa_filename = qa_filename.split("/")[-1].split("\\")[-1]
-            qa_path = self.paths["intermediate"] / qa_filename
+        if not self.args.skip_auto and not (self.args.skip_llm or self.args.skip_qa):
+            artifacts = self.config.get("artifacts", {})
+            qa_path = Path(artifacts.get("auto_qa_raw_jsonl", "data/intermediate/auto_qa_raw.jsonl"))
             self.logger.info(f"Using auto QA from {qa_path.name}")
         else:
             qa_path = self.paths["qa_raw_jsonl"]

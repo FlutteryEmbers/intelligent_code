@@ -28,7 +28,7 @@ class SplitStep(BaseStep):
         self.logger.info(f"Total samples: {len(samples)} (QA: {len(qa_samples)}, Design: {len(design_samples)})")
         
         split_config = self.config.get("split", {})
-        global_seed = self.config.get("global", {}).get("seed", 42)
+        global_seed = self.config.get("generation", {}).get("seed", 42)
         
         # Split combined dataset (for backward compatibility)
         if len(samples) < 3:
