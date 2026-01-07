@@ -66,6 +66,8 @@ class LLMClient:
         self.rejected_log_path.parent.mkdir(parents=True, exist_ok=True)
         
         # 初始化 ChatOpenAI 客户端
+        # 注意：Ollama 的 OpenAI 兼容 API (/v1/chat/completions) 使用 max_tokens 参数
+        # 但某些 LangChain 版本可能不正确传递该参数，需要显式设置
         self.llm = ChatOpenAI(
             base_url=self.base_url,
             model=self.model,
@@ -174,9 +176,12 @@ JSON Schema:
                         HumanMessage(content=user_prompt)
                     ]
                 
-                # 调用 LLM
+                # 调用 LLM（尝试在调用时传递 max_tokens 以确保生效）
                 start_time = time.time()
-                response = self.llm.invoke(messages)
+                response = self.llm.invoke(
+                    messages,
+                    max_tokens=self.max_tokens  # 显式传递以确保参数生效
+                )
                 elapsed = time.time() - start_time
                 
                 raw_output = response.content.strip()

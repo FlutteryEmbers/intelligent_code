@@ -224,10 +224,13 @@ class AutoMethodUnderstander:
         
         try:
             # 这里直接调用 LLM，期望返回 JSON
-            response = self.llm_client.llm.invoke([
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ])
+            response = self.llm_client.llm.invoke(
+                [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=self.llm_client.max_tokens
+            )
             
             raw_output = response.content.strip()
             

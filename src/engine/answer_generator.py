@@ -10,6 +10,7 @@ from typing import List
 from src.utils.schemas import QuestionSample, TrainingSample, CodeSymbol, EvidenceRef, ReasoningTrace
 from src.utils.config import Config
 from src.utils.logger import get_logger
+from src.utils.validator import normalize_path_separators
 from src.utils.language_profile import load_language_profile
 from src.utils import vector_index
 from src.engine.llm_client import LLMClient
@@ -191,7 +192,9 @@ class AnswerGenerator:
 
         if question.evidence_refs:
             for ref in question.evidence_refs:
-                symbol = symbols_map.get(ref.symbol_id)
+                # 标准化路径以支持跨平台
+                normalized_symbol_id = normalize_path_separators(ref.symbol_id)
+                symbol = symbols_map.get(normalized_symbol_id)
                 if not symbol:
                     continue
 
@@ -230,7 +233,9 @@ class AnswerGenerator:
                 raise ValueError("No relevant methods found in vector search")
 
             for symbol_id, score in search_results:
-                symbol = symbols_map.get(symbol_id)
+                # 标准化路径以支持跨平台
+                normalized_symbol_id = normalize_path_separators(symbol_id)
+                symbol = symbols_map.get(normalized_symbol_id)
                 if not symbol:
                     continue
 
@@ -282,10 +287,13 @@ class AnswerGenerator:
         system_prompt = f"你是一位资深的 {language_display} 架构师和代码审查专家，擅长基于代码证据进行深度分析。"
         
         try:
-            response = self.llm_client.llm.invoke([
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ])
+            response = self.llm_client.llm.invoke(
+                [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=self.llm_client.max_tokens
+            )
             
             raw_output = response.content.strip()
             

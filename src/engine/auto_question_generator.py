@@ -13,6 +13,7 @@ import yaml
 from src.utils.schemas import MethodProfile, QuestionSample, CodeSymbol, EvidenceRef
 from src.utils.config import Config
 from src.utils.logger import get_logger
+from src.utils.validator import normalize_path_separators
 from src.engine.llm_client import LLMClient
 
 logger = get_logger(__name__)
@@ -202,8 +203,9 @@ class AutoQuestionGenerator:
                     logger.info(f"Generating questions for {i}/{len(profiles)}: {profile.qualified_name}")
                     
                     try:
-                        # 获取源码
-                        symbol = symbols_map.get(profile.symbol_id)
+                        # 获取源码（标准化路径以支持跨平台）
+                        normalized_symbol_id = normalize_path_separators(profile.symbol_id)
+                        symbol = symbols_map.get(normalized_symbol_id)
                         if not symbol:
                             logger.warning(f"Symbol not found for {profile.symbol_id}")
                             continue
@@ -282,10 +284,13 @@ class AutoQuestionGenerator:
         system_prompt = "你是一位资深的业务分析师和技术培训专家，擅长设计高质量的学习问题。"
         
         try:
-            response = self.llm_client.llm.invoke([
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ])
+            response = self.llm_client.llm.invoke(
+                [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=self.llm_client.max_tokens
+            )
             
             raw_output = response.content.strip()
             

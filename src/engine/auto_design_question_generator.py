@@ -13,6 +13,7 @@ from typing import Generator
 from src.utils.schemas import CodeSymbol
 from src.utils.config import Config
 from src.utils.logger import get_logger
+from src.utils.validator import normalize_path_separators
 from src.utils.language_profile import load_language_profile
 from src.engine.llm_client import LLMClient
 
@@ -526,7 +527,10 @@ class DesignQuestionGenerator:
             "Return only valid JSON, without markdown or extra text."
         )
         messages = [SystemMessage(content=system_prompt), HumanMessage(content=prompt)]
-        response = self.llm_client.llm.invoke(messages)
+        response = self.llm_client.llm.invoke(
+            messages,
+            max_tokens=self.llm_client.max_tokens  # 显式传递以确保参数生效
+        )
         return response.content
 
     def _parse_llm_output(self, raw_output: str) -> list[dict]:
@@ -702,7 +706,9 @@ class DesignQuestionGenerator:
 
         evidence = []
         for symbol_id in symbol_ids:
-            symbol = symbols_map.get(symbol_id)
+            # 标准化路径以支持跨平台
+            normalized_symbol_id = normalize_path_separators(symbol_id)
+            symbol = symbols_map.get(normalized_symbol_id)
             if not symbol:
                 continue
             evidence.append({
