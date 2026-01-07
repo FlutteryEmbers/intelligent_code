@@ -31,7 +31,7 @@ llm:
   model: "qwen2.5:7b"
   temperature: 0.2  # 降低 temperature 以提高格式稳定性
   max_tokens: 10000  # 优化后：6个需求约需8000 tokens，留有余量
-  timeout: 120  # 增加超时时间以适应更长的生成
+  timeout: 180  # 增加超时时间以适应更长的生成
 
 # ================================================================================================
 # PIPELINE STEPS (按执行顺序排列)
@@ -60,8 +60,8 @@ llm:
 # 自动理解方法并生成问答对
 auto:
   enabled: true                                       # Enable auto module
-  max_methods: 5                                     # Maximum methods to process (cost control)
-  questions_per_method: 1                             # Number of questions per method
+  max_methods: 200                                    # Maximum methods to process (cost control)
+  questions_per_method: 3                             # Number of questions per method
   top_k_context: 6                                    # Top-K methods for context retrieval
   embedding_model: "nomic-embed-text"                 # Ollama embedding model
   prompts:
@@ -80,7 +80,7 @@ auto:
 # 基于代码自动生成架构改进需求
 auto_requirements:
   enabled: true                    # true = auto-generate requirements, false = use configs/requirements.yaml
-  max_requirements: 6               # Maximum requirements to generate (reduced for token efficiency)
+  max_requirements: 200               # Maximum requirements to generate (reduced for token efficiency)
   top_k_symbols: 12                 # Top-K symbols for context
   require_min_evidence: 2           # Minimum evidence_refs per requirement
   max_context_chars: 18000          # Maximum characters for context (prompt size control)

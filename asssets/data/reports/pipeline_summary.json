@@ -1,0 +1,76 @@
+{
+  "start_time": "2026-01-06T23:13:46.577830",
+  "config_file": "configs/pipeline.yaml",
+  "steps": {
+    "parse": {
+      "status": "success",
+      "symbols_count": 233,
+      "license": "Apache-2.0"
+    },
+    "auto": {
+      "status": "success",
+      "method_profiles": 199,
+      "questions": 595,
+      "qa_samples": 527
+    },
+    "qa_generation": {
+      "status": "skipped",
+      "reason": "auto_enabled"
+    },
+    "design_generation": {
+      "status": "success",
+      "auto_requirements_count": 8,
+      "samples_count": 8
+    },
+    "validation": {
+      "status": "success"
+    },
+    "merge": {
+      "status": "success",
+      "total_samples": 535
+    },
+    "deduplication": {
+      "status": "success"
+    },
+    "secrets_scan": {
+      "status": "success",
+      "mode": "drop",
+      "filtered_count": 0
+    },
+    "split": {
+      "status": "success",
+      "train_count": 393,
+      "val_count": 68,
+      "test_count": 74,
+      "qa": {
+        "train_count": 385,
+        "val_count": 68,
+        "test_count": 74
+      },
+      "design": {
+        "train_count": 6,
+        "val_count": 1,
+        "test_count": 1
+      }
+    },
+    "export": {
+      "status": "success",
+      "files": [
+        "data\\final\\train_sft.jsonl",
+        "data\\final\\val_sft.jsonl",
+        "data\\final\\test_sft.jsonl"
+      ]
+    }
+  },
+  "repo_path": "repos\\java\\spring-ai",
+  "repo_commit": "c5f4313f5c9a5b49f68f92a865f322091f6649d1",
+  "end_time": "2026-01-07T02:30:23.374038",
+  "output_files": {
+    "symbols": "data\\raw\\extracted\\symbols.jsonl",
+    "repo_meta": "data\\raw\\repo_meta\\repo_meta.json",
+    "train_sft": "data\\final\\train_sft.jsonl",
+    "val_sft": "data\\final\\val_sft.jsonl",
+    "test_sft": "data\\final\\test_sft.jsonl",
+    "reports": "data\\reports"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "repo_path": "repos\\java\\spring-ai",
+  "repo_commit": "c5f4313f5c9a5b49f68f92a865f322091f6649d1",
+  "total_symbols": 233,
+  "license": {
+    "exists": true,
+    "file": "LICENSE.txt",
+    "name": "Apache-2.0",
+    "snippet": "Apache License\n                           Version 2.0, January 2004\n                        https://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.",
+    "confidence": "high"
+  }
+}

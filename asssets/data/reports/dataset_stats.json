@@ -1,0 +1,29 @@
+{
+  "total_samples": 535,
+  "scenario_distribution": {
+    "qa_rule": 527,
+    "arch_design": 8
+  },
+  "length_stats": {
+    "instruction": {
+      "min": 17,
+      "max": 124,
+      "avg": 40.74205607476635
+    },
+    "context": {
+      "min": 105,
+      "max": 4998,
+      "avg": 479.42056074766356
+    },
+    "answer": {
+      "min": 74,
+      "max": 1120,
+      "avg": 360.99439252336447
+    }
+  },
+  "evidence_refs": {
+    "min": 1,
+    "max": 2,
+    "avg": 1.0149532710280373
+  }
+}
