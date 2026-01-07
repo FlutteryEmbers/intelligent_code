@@ -19,7 +19,7 @@
 1. **CLI 层**：`main.py` 解析参数并启动 pipeline
 2. **编排层**：`src/pipeline/orchestrator.py` 负责加载配置、初始化路径、组装并串行执行 step
 3. **步骤层**：`src/pipeline/steps/*` 每个 step 承担单一职责，读写固定 artifact
-4. **引擎层**：`src/engine/*` 负责 LLM/RAG/需求生成等“重逻辑”，往往自带输出文件
+4. **引擎层**：`src/engine/*` 负责 LLM/RAG/设计问题生成等“重逻辑”，往往自带输出文件
 5. **工具层**：`src/utils/*` 提供 schema、去重、校验、split、导出、安全扫描等
 6. **持久层（DB 等价物）**：`data/*` + `logs/*` + `data/reports/*`
 

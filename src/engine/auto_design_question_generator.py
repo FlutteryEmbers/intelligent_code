@@ -1,7 +1,7 @@
 """
-Automatic Requirement Generator - 自动生成架构设计需求
+Automatic Design Question Generator - 自动生成架构设计问题
 
-从代码仓库结构和符号中自动生成架构改进需求，用于 DesignGenerator。
+从代码仓库结构和符号中自动生成架构设计问题，用于 DesignGenerator。
 该版本去除过度的约束校验，保留基础能力与必要字段归一化。
 """
 import json
@@ -34,14 +34,14 @@ def load_prompt_template(template_path: str | Path) -> str:
         return f.read()
 
 
-class RequirementGenerator:
+class DesignQuestionGenerator:
     """
-    自动需求生成器（轻量版）
+    自动设计问题生成器（轻量版）
 
     功能：
     1. 过滤候选符号（Controller/Service/Repository）
     2. 构造上下文与证据池
-    3. LLM 生成需求（JSON）
+    3. LLM 生成设计问题（JSON）
     4. 归一化字段，尽量保留有效结果
     """
 
@@ -55,41 +55,41 @@ class RequirementGenerator:
 
         # 加载 prompt 模板
         prompt_path = self.config.get(
-            'prompts.requirements_generation',
-            'configs/prompts/auto_requirement_generation.txt'
+            'prompts.design_questions_generation',
+            'configs/prompts/auto_design_question_generation.txt'
         )
         self.prompt_template = load_prompt_template(prompt_path)
 
         # 从配置读取参数
-        self.max_requirements = self.config.get('generation.max_items', 50)
+        self.max_design_questions = self.config.get('generation.max_items', 50)
         self.top_k_symbols = self.config.get('generation.retrieval_top_k', 6)
-        self.require_min_evidence = self.config.get('requirements.min_evidence_refs', 1)
+        self.min_evidence_refs = self.config.get('design_questions.min_evidence_refs', 1)
         self.max_context_chars = self.config.get('generation.max_context_chars', 16000)
         self.seed = self.config.get('generation.seed', 42)
 
         # Method profiles 配置（可选增强）
-        self.use_method_profiles = self.config.get('requirements.use_method_profiles', False)
+        self.use_method_profiles = self.config.get('design_questions.use_method_profiles', False)
         self.method_profiles_jsonl = Path(self.config.get(
             'artifacts.method_profiles_jsonl',
             'data/intermediate/method_profiles.jsonl'
         ))
-        self.profiles_top_k = self.config.get('requirements.profiles_top_k', 10)
-        self.profiles_max_chars = self.config.get('requirements.profiles_max_chars', 4000)
+        self.profiles_top_k = self.config.get('design_questions.profiles_top_k', 10)
+        self.profiles_max_chars = self.config.get('design_questions.profiles_max_chars', 4000)
 
         # Batching 配置（可选）
-        batching_config = self.config.get('requirements.batching', {})
+        batching_config = self.config.get('design_questions.batching', {})
         self.batching_enabled = batching_config.get('enabled', False)
         self.batch_size = self.config.get('generation.batch_size', 5)
         self.max_batches = batching_config.get('max_batches', 5)
 
         # 输出路径
         self.output_jsonl = Path(self.config.get(
-            'artifacts.requirements_jsonl',
-            'data/intermediate/requirements_auto.jsonl'
+            'artifacts.design_questions_jsonl',
+            'data/intermediate/design_questions_auto.jsonl'
         ))
         self.rejected_jsonl = Path(self.config.get(
-            'artifacts.requirements_rejected_jsonl',
-            'data/intermediate/requirements_auto_rejected.jsonl'
+            'artifacts.design_questions_rejected_jsonl',
+            'data/intermediate/design_questions_auto_rejected.jsonl'
         ))
 
         self.output_jsonl.parent.mkdir(parents=True, exist_ok=True)
@@ -98,16 +98,16 @@ class RequirementGenerator:
         self.stats = {
             'total_symbols': 0,
             'filtered_symbols': 0,
-            'generated_requirements': 0,
-            'rejected_requirements': 0,
+            'generated_design_questions': 0,
+            'rejected_design_questions': 0,
         }
 
         logger.info(
-            "RequirementGenerator initialized: max_requirements=%s, top_k_symbols=%s, "
+            "DesignQuestionGenerator initialized: max_design_questions=%s, top_k_symbols=%s, "
             "min_evidence=%s, use_method_profiles=%s, batching_enabled=%s, batch_size=%s",
-            self.max_requirements,
+            self.max_design_questions,
             self.top_k_symbols,
-            self.require_min_evidence,
+            self.min_evidence_refs,
             self.use_method_profiles,
             self.batching_enabled,
             self.batch_size,
@@ -119,17 +119,17 @@ class RequirementGenerator:
         repo_commit: str | None = None
     ) -> list[dict]:
         """
-        从符号文件生成需求
+        从符号文件生成设计问题
 
         Args:
             symbols_path: 符号 JSONL 文件路径
             repo_commit: 仓库 commit
 
         Returns:
-            list[dict]: 需求字典列表
+            list[dict]: 设计问题字典列表
         """
         start_time = time.time()
-        logger.info(f"Starting requirement generation from {symbols_path}")
+        logger.info(f"Starting design question generation from {symbols_path}")
 
         symbols = self._load_symbols(symbols_path)
         self.stats['total_symbols'] = len(symbols)
@@ -172,21 +172,26 @@ class RequirementGenerator:
         symbols_map = {s.symbol_id: s for s in symbols}
 
         if self.batching_enabled:
-            requirements = self._generate_with_batching(context, evidence_pool, symbols_map)
+            design_questions = self._generate_with_batching(context, evidence_pool, symbols_map)
         else:
-            requirements = self._generate_single_batch(context, evidence_pool, symbols_map, self.max_requirements)
+            design_questions = self._generate_single_batch(
+                context,
+                evidence_pool,
+                symbols_map,
+                self.max_design_questions,
+            )
 
         elapsed = time.time() - start_time
         logger.info(
-            "Requirement generation completed in %.1fs: total=%s, success=%s, rejected=%s",
+            "Design question generation completed in %.1fs: total=%s, success=%s, rejected=%s",
             elapsed,
-            len(requirements) + self.stats['rejected_requirements'],
-            len(requirements),
-            self.stats['rejected_requirements'],
+            len(design_questions) + self.stats['rejected_design_questions'],
+            len(design_questions),
+            self.stats['rejected_design_questions'],
         )
 
-        self._save_requirements(requirements)
-        return requirements
+        self._save_design_questions(design_questions)
+        return design_questions
 
     def _generate_single_batch(
         self,
@@ -198,7 +203,7 @@ class RequirementGenerator:
         prompt = self._build_prompt(context, evidence_pool, target_count)
         raw_output = self._call_llm(prompt)
         parsed = self._parse_llm_output(raw_output)
-        normalized = self._normalize_requirements(parsed, symbols_map)
+        normalized = self._normalize_design_questions(parsed, symbols_map)
         return normalized
 
     def _generate_with_batching(
@@ -211,13 +216,13 @@ class RequirementGenerator:
         seen_goals: set[str] = set()
 
         for batch_idx in range(self.max_batches):
-            remaining = self.max_requirements - len(collected)
+            remaining = self.max_design_questions - len(collected)
             if remaining <= 0:
                 break
 
             current_batch_size = min(self.batch_size, remaining)
             logger.info(
-                "Batch %s/%s: Generating %s requirements",
+                "Batch %s/%s: Generating %s design questions",
                 batch_idx + 1,
                 self.max_batches,
                 current_batch_size,
@@ -226,7 +231,11 @@ class RequirementGenerator:
             prompt = self._build_prompt(context, evidence_pool, current_batch_size)
             raw_output = self._call_llm(prompt)
             parsed = self._parse_llm_output(raw_output)
-            batch_items = self._normalize_requirements(parsed, symbols_map, start_index=len(collected) + 1)
+            batch_items = self._normalize_design_questions(
+                parsed,
+                symbols_map,
+                start_index=len(collected) + 1,
+            )
 
             added = 0
             for item in batch_items:
@@ -482,18 +491,18 @@ class RequirementGenerator:
             result = result[:self.profiles_max_chars] + "\n\n... (profiles truncated)"
         return result
 
-    def _build_prompt(self, context: str, evidence_pool: str, max_requirements: int) -> str:
+    def _build_prompt(self, context: str, evidence_pool: str, max_design_questions: int) -> str:
         language_name = self.language_profile.get('language', 'java')
         return self.prompt_template.format(
             language=language_name.capitalize(),
-            max_requirements=max_requirements,
-            require_min_evidence=self.require_min_evidence,
+            max_design_questions=max_design_questions,
+            min_evidence_refs=self.min_evidence_refs,
             context=context,
             evidence_pool=evidence_pool
         )
 
     def _call_llm(self, prompt: str) -> str:
-        logger.info("Calling LLM to generate requirements...")
+        logger.info("Calling LLM to generate design questions...")
         from langchain_core.messages import SystemMessage, HumanMessage
 
         language_name = self.language_profile.get('language', 'java').capitalize()
@@ -566,10 +575,9 @@ class RequirementGenerator:
             return []
 
         if isinstance(data, dict):
-            if 'requirements' in data and isinstance(data['requirements'], list):
-                return data['requirements']
-            # 兼容 requirement1/requirement2 形式
-            if any(k.lower().startswith('requirement') for k in data.keys()):
+            if 'design_questions' in data and isinstance(data['design_questions'], list):
+                return data['design_questions']
+            if any(k.lower().startswith('design_question') for k in data.keys()):
                 return [v for k, v in data.items() if isinstance(v, dict)]
             return [data]
 
@@ -578,25 +586,25 @@ class RequirementGenerator:
 
         return []
 
-    def _normalize_requirements(
+    def _normalize_design_questions(
         self,
-        requirements: list,
+        design_questions: list,
         symbols_map: dict[str, CodeSymbol],
         start_index: int = 1
     ) -> list[dict]:
         normalized = []
 
-        for idx, req in enumerate(requirements, start=start_index):
-            norm = self._normalize_requirement(req, symbols_map, idx)
+        for idx, req in enumerate(design_questions, start=start_index):
+            norm = self._normalize_design_question(req, symbols_map, idx)
             if not norm:
-                self.stats['rejected_requirements'] += 1
+                self.stats['rejected_design_questions'] += 1
                 continue
             normalized.append(norm)
-            self.stats['generated_requirements'] += 1
+            self.stats['generated_design_questions'] += 1
 
         return normalized
 
-    def _normalize_requirement(
+    def _normalize_design_question(
         self,
         req: dict,
         symbols_map: dict[str, CodeSymbol],
@@ -605,15 +613,15 @@ class RequirementGenerator:
         if not isinstance(req, dict):
             return None
 
-        req_id = f"REQ-AUTO-{index:03d}"
+        req_id = f"DQ-AUTO-{index:03d}"
 
-        goal = req.get('goal') or req.get('description') or req.get('requirement') or req.get('title')
+        goal = req.get('goal') or req.get('description') or req.get('question') or req.get('title')
         if isinstance(goal, list):
             goal = goal[0] if goal else ""
 
         if not goal or not isinstance(goal, str):
             self._log_rejected({
-                'requirement': req,
+                'design_question': req,
                 'reason': 'missing_goal'
             })
             return None
@@ -692,14 +700,14 @@ class RequirementGenerator:
 
         return evidence
 
-    def _save_requirements(self, requirements: list[dict]):
-        if not requirements:
-            logger.warning("No requirements to save")
+    def _save_design_questions(self, design_questions: list[dict]):
+        if not design_questions:
+            logger.warning("No design questions to save")
             return
         with open(self.output_jsonl, 'w', encoding='utf-8') as f:
-            for req in requirements:
+            for req in design_questions:
                 f.write(json.dumps(req, ensure_ascii=False) + '\n')
-        logger.info(f"Saved {len(requirements)} requirements to {self.output_jsonl}")
+        logger.info(f"Saved {len(design_questions)} design questions to {self.output_jsonl}")
 
     def _log_rejected(self, entry: dict):
         entry['timestamp'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
@@ -711,14 +719,14 @@ class RequirementGenerator:
 
     def print_summary(self):
         print("\n" + "=" * 70)
-        print(" 自动需求生成摘要")
+        print(" 自动设计问题生成摘要")
         print("=" * 70)
         print(f"总符号数: {self.stats['total_symbols']}")
         print(f"过滤候选: {self.stats['filtered_symbols']}")
-        print(f"成功生成: {self.stats['generated_requirements']}")
-        print(f"生成失败: {self.stats['rejected_requirements']}")
+        print(f"成功生成: {self.stats['generated_design_questions']}")
+        print(f"生成失败: {self.stats['rejected_design_questions']}")
         print(f"\n输出文件:")
-        print(f"  - 需求文件: {self.output_jsonl}")
+        print(f"  - 设计问题文件: {self.output_jsonl}")
         print(f"  - 失败样本: {self.rejected_jsonl}")
         print("=" * 70)
 
@@ -727,7 +735,7 @@ def main():
     """命令行入口"""
     import argparse
 
-    parser = argparse.ArgumentParser(description='自动需求生成器')
+    parser = argparse.ArgumentParser(description='自动设计问题生成器')
     parser.add_argument(
         '--symbols',
         default='data/raw/extracted/symbols.jsonl',
@@ -751,19 +759,19 @@ def main():
     if args.out:
         if 'artifacts' not in config._config:
             config._config['artifacts'] = {}
-        config._config['artifacts']['requirements_jsonl'] = args.out
+        config._config['artifacts']['design_questions_jsonl'] = args.out
 
-    generator = RequirementGenerator(config=config)
+    generator = DesignQuestionGenerator(config=config)
 
     try:
-        requirements = generator.generate_from_repo(
+        design_questions = generator.generate_from_repo(
             symbols_path=args.symbols,
             repo_commit=args.repo_commit
         )
         generator.print_summary()
-        return 0 if requirements else 1
+        return 0 if design_questions else 1
     except Exception as e:
-        logger.error(f"Requirement generation failed: {e}", exc_info=True)
+        logger.error(f"Design question generation failed: {e}", exc_info=True)
         return 1
 
 

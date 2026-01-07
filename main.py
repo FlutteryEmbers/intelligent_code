@@ -36,9 +36,9 @@ def main():
         help="Skip auto module (method profiles + auto QA)"
     )
     parser.add_argument(
-        "--skip-auto-requirements",
+        "--skip-auto-design-questions",
         action="store_true",
-        help="Skip auto requirements generation"
+        help="Skip auto design question generation"
     )
     parser.add_argument(
         "--skip-llm",

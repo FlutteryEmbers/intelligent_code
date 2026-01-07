@@ -22,7 +22,7 @@
 |---|---|---|---|
 | `data/raw/extracted/symbols.jsonl` | `CodeSymbol` | `ParseStep` → parser | QA/Design/Auto 引擎、Validation、Split |
 | `data/intermediate/*_raw.jsonl` | `TrainingSample`（dict 形态） | `QAGenerator` / `DesignGenerator` / `AutoAnswerGenerator` | Validation、Merge、Dedup、Safety、Split、Export |
-| `data/intermediate/method_profiles.jsonl` | `MethodProfile` | `AutoMethodUnderstander` | Auto QA（问/答）、Auto Requirements（可选） |
+| `data/intermediate/method_profiles.jsonl` | `MethodProfile` | `AutoMethodUnderstander` | Auto QA（问/答）、Auto Design Questions（可选） |
 | `data/intermediate/questions.jsonl` | `QuestionSample` | `AutoQuestionGenerator` | `AutoAnswerGenerator` |
 | `data/final/*_sft.jsonl` | SFT messages（dict） | `ExportStep` | 训练框架/微调脚本 |
 
@@ -287,7 +287,7 @@ classDiagram
 
 ### Schema: `MethodProfile`（Auto 模块）
 
-用途：方法级理解的中间表示（可视为“可检索的语义文档”），支撑 Auto QA 与自动需求增强。
+用途：方法级理解的中间表示（可视为“可检索的语义文档”），支撑 Auto QA 与自动设计问题增强。
 
 字段注解（核心）：
 
@@ -301,7 +301,7 @@ classDiagram
 生产者/消费者：
 
 - 生产者：`AutoMethodUnderstander`
-- 消费者：`vector_index.build_embeddings`、`AutoQuestionGenerator`、Auto Requirements（可选）
+- 消费者：`vector_index.build_embeddings`、`AutoQuestionGenerator`、Auto Design Questions（可选）
 
 ---
 

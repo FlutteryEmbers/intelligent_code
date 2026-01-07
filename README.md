@@ -77,13 +77,11 @@ export OLLAMA_MODEL=qwen2.5:7b
 
 ```yaml
 auto:
-  enabled: true                    # Auto QA（建议先开）
   embedding_model: "nomic-embed-text"
   max_methods: 50
   questions_per_method: 5
 
-auto_requirements:
-  enabled: true                    # 设计方案用自动需求（可选）
+design_questions:
   use_method_profiles: true
 ```
 

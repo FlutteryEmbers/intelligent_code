@@ -14,13 +14,13 @@
 
 ### 职责边界（Single Responsibility）
 
-AutoModuleStep 的职责是：在启用 Auto 模式时，执行“方法级理解 + RAG”链路，生成更高质量、更可解释的 QA 数据；同时可选地输出 method profiles 供自动需求生成增强上下文。
+AutoModuleStep 的职责是：在启用 Auto 模式时，执行“方法级理解 + RAG”链路，生成更高质量、更可解释的 QA 数据；同时可选地输出 method profiles 供自动设计问题生成增强上下文。
 
 ### 执行模式
 
 - **Auto QA 模式**：`auto.enabled=true` 且未设置 `--skip-llm/--skip-qa`
   - 产生 `auto_qa_raw.jsonl`（TrainingSample）
-- **Profiles-only 模式**：Auto QA 不需要，但 auto requirements 需要 method profiles
+- **Profiles-only 模式**：Auto QA 不需要，但 auto design questions 需要 method profiles
   - 仅产生 `method_profiles.jsonl`
 - **Disabled/Skipped**：Auto 关闭或显式 skip
 

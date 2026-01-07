@@ -1,8 +1,8 @@
-# Architecture Design Requirements Configuration
-# 用于生成架构设计方案的需求定义
+# Architecture Design Questions Configuration
+# 用于生成架构设计方案的设计问题定义
 
-requirements:
-  - id: "REQ-001"
+design_questions:
+  - id: "DQ-001"
     goal: "为用户登录接口添加 Redis 缓存层，提升高并发场景下的性能"
     constraints:
       - "使用 Redis 作为缓存存储"
@@ -18,7 +18,7 @@ requirements:
       - "不改变现有登录业务逻辑"
       - "不引入分布式锁（MVP 阶段）"
 
-  - id: "REQ-002"
+  - id: "DQ-002"
     goal: "为订单创建接口实现幂等性保证，防止重复下单"
     constraints:
       - "使用唯一业务流水号作为幂等标识"
@@ -34,7 +34,7 @@ requirements:
       - "不处理分布式事务回滚"
       - "不实现全局唯一 ID 生成器"
 
-  - id: "REQ-003"
+  - id: "DQ-003"
     goal: "为产品查询接口实现读写分离，提升查询性能"
     constraints:
       - "主库负责写操作，从库负责读操作"
@@ -50,7 +50,7 @@ requirements:
       - "不实现自动主从切换（依赖 DBA）"
       - "不支持多从库负载均衡（MVP 阶段）"
 
-  - id: "REQ-004"
+  - id: "DQ-004"
     goal: "为商品搜索接口添加限流保护，防止恶意刷单"
     constraints:
       - "基于用户 ID 和 IP 的双重限流"
@@ -66,7 +66,7 @@ requirements:
       - "不实现分布式限流（单机版）"
       - "不记录限流日志到数据库"
 
-  - id: "REQ-005"
+  - id: "DQ-005"
     goal: "为用户收藏夹功能添加异步处理，优化响应时间"
     constraints:
       - "使用消息队列（RabbitMQ/Kafka）"

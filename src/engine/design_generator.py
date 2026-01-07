@@ -1,7 +1,7 @@
 """
-场景 2：架构设计方案生成器 - 基于需求生成设计方案
+场景 2：架构设计方案生成器 - 基于设计问题生成设计方案
 
-从代码仓库中检索相关上下文，为给定需求生成架构设计方案。
+从代码仓库中检索相关上下文，为给定设计问题生成架构设计方案。
 """
 import json
 import time
@@ -37,49 +37,49 @@ def load_prompt_template(template_name: str) -> str:
         return f.read()
 
 
-def load_requirements_config(config_path: str | Path | None = None) -> list['Requirement']:
-    """从 YAML 配置文件加载需求定义
+def load_design_questions_config(config_path: str | Path | None = None) -> list['DesignQuestion']:
+    """从 YAML 配置文件加载设计问题定义
     
     Args:
-        config_path: 配置文件路径，默认为 configs/requirements.yaml
+        config_path: 配置文件路径，默认为 configs/design_questions.yaml
         
     Returns:
-        list[Requirement]: 需求对象列表
+        list[DesignQuestion]: 设计问题对象列表
     """
     if config_path is None:
-        config_path = Path(__file__).parent.parent.parent / "configs" / "requirements.yaml"
+        config_path = Path(__file__).parent.parent.parent / "configs" / "design_questions.yaml"
     else:
         config_path = Path(config_path)
     
     if not config_path.exists():
-        logger.warning(f"Requirements config not found: {config_path}, using empty list")
+        logger.warning(f"Design questions config not found: {config_path}, using empty list")
         return []
     
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
             data = yaml.safe_load(f)
         
-        requirements = []
-        for req_data in data.get('requirements', []):
-            req = Requirement(
-                id=req_data['id'],
-                goal=req_data['goal'],
-                constraints=req_data.get('constraints', []),
-                acceptance_criteria=req_data.get('acceptance_criteria', []),
-                non_goals=req_data.get('non_goals', [])
+        design_questions = []
+        for question_data in data.get('design_questions', []):
+            question = DesignQuestion(
+                id=question_data['id'],
+                goal=question_data['goal'],
+                constraints=question_data.get('constraints', []),
+                acceptance_criteria=question_data.get('acceptance_criteria', []),
+                non_goals=question_data.get('non_goals', [])
             )
-            requirements.append(req)
+            design_questions.append(question)
         
-        logger.info(f"Loaded {len(requirements)} requirements from {config_path}")
-        return requirements
+        logger.info(f"Loaded {len(design_questions)} design questions from {config_path}")
+        return design_questions
         
     except Exception as e:
-        logger.error(f"Failed to load requirements config: {e}")
+        logger.error(f"Failed to load design questions config: {e}")
         return []
 
 
-class Requirement:
-    """需求模型"""
+class DesignQuestion:
+    """设计问题模型"""
     def __init__(
         self,
         id: str,
@@ -104,8 +104,8 @@ class Requirement:
         }
     
     @classmethod
-    def from_dict(cls, data: dict) -> 'Requirement':
-        """从字典创建 Requirement 对象"""
+    def from_dict(cls, data: dict) -> 'DesignQuestion':
+        """从字典创建 DesignQuestion 对象"""
         return cls(
             id=data['id'],
             goal=data['goal'],
@@ -119,8 +119,8 @@ class DesignGenerator:
     """
     架构设计方案生成器
     
-    为给定需求生成基于现有代码架构的设计方案：
-    1. 需求结构化存储
+    为给定设计问题生成基于现有代码架构的设计方案：
+    1. 设计问题结构化存储
     2. 轻量级 RAG（过滤 + 检索）
     3. LLM 生成设计方案
     4. 质量校验并保存
@@ -150,13 +150,13 @@ class DesignGenerator:
         self.output_dir = Path(self.config.get('output.intermediate_dir', 'data/intermediate'))
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        self.requirements_path = self.output_dir / 'requirements.jsonl'
+        self.design_questions_path = self.output_dir / 'design_questions.jsonl'
         self.raw_output_path = self.output_dir / 'design_raw.jsonl'
         self.rejected_path = self.output_dir / 'design_rejected.jsonl'
         
         # 统计
         self.stats = {
-            'total_requirements': 0,
+            'total_design_questions': 0,
             'generated_samples': 0,
             'rejected_samples': 0,
             'validation_errors': []
@@ -168,15 +168,15 @@ class DesignGenerator:
         self,
         symbols_path: str | Path = 'data/raw/extracted/symbols.jsonl',
         repo_commit: str | None = None,
-        requirements: list[Requirement] | None = None
+        design_questions: list[DesignQuestion] | None = None
     ) -> list[TrainingSample]:
         """
-        从符号文件和需求生成设计方案
+        从符号文件和设计问题生成设计方案
         
         Args:
             symbols_path: 符号 JSONL 文件路径
             repo_commit: 仓库 commit
-            requirements: 需求列表（可选，默认使用内置需求）
+            design_questions: 设计问题列表（可选，默认使用内置问题）
             
         Returns:
             list[TrainingSample]: 生成的训练样本列表
@@ -196,33 +196,42 @@ class DesignGenerator:
             repo_commit = symbols[0].repo_commit
             logger.info(f"Using repo_commit from symbols: {repo_commit}")
         
-        # 使用自定义需求或从配置文件加载
-        if requirements is None:
-            requirements = load_requirements_config()
+        # 使用自定义设计问题或从配置文件加载
+        if design_questions is None:
+            design_questions = load_design_questions_config()
         
-        self.stats['total_requirements'] = len(requirements)
+        self.stats['total_design_questions'] = len(design_questions)
         
-        # 保存需求到文件
-        self._save_requirements(requirements)
+        # 保存设计问题到文件
+        self._save_design_questions(design_questions)
         
-        # 限制需求数量
-        if len(requirements) > self.max_samples:
-            logger.info(f"Limiting requirements to {self.max_samples} (from {len(requirements)})")
-            requirements = requirements[:self.max_samples]
+        # 限制设计问题数量
+        if len(design_questions) > self.max_samples:
+            logger.info(
+                "Limiting design questions to %s (from %s)",
+                self.max_samples,
+                len(design_questions),
+            )
+            design_questions = design_questions[:self.max_samples]
         
-        # 为每个需求生成设计方案
+        # 为每个设计问题生成设计方案
         samples = []
-        for i, req in enumerate(requirements, 1):
-            logger.info(f"Processing requirement {i}/{len(requirements)}: {req.id}")
+        for i, question in enumerate(design_questions, 1):
+            logger.info(
+                "Processing design question %s/%s: %s",
+                i,
+                len(design_questions),
+                question.id,
+            )
             
             try:
-                sample = self._generate_single(req, symbols, repo_commit)
+                sample = self._generate_single(question, symbols, repo_commit)
                 if sample:
                     samples.append(sample)
                     self.stats['generated_samples'] += 1
             except Exception as e:
-                logger.error(f"Failed to generate sample for {req.id}: {e}")
-                self._log_rejected(req, str(e), None)
+                logger.error(f"Failed to generate sample for {question.id}: {e}")
+                self._log_rejected(question, str(e), None)
                 self.stats['rejected_samples'] += 1
         
         # 保存结果
@@ -230,7 +239,7 @@ class DesignGenerator:
         
         elapsed = time.time() - start_time
         logger.info(f"Design generation completed in {elapsed:.1f}s:")
-        logger.info(f"  - Total requirements: {self.stats['total_requirements']}")
+        logger.info(f"  - Total design questions: {self.stats['total_design_questions']}")
         logger.info(f"  - Generated samples: {self.stats['generated_samples']}")
         logger.info(f"  - Rejected samples: {self.stats['rejected_samples']}")
         
@@ -260,37 +269,37 @@ class DesignGenerator:
         logger.info(f"Loaded {len(symbols)} symbols from {symbols_path}")
         return symbols
     
-    def _save_requirements(self, requirements: list[Requirement]):
-        """保存需求到 JSONL"""
-        with open(self.requirements_path, 'w', encoding='utf-8') as f:
-            for req in requirements:
-                f.write(json.dumps(req.to_dict(), ensure_ascii=False) + '\n')
+    def _save_design_questions(self, design_questions: list[DesignQuestion]):
+        """保存设计问题到 JSONL"""
+        with open(self.design_questions_path, 'w', encoding='utf-8') as f:
+            for question in design_questions:
+                f.write(json.dumps(question.to_dict(), ensure_ascii=False) + '\n')
         
-        logger.info(f"Saved {len(requirements)} requirements to {self.requirements_path}")
+        logger.info(f"Saved {len(design_questions)} design questions to {self.design_questions_path}")
     
     def _generate_single(
         self,
-        requirement: Requirement,
+        design_question: DesignQuestion,
         symbols: list[CodeSymbol],
         repo_commit: str
     ) -> TrainingSample | None:
-        """为单个需求生成设计方案"""
+        """为单个设计问题生成设计方案"""
         # 1. RAG：检索相关上下文
-        relevant_symbols = self._retrieve_context(requirement, symbols)
+        relevant_symbols = self._retrieve_context(design_question, symbols)
         
         if not relevant_symbols:
-            logger.warning(f"No relevant symbols found for {requirement.id}")
-            self._log_rejected(requirement, "No relevant context found", None)
+            logger.warning(f"No relevant symbols found for {design_question.id}")
+            self._log_rejected(design_question, "No relevant context found", None)
             return None
         
-        logger.info(f"Retrieved {len(relevant_symbols)} relevant symbols for {requirement.id}")
+        logger.info(f"Retrieved {len(relevant_symbols)} relevant symbols for {design_question.id}")
         
         # 2. 构造上下文
-        context = self._build_context(relevant_symbols, requirement)
+        context = self._build_context(relevant_symbols, design_question)
         
         # 3. 构造 prompts
         system_prompt = self._build_system_prompt()
-        user_prompt = self._build_user_prompt(requirement, context, relevant_symbols, repo_commit)
+        user_prompt = self._build_user_prompt(design_question, context, relevant_symbols, repo_commit)
         
         # 4. 调用 LLM
         try:
@@ -301,8 +310,8 @@ class DesignGenerator:
                 repo_commit=repo_commit
             )
         except Exception as e:
-            logger.warning(f"LLM generation failed for {requirement.id}: {e}")
-            self._log_rejected(requirement, f"LLM error: {e}", None)
+            logger.warning(f"LLM generation failed for {design_question.id}: {e}")
+            self._log_rejected(design_question, f"LLM error: {e}", None)
             return None
         
         # 5. 强制设置必填字段
@@ -310,13 +319,17 @@ class DesignGenerator:
         sample.repo_commit = repo_commit
         
         # 6. 校验样本
-        is_valid, errors = self._validate_sample(sample, requirement, repo_commit, symbols)
+        is_valid, errors = self._validate_sample(sample, design_question, repo_commit, symbols)
         
         if not is_valid:
-            logger.warning(f"Validation failed for {requirement.id}: {errors}")
-            self._log_rejected(requirement, "Validation failed", {"errors": errors, "sample": sample.model_dump()})
+            logger.warning(f"Validation failed for {design_question.id}: {errors}")
+            self._log_rejected(
+                design_question,
+                "Validation failed",
+                {"errors": errors, "sample": sample.model_dump()}
+            )
             self.stats['validation_errors'].append({
-                'requirement_id': requirement.id,
+                'design_question_id': design_question.id,
                 'errors': errors
             })
             return None
@@ -325,7 +338,7 @@ class DesignGenerator:
         sample.quality = {
             "schema_ok": True,
             "evidence_ok": True,
-            "requirement_id": requirement.id,
+            "design_question_id": design_question.id,
             "context_symbols": len(relevant_symbols)
         }
         
@@ -333,7 +346,7 @@ class DesignGenerator:
     
     def _retrieve_context(
         self,
-        requirement: Requirement,
+        design_question: DesignQuestion,
         symbols: list[CodeSymbol]
     ) -> list[CodeSymbol]:
         """
@@ -354,8 +367,8 @@ class DesignGenerator:
         # 第二阶段：关键词检索打分
         scored_candidates = []
         
-        # 提取需求关键词
-        req_keywords = self._extract_keywords(requirement.goal)
+        # 提取设计问题关键词
+        req_keywords = self._extract_keywords(design_question.goal)
         
         for symbol in candidates:
             score = self._calculate_relevance_score(symbol, req_keywords)
@@ -404,7 +417,7 @@ class DesignGenerator:
         return keywords
     
     def _calculate_relevance_score(self, symbol: CodeSymbol, req_keywords: list[str]) -> int:
-        """Calculate relevance score between symbol and requirement keywords"""
+        """Calculate relevance score between symbol and design question keywords"""
         score = 0
         
         # Search in qualified_name + doc + source
@@ -505,7 +518,7 @@ class DesignGenerator:
     def _build_context(
         self,
         symbols: list[CodeSymbol],
-        requirement: Requirement
+        design_question: DesignQuestion
     ) -> str:
         """构造上下文字符串"""
         parts = []
@@ -565,7 +578,7 @@ class DesignGenerator:
     
     def _build_user_prompt(
         self,
-        requirement: Requirement,
+        design_question: DesignQuestion,
         context: str,
         symbols: list[CodeSymbol],
         repo_commit: str
@@ -576,9 +589,9 @@ class DesignGenerator:
         service_symbol = next((s for s in symbols if self._is_service(s)), symbols[0] if len(symbols) > 0 else None)
         
         # 准备约束条件、验收标准和非目标的格式化文本
-        constraints_text = '\n'.join([f'- {c}' for c in requirement.constraints])
-        acceptance_criteria_text = '\n'.join([f'- {a}' for a in requirement.acceptance_criteria])
-        non_goals_text = '\n'.join([f'- {n}' for n in requirement.non_goals])
+        constraints_text = '\n'.join([f'- {c}' for c in design_question.constraints])
+        acceptance_criteria_text = '\n'.join([f'- {a}' for a in design_question.acceptance_criteria])
+        non_goals_text = '\n'.join([f'- {n}' for n in design_question.non_goals])
         
         # 准备service evidence文本
         if service_symbol:
@@ -604,8 +617,8 @@ Service 核心逻辑：
         
         # 使用模板并替换变量
         prompt = self.user_prompt_template.format(
-            requirement_id=requirement.id,
-            goal=requirement.goal,
+            design_question_id=design_question.id,
+            goal=design_question.goal,
             constraints=constraints_text,
             acceptance_criteria=acceptance_criteria_text,
             non_goals=non_goals_text,
@@ -617,7 +630,7 @@ Service 核心逻辑：
             controller_source_hash=controller_symbol.source_hash,
             service_evidence=service_evidence,
             service_evidence_json=service_evidence_json,
-            goal_short=requirement.goal[:50] + "..." if len(requirement.goal) > 50 else requirement.goal,
+            goal_short=design_question.goal[:50] + "..." if len(design_question.goal) > 50 else design_question.goal,
             repo_commit=repo_commit
         )
         
@@ -626,7 +639,7 @@ Service 核心逻辑：
     def _validate_sample(
         self,
         sample: TrainingSample,
-        requirement: Requirement,
+        design_question: DesignQuestion,
         repo_commit: str,
         symbols: list[CodeSymbol]
     ) -> tuple[bool, list[str]]:
@@ -694,12 +707,12 @@ Service 核心逻辑：
         
         logger.info(f"Saved {len(samples)} samples to {self.raw_output_path}")
     
-    def _log_rejected(self, requirement: Requirement, reason: str, raw_output: dict | None):
+    def _log_rejected(self, design_question: DesignQuestion, reason: str, raw_output: dict | None):
         """记录被拒绝的样本"""
         entry = {
             'timestamp': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
-            'requirement_id': requirement.id,
-            'goal': requirement.goal,
+            'design_question_id': design_question.id,
+            'goal': design_question.goal,
             'reason': reason,
             'raw_output': raw_output
         }
@@ -715,7 +728,7 @@ Service 核心逻辑：
         print("\n" + "=" * 70)
         print(" 架构设计方案生成摘要")
         print("=" * 70)
-        print(f"总需求数: {self.stats['total_requirements']}")
+        print(f"总设计问题数: {self.stats['total_design_questions']}")
         print(f"成功生成: {self.stats['generated_samples']}")
         print(f"生成失败: {self.stats['rejected_samples']}")
         
@@ -730,7 +743,7 @@ Service 核心逻辑：
                 print(f"  - {err_type}: {count}")
         
         print(f"\n输出文件:")
-        print(f"  - 需求文件: {self.requirements_path}")
+        print(f"  - 设计问题文件: {self.design_questions_path}")
         print(f"  - 成功样本: {self.raw_output_path}")
         print(f"  - 失败样本: {self.rejected_path}")
         print("=" * 70)

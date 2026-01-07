@@ -23,10 +23,10 @@ generation:
 
 auto:
   max_methods: 5
-  questions_per_method: 3
+  questions_per_method: 1
   embedding_model: "nomic-embed-text"
 
-requirements:
+design_questions:
   min_evidence_refs: 2
   use_method_profiles: true
   profiles_top_k: 20
@@ -41,7 +41,7 @@ prompts:
     method_understanding: "configs/prompts/auto_method_understanding.txt"
     question_generation: "configs/prompts/auto_question_generation.txt"
     answer_generation: "configs/prompts/auto_answer_generation.txt"
-  requirements_generation: "configs/prompts/auto_requirement_generation.txt"
+  design_questions_generation: "configs/prompts/auto_design_question_generation.txt"
 
 artifacts:
   method_profiles_jsonl: "data/intermediate/method_profiles.jsonl"
@@ -50,8 +50,8 @@ artifacts:
   method_embeddings_jsonl: "data/intermediate/method_embeddings.jsonl"
   auto_qa_raw_jsonl: "data/intermediate/auto_qa_raw.jsonl"
   auto_answer_rejected_jsonl: "data/intermediate/auto_answer_rejected.jsonl"
-  requirements_jsonl: "data/intermediate/requirements_auto.jsonl"
-  requirements_rejected_jsonl: "data/intermediate/requirements_auto_rejected.jsonl"
+  design_questions_jsonl: "data/intermediate/design_questions_auto.jsonl"
+  design_questions_rejected_jsonl: "data/intermediate/design_questions_auto_rejected.jsonl"
 
 quality:
   min_instruction_length: 10

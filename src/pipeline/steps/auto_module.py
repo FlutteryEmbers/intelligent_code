@@ -20,34 +20,34 @@ class AutoModuleStep(BaseStep):
     @property
     def display_name(self) -> str:
         """Dynamic display name based on execution mode."""
-        if self.need_auto_qa and self.need_profiles_for_requirements:
-            return "Auto Module: Method Profiles for Auto QA & Requirements"
+        if self.need_auto_qa and self.need_profiles_for_design_questions:
+            return "Auto Module: Method Profiles for Auto QA & Design Questions"
         elif self.need_auto_qa:
             return "Auto Module: Method-Level Understanding & Question Generation"
         else:
-            return "Auto Module: Generating Method Profiles for Requirements Enhancement"
+            return "Auto Module: Generating Method Profiles for Design Question Enhancement"
     
     def __init__(self, config: dict, args, paths: dict, repo_commit: str):
         super().__init__(config, args, paths, repo_commit)
         
         # Determine execution needs
         auto_config = config.get("auto", {})
-        requirements_config = config.get("requirements", {})
+        design_questions_config = config.get("design_questions", {})
         
         # Condition 1: Auto QA is enabled via CLI and not skipping QA
         self.need_auto_qa = not args.skip_auto and not (args.skip_llm or args.skip_qa)
         
-        # Condition 2: Auto Requirements needs profiles
-        self.need_profiles_for_requirements = (
+        # Condition 2: Auto design questions need profiles
+        self.need_profiles_for_design_questions = (
             not args.skip_auto and
-            not args.skip_auto_requirements and
-            requirements_config.get("use_method_profiles", False) and
+            not args.skip_auto_design_questions and
+            design_questions_config.get("use_method_profiles", False) and
             not (args.skip_llm or args.skip_design)
         )
     
     def should_skip(self) -> tuple[bool, str]:
         """Check if auto module should run."""
-        if not (self.need_auto_qa or self.need_profiles_for_requirements):
+        if not (self.need_auto_qa or self.need_profiles_for_design_questions):
             if self.args.skip_auto:
                 return True, "skip_flag"
             return True, "disabled"

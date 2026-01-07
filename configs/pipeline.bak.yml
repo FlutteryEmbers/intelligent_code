@@ -13,7 +13,7 @@ repo:
 # ==================== 2. Global Settings ====================
 # 全局配置：随机种子、批处理大小等
 global:
-  seed: 42                          # Random seed for reproducibility (used by dedup, split, auto_requirements)
+  seed: 42                          # Random seed for reproducibility (used by dedup, split, auto_design_questions)
   batch_size: 5                     # Default batch size for generation
   top_k_context: 6                  # Default Top-K context selection for RAG
 
@@ -30,7 +30,7 @@ llm:
   base_url: "http://localhost:11434/v1"
   model: "qwen2.5:7b"
   temperature: 0.2  # 降低 temperature 以提高格式稳定性
-  max_tokens: 10000  # 优化后：6个需求约需8000 tokens，留有余量
+  max_tokens: 10000  # 优化后：6个设计问题约需8000 tokens，留有余量
   timeout: 180  # 增加超时时间以适应更长的生成
 
 # ================================================================================================
@@ -76,28 +76,28 @@ auto:
     auto_qa_raw_jsonl: "data/intermediate/auto_qa_raw.jsonl"
     auto_answer_rejected_jsonl: "data/intermediate/auto_answer_rejected.jsonl"
 
-# ==================== Step 3a: Auto Requirements Generation ====================
-# 基于代码自动生成架构改进需求
-auto_requirements:
-  enabled: true                    # true = auto-generate requirements, false = use configs/requirements.yaml
-  max_requirements: 200               # Maximum requirements to generate (reduced for token efficiency)
+# ==================== Step 3a: Auto Design Questions Generation ====================
+# 基于代码自动生成架构设计问题
+auto_design_questions:
+  enabled: true                    # true = auto-generate design_questions, false = use configs/design_questions.yaml
+  max_design_questions: 200               # Maximum design_questions to generate (reduced for token efficiency)
   top_k_symbols: 12                 # Top-K symbols for context
-  require_min_evidence: 2           # Minimum evidence_refs per requirement
+  require_min_evidence: 2           # Minimum evidence_refs per design_question
   max_context_chars: 18000          # Maximum characters for context (prompt size control)
-  use_method_profiles: true        # Use method profiles to enhance requirement generation
+  use_method_profiles: true        # Use method profiles to enhance design_question generation
   method_profiles_jsonl: "data/intermediate/method_profiles.jsonl"  # Method profiles file path
   profiles_top_k: 20                # Top-K profiles for semantic enhancement
   profiles_max_chars: 6000          # Max characters for profiles context to prevent context explosion
   batching:                         # Batch generation to reduce JSON truncation risk
     enabled: true                   # Enable batch generation (false = single-shot like before)
-    batch_size: 2                   # Generate N requirements per batch (smaller = safer)
+    batch_size: 2                   # Generate N design_questions per batch (smaller = safer)
     max_batches: 5                  # Maximum batch iterations (safety limit)
-    diversity_hint: true            # Provide existing requirements to avoid duplicates
+    diversity_hint: true            # Provide existing design_questions to avoid duplicates
   prompts:
-    requirement_generation: "configs/prompts/auto_requirement_generation.txt"
+    design_questions_generation: "configs/prompts/auto_design_question_generation.txt"
   outputs:
-    requirements_jsonl: "data/intermediate/requirements_auto.jsonl"
-    rejected_jsonl: "data/intermediate/requirements_auto_rejected.jsonl"
+    design_questions_jsonl: "data/intermediate/design_questions_auto.jsonl"
+    rejected_jsonl: "data/intermediate/design_questions_auto_rejected.jsonl"
 
 # ==================== Step 3b: QA Generation ====================
 # 基于代码符号生成问答对
@@ -117,7 +117,7 @@ qa_generator:
     - "Controller"
 
 # ==================== Step 3c: Design Generation ====================
-# 基于需求生成设计方案
+# 基于设计问题生成设计方案
 design_generator:
   top_k_context: 6
   max_context_chars: 20000

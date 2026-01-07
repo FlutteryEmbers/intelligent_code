@@ -6,7 +6,7 @@
 
 1. `docs/pipeline/00-orchestrator-and-step-api.md`
 2. `docs/pipeline/01-parse-step.md`
-3. `docs/pipeline/02-auto-module-step.md`（可选分支：Auto QA / Profiles for Requirements）
+3. `docs/pipeline/02-auto-module-step.md`（可选分支：Auto QA / Profiles for Design Questions）
 4. `docs/pipeline/03-qa-generation-step.md`（标准 QA，Auto 开启时默认跳过）
 5. `docs/pipeline/04-design-generation-step.md`
 6. `docs/pipeline/05-validation-step.md`

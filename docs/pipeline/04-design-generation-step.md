@@ -2,11 +2,11 @@
 
 ## 章节与重点内容
 
-- Architecture Overview：需求驱动的设计方案生成（可选 Auto Requirements）
-- Design Patterns：Two-stage generation（Requirements → Design）、RAG（轻量检索）
-- Data Flow：`symbols.jsonl` → `requirements(_auto).jsonl` → `design_raw.jsonl`
-- Modular Detail：需求结构、上下文分层、证据最小数约束
-- Trade-offs：需求质量与稳定性、fallback 行为、证据覆盖 vs 成本
+- Architecture Overview：设计问题驱动的设计方案生成（可选 Auto Design Questions）
+- Design Patterns：Two-stage generation（Design Questions → Design）、RAG（轻量检索）
+- Data Flow：`symbols.jsonl` → `design_questions(_auto).jsonl` → `design_raw.jsonl`
+- Modular Detail：设计问题结构、上下文分层、证据最小数约束
+- Trade-offs：设计问题质量与稳定性、fallback 行为、证据覆盖 vs 成本
 
 ---
 
@@ -16,32 +16,32 @@
 
 DesignGenerationStep 的职责是：为架构设计场景生成 `TrainingSample(scenario=arch_design)`，并确保每个样本带有可验证证据引用。
 
-### 两种输入需求来源
+### 两种输入设计问题来源
 
-1. **Auto Requirements（可选）**：从代码结构自动生成需求集合（用于更贴合仓库现状）。
-2. **Default Requirements（固定）**：从 `configs/requirements.yaml` 读取需求集合（用于稳定基线与可重复测试）。
+1. **Auto Design Questions（可选）**：从代码结构自动生成设计问题集合（用于更贴合仓库现状）。
+2. **Default Design Questions（固定）**：从 `configs/design_questions.yaml` 读取设计问题集合（用于稳定基线与可重复测试）。
 
 ### 输入/输出（Artifacts）
 
 - 输入：`symbols.jsonl`
 - 输出：
-  - requirements：`data/intermediate/requirements.jsonl`（DesignGenerator 默认）或 `requirements_auto.jsonl`（auto_requirements 配置）
+  - design_questions：`data/intermediate/design_questions.jsonl`（DesignGenerator 默认）或 `design_questions_auto.jsonl`（design_questions 配置）
   - design：`data/intermediate/design_raw.jsonl`、`data/intermediate/design_rejected.jsonl`
 
 ---
 
 ## Design Patterns
 
-### 1) Two-stage generation（需求生成与方案生成分离）
+### 1) Two-stage generation（设计问题生成与方案生成分离）
 
-把“要解决什么问题”（Requirement）与“怎么改”（Design Sample）分开，主要收益：
+把“要解决什么问题”（Design Question）与“怎么改”（Design Sample）分开，主要收益：
 
-- 需求作为显式对象便于调参、审计与复用；
-- 可独立替换需求生成策略（固定需求/自动需求/人工输入），而不影响设计生成器的主体结构。
+- 设计问题作为显式对象便于调参、审计与复用；
+- 可独立替换设计问题生成策略（固定设计问题/自动设计问题/人工输入），而不影响设计生成器的主体结构。
 
 ### 2) Light RAG（轻量检索）
 
-DesignGenerator 在生成设计方案前，会从 symbols 中选择与需求相关的层级/组件，拼装成结构化上下文（Controller/Service/Repository 等），提升模型回答的贴合度与可落地性。
+DesignGenerator 在生成设计方案前，会从 symbols 中选择与设计问题相关的层级/组件，拼装成结构化上下文（Controller/Service/Repository 等），提升模型回答的贴合度与可落地性。
 
 ---
 
@@ -49,8 +49,8 @@ DesignGenerator 在生成设计方案前，会从 symbols 中选择与需求相�
 
 ```mermaid
 flowchart TD
-  S[(symbols.jsonl)] -->|optional| R[RequirementGenerator]
-  R --> RA[(requirements_auto.jsonl)]
+  S[(symbols.jsonl)] -->|optional| R[DesignQuestionGenerator]
+  R --> RA[(design_questions_auto.jsonl)]
   S --> D[DesignGenerator]
   RA --> D
   D --> O[(design_raw.jsonl)]
@@ -61,9 +61,9 @@ flowchart TD
 
 ## Modular Detail
 
-### Requirement 数据结构
+### Design Question 数据结构
 
-Requirement 作为结构化输入，典型字段：
+Design Question 作为结构化输入，典型字段：
 
 - `id`
 - `goal`（核心目标）
@@ -79,11 +79,11 @@ Requirement 作为结构化输入，典型字段：
 - 业务层（Service/core logic）
 - 数据层（Repository/DAO）或关键配置点
 
-该约束与 `design_generator.require_min_evidence`/`auto_requirements.require_min_evidence` 共同决定样本可接受性与生成成本。
+该约束与 `design_questions.min_evidence_refs` 共同决定样本可接受性与生成成本。
 
-### Auto Requirements 的上下文增强（可选）
+### Auto Design Questions 的上下文增强（可选）
 
-当启用 `auto_requirements.use_method_profiles=true` 时，RequirementGenerator 会读取 `method_profiles.jsonl` 并将其摘要拼入上下文，提升自动需求的语义质量。
+当启用 `design_questions.use_method_profiles=true` 时，DesignQuestionGenerator 会读取 `method_profiles.jsonl` 并将其摘要拼入上下文，提升自动设计问题的语义质量。
 
 ---
 
@@ -98,10 +98,10 @@ Requirement 作为结构化输入，典型字段：
 
 ## Trade-offs
 
-### 1) Auto Requirements 的不确定性 vs 贴合度
+### 1) Auto Design Questions 的不确定性 vs 贴合度
 
-- 贴合度：自动需求可针对代码现状提出更具体的改进建议。
-- 不确定性：需求质量高度依赖 LLM 输出稳定性；因此实现上提供 fallback 到 default requirements。
+- 贴合度：自动设计问题可针对代码现状提出更具体的改进建议。
+- 不确定性：设计问题质量高度依赖 LLM 输出稳定性；因此实现上提供 fallback 到 default design questions。
 
 ### 2) 上下文覆盖 vs token 成本
 

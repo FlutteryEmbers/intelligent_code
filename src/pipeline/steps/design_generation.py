@@ -1,14 +1,14 @@
 """
-Step 3: Design Generation (Auto Requirements + Design Samples)
+Step 3: Design Generation (Auto Design Questions + Design Samples)
 """
-from src.engine.auto_requirement_generator import RequirementGenerator
-from src.engine.design_generator import DesignGenerator, Requirement
+from src.engine.auto_design_question_generator import DesignQuestionGenerator
+from src.engine.design_generator import DesignGenerator, DesignQuestion
 from src.pipeline.base_step import BaseStep
 from src.utils.config import Config
 
 
 class DesignGenerationStep(BaseStep):
-    """Generate design samples from requirements."""
+    """Generate design samples from design questions."""
     
     @property
     def name(self) -> str:
@@ -25,36 +25,39 @@ class DesignGenerationStep(BaseStep):
         return False, ""
     
     def execute(self) -> dict:
-        """Execute design generation with optional auto requirements."""
-        use_auto_requirements = not self.args.skip_auto_requirements
+        """Execute design generation with optional auto design questions."""
+        use_auto_design_questions = not self.args.skip_auto_design_questions
         
-        custom_requirements = None
+        custom_design_questions = None
         
-        # Step 3a: Generate Auto Requirements (if enabled)
-        if use_auto_requirements and not (self.args.skip_llm or self.args.skip_design):
+        # Step 3a: Generate Auto Design Questions (if enabled)
+        if use_auto_design_questions and not (self.args.skip_llm or self.args.skip_design):
             self.logger.info("=" * 70)
-            self.logger.info(" Step 3a: Generating Auto Requirements")
+            self.logger.info(" Step 3a: Generating Auto Design Questions")
             self.logger.info("=" * 70)
             
             try:
-                req_gen = RequirementGenerator(Config())
-                requirements_dicts = req_gen.generate_from_repo(
+                question_gen = DesignQuestionGenerator(Config())
+                design_question_dicts = question_gen.generate_from_repo(
                     symbols_path=self.paths["symbols_jsonl"],
                     repo_commit=self.repo_commit
                 )
                 
-                # Convert to Requirement objects
-                custom_requirements = [Requirement.from_dict(req_dict) for req_dict in requirements_dicts]
+                # Convert to DesignQuestion objects
+                custom_design_questions = [
+                    DesignQuestion.from_dict(question_dict)
+                    for question_dict in design_question_dicts
+                ]
                 
-                self.logger.info(f"Generated {len(custom_requirements)} auto requirements")
-                if custom_requirements:
-                    self.logger.info(f"First requirement ID: {custom_requirements[0].id}")
+                self.logger.info(f"Generated {len(custom_design_questions)} auto design questions")
+                if custom_design_questions:
+                    self.logger.info(f"First design question ID: {custom_design_questions[0].id}")
                 else:
-                    self.logger.warning("No valid requirements generated, all were rejected")
-                    custom_requirements = None
+                    self.logger.warning("No valid design questions generated, all were rejected")
+                    custom_design_questions = None
             except Exception as e:
-                self.logger.error(f"Auto requirement generation failed: {e}", exc_info=True)
-                custom_requirements = None
+                self.logger.error(f"Auto design question generation failed: {e}", exc_info=True)
+                custom_design_questions = None
         
         # Step 3b: Generate Design Samples
         self.logger.info("=" * 70)
@@ -63,20 +66,20 @@ class DesignGenerationStep(BaseStep):
         
         design_gen = DesignGenerator(Config())
         
-        # Use auto-generated requirements or default
-        if custom_requirements:
-            self.logger.info(f"Using {len(custom_requirements)} auto-generated requirements")
-            self.logger.info(f"Auto requirement IDs: {[req.id for req in custom_requirements[:3]]}")
+        # Use auto-generated design questions or default
+        if custom_design_questions:
+            self.logger.info(f"Using {len(custom_design_questions)} auto-generated design questions")
+            self.logger.info(f"Auto design question IDs: {[q.id for q in custom_design_questions[:3]]}")
             design_samples = design_gen.generate_from_repo(
                 symbols_path=self.paths["symbols_jsonl"],
                 repo_commit=self.repo_commit,
-                requirements=custom_requirements
+                design_questions=custom_design_questions
             )
         else:
-            if use_auto_requirements:
-                self.logger.warning("Auto requirements enabled but none generated, falling back to default")
+            if use_auto_design_questions:
+                self.logger.warning("Auto design questions enabled but none generated, falling back to default")
             else:
-                self.logger.info("Using default requirements from config")
+                self.logger.info("Using default design questions from config")
             design_samples = design_gen.generate_from_repo(
                 symbols_path=self.paths["symbols_jsonl"],
                 repo_commit=self.repo_commit
@@ -86,6 +89,6 @@ class DesignGenerationStep(BaseStep):
         
         return {
             "status": "success",
-            "auto_requirements_count": len(custom_requirements) if custom_requirements else 0,
+            "auto_design_questions_count": len(custom_design_questions) if custom_design_questions else 0,
             "samples_count": len(design_samples)
         }
