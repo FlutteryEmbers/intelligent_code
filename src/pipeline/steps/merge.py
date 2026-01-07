@@ -23,19 +23,35 @@ class MergeStep(BaseStep):
         all_samples = []
         
         # Determine which QA source to use
-        qa_path = None
+        qa_paths = []
         if not (self.args.skip_llm or self.args.skip_qa):
             artifacts = self.config.get("artifacts", {})
-            qa_path = Path(artifacts.get("auto_qa_raw_jsonl", "data/intermediate/auto_qa_raw.jsonl"))
-            self.logger.info(f"Using QA from {qa_path.name}")
+            qa_paths.append(
+                Path(artifacts.get("auto_qa_raw_jsonl", "data/intermediate/auto_qa_raw.jsonl"))
+            )
+            qa_paths.append(self.paths.get("qa_raw_jsonl"))
+            # De-duplicate paths while preserving order.
+            seen = set()
+            qa_paths = [p for p in qa_paths if p and not (p in seen or seen.add(p))]
+            if qa_paths:
+                self.logger.info(
+                    "Using QA sources: %s",
+                    ", ".join(p.name for p in qa_paths),
+                )
         
         # Load QA samples
-        if qa_path and qa_path.exists():
-            qa_samples = read_jsonl(qa_path)
-            all_samples.extend(qa_samples)
-            self.logger.info(f"Loaded {len(qa_samples)} QA samples")
-        elif qa_path:
-            self.logger.warning(f"QA samples not found: {qa_path}")
+        if qa_paths:
+            loaded_any = False
+            for qa_path in qa_paths:
+                if qa_path.exists():
+                    qa_samples = read_jsonl(qa_path)
+                    all_samples.extend(qa_samples)
+                    self.logger.info(f"Loaded {len(qa_samples)} QA samples from {qa_path.name}")
+                    loaded_any = True
+                else:
+                    self.logger.warning(f"QA samples not found: {qa_path}")
+            if not loaded_any:
+                self.logger.warning("No QA samples loaded from configured sources")
         
         # Load design samples
         if self.paths["design_raw_jsonl"].exists():

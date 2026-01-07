@@ -41,8 +41,15 @@ class AnswerGenerator:
         logger.info(f"Loaded language profile: {self.language}")
         
         # 从配置读取参数
-        self.top_k_context = self.config.get('generation.retrieval_top_k', 6)
-        self.max_context_chars = self.config.get('generation.max_context_chars', 16000)
+        self.top_k_context = self.config.get(
+            'core.retrieval_top_k',
+            self.config.get('generation.retrieval_top_k', 6),
+        )
+        self.max_context_chars = self.config.get(
+            'core.max_context_chars',
+            self.config.get('generation.max_context_chars', 16000),
+        )
+        self.batch_size = self.config.get('question_answer.batch_size', None)
         self.embedding_model = self.config.get('question_answer.embedding_model', 'nomic-embed-text')
         
         # 加载 prompt 模板
@@ -127,36 +134,46 @@ class AnswerGenerator:
         with open(self.output_jsonl, 'w', encoding='utf-8') as f_out, \
              open(self.rejected_jsonl, 'w', encoding='utf-8') as f_rej:
             
-            for i, question in enumerate(questions, 1):
-                logger.info(f"Generating answer for {i}/{len(questions)}: {question.question[:60]}...")
-                
-                try:
-                    sample = self._generate_answer(question, symbols_map)
+            batch_size = self.batch_size or len(questions) or 1
+            for batch_start in range(0, len(questions), batch_size):
+                batch = questions[batch_start:batch_start + batch_size]
+                if self.batch_size:
+                    logger.info(
+                        "Answer batch %s-%s/%s",
+                        batch_start + 1,
+                        batch_start + len(batch),
+                        len(questions),
+                    )
+                for i, question in enumerate(batch, batch_start + 1):
+                    logger.info(f"Generating answer for {i}/{len(questions)}: {question.question[:60]}...")
                     
-                    # 写入成功的样本
-                    f_out.write(sample.model_dump_json() + '\n')
-                    f_out.flush()
-                    
-                    samples.append(sample)
-                    self.stats['success'] += 1
-                    
-                except Exception as e:
-                    logger.error(f"Failed to generate answer for question {question.question_id}: {e}")
-                    logger.error(f"Exception type: {type(e).__name__}")
-                    logger.error(f"Full traceback:", exc_info=True)
-                    
-                    # 写入失败记录
-                    rejected_entry = {
-                        'question_id': question.question_id,
-                        'question': question.question,
-                        'error': str(e),
-                        'error_type': type(e).__name__,
-                        'timestamp': question.created_at
-                    }
-                    f_rej.write(json.dumps(rejected_entry, ensure_ascii=False) + '\n')
-                    f_rej.flush()
-                    
-                    self.stats['failed'] += 1
+                    try:
+                        sample = self._generate_answer(question, symbols_map)
+                        
+                        # 写入成功的样本
+                        f_out.write(sample.model_dump_json() + '\n')
+                        f_out.flush()
+                        
+                        samples.append(sample)
+                        self.stats['success'] += 1
+                        
+                    except Exception as e:
+                        logger.error(f"Failed to generate answer for question {question.question_id}: {e}")
+                        logger.error(f"Exception type: {type(e).__name__}")
+                        logger.error(f"Full traceback:", exc_info=True)
+                        
+                        # 写入失败记录
+                        rejected_entry = {
+                            'question_id': question.question_id,
+                            'question': question.question,
+                            'error': str(e),
+                            'error_type': type(e).__name__,
+                            'timestamp': question.created_at
+                        }
+                        f_rej.write(json.dumps(rejected_entry, ensure_ascii=False) + '\n')
+                        f_rej.flush()
+                        
+                        self.stats['failed'] += 1
         
         logger.info(f"Answer generation completed: {self.stats['success']} success, {self.stats['failed']} failed")
         return samples

@@ -11,15 +11,30 @@ from .schemas import CodeSymbol, TrainingSample, EvidenceRef
 from .io import read_jsonl, write_json, append_jsonl
 
 
+def normalize_path_separators(path: str) -> str:
+    """
+    Normalize path separators to forward slashes for cross-platform compatibility.
+    Converts Windows backslashes (\\) to Unix forward slashes (/).
+    
+    Args:
+        path: Path string with any separator type
+        
+    Returns:
+        Path string with normalized forward slashes
+    """
+    return path.replace('\\', '/')
+
+
 def load_symbols_map(symbols_jsonl: Path | str) -> dict[str, CodeSymbol]:
     """
     Load symbols from JSONL and build symbol_id -> CodeSymbol mapping.
+    Normalizes symbol_ids to use forward slashes for cross-platform compatibility.
     
     Args:
         symbols_jsonl: Path to symbols.jsonl file
         
     Returns:
-        Dict mapping symbol_id to CodeSymbol
+        Dict mapping normalized symbol_id to CodeSymbol
     """
     symbols_jsonl = Path(symbols_jsonl)
     symbols_map = {}
@@ -29,7 +44,9 @@ def load_symbols_map(symbols_jsonl: Path | str) -> dict[str, CodeSymbol]:
     for idx, raw_obj in enumerate(raw_lines, 1):
         try:
             symbol = CodeSymbol.model_validate(raw_obj)
-            symbols_map[symbol.symbol_id] = symbol
+            # Normalize symbol_id for cross-platform compatibility
+            normalized_id = normalize_path_separators(symbol.symbol_id)
+            symbols_map[normalized_id] = symbol
         except Exception as e:
             print(f"Warning: Failed to parse symbol at line {idx}: {e}")
             continue
@@ -75,13 +92,16 @@ def validate_sample_obj(
     for idx, ref in enumerate(sample.thought.evidence_refs):
         ref_id = f"evidence_refs[{idx}]"
         
+        # Normalize symbol_id for cross-platform path comparison
+        normalized_symbol_id = normalize_path_separators(ref.symbol_id)
+        
         # Check if symbol_id exists
-        if ref.symbol_id not in symbols_map:
+        if normalized_symbol_id not in symbols_map:
             result["evidence_ok"] = False
             result["errors"].append(f"{ref_id}: symbol_id '{ref.symbol_id}' not found in symbols map")
             continue
         
-        symbol = symbols_map[ref.symbol_id]
+        symbol = symbols_map[normalized_symbol_id]
         
         # Check source_hash matches
         if ref.source_hash != symbol.source_hash:

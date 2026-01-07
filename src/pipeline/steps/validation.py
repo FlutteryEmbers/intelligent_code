@@ -1,6 +1,8 @@
 """
 Step 4: Validation
 """
+from pathlib import Path
+
 from src.utils import load_symbols_map, validate_dataset
 from src.pipeline.base_step import BaseStep
 
@@ -21,14 +23,25 @@ class ValidationStep(BaseStep):
         symbols_map = load_symbols_map(self.paths["symbols_jsonl"])
         
         # Validate QA
-        if self.paths["qa_raw_jsonl"].exists():
-            self.logger.info("Validating QA samples...")
-            validate_dataset(
-                self.paths["qa_raw_jsonl"],
-                symbols_map,
-                self.paths["qa_quality_json"],
-                self.paths["intermediate"] / "qa_validation_rejected.jsonl"
-            )
+        qa_paths = []
+        artifacts = self.config.get("artifacts", {})
+        qa_paths.append(
+            artifacts.get("auto_qa_raw_jsonl", "data/intermediate/auto_qa_raw.jsonl")
+        )
+        qa_paths.append(self.paths.get("qa_raw_jsonl"))
+        seen = set()
+        qa_paths = [p for p in qa_paths if p and not (p in seen or seen.add(p))]
+        for qa_path in qa_paths:
+            qa_path = Path(qa_path)
+            if qa_path.exists():
+                self.logger.info("Validating QA samples from %s...", qa_path.name)
+                validate_dataset(
+                    qa_path,
+                    symbols_map,
+                    self.paths["qa_quality_json"],
+                    self.paths["intermediate"] / "qa_validation_rejected.jsonl"
+                )
+                break
         
         # Validate Design
         if self.paths["design_raw_jsonl"].exists():

@@ -1,9 +1,9 @@
 repo:
-  path: "./repos/java/spring-ai"
+  path: "./repos/python/Mini-Chat-GPT"
   commit: ""
 
 language:
-  name: "java"
+  name: "python"
   profile_dir: "configs/language"
 
 llm:
@@ -14,9 +14,8 @@ llm:
   max_tokens: 10000
   timeout_sec: 180
 
-generation:
+core:
   seed: 42
-  batch_size: 5
   retrieval_top_k: 6
   max_context_chars: 16000
   max_items: 50
@@ -27,6 +26,8 @@ method_understanding:
 
 question_answer:
   questions_per_method: 1
+  max_questions: 20
+  batch_size: 5
   embedding_model: "nomic-embed-text"
   user_questions_path: "configs/user_questions.yaml"
   build_embeddings_in_user_mode: true
@@ -36,6 +37,8 @@ design_questions:
   use_method_profiles: true
   profiles_top_k: 20
   profiles_max_chars: 6000
+  batch_size: 5
+  max_questions: 5
   user_questions_path: "configs/design_questions.yaml"
   batching:
     enabled: true

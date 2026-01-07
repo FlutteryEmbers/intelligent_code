@@ -119,6 +119,8 @@ class AutoQuestionGenerator:
         
         # 从配置读取参数
         self.questions_per_method = self.config.get('question_answer.questions_per_method', 5)
+        self.max_questions = self.config.get('question_answer.max_questions', None)
+        self.batch_size = self.config.get('question_answer.batch_size', None)
         
         # 加载 prompt 模板
         template_path = self.config.get(
@@ -181,37 +183,59 @@ class AutoQuestionGenerator:
         question_hashes = set()  # 用于去重
         
         with open(self.output_jsonl, 'w', encoding='utf-8') as f:
-            for i, profile in enumerate(profiles, 1):
-                logger.info(f"Generating questions for {i}/{len(profiles)}: {profile.qualified_name}")
-                
-                try:
-                    # 获取源码
-                    symbol = symbols_map.get(profile.symbol_id)
-                    if not symbol:
-                        logger.warning(f"Symbol not found for {profile.symbol_id}")
+            batch_size = self.batch_size or len(profiles) or 1
+            for batch_start in range(0, len(profiles), batch_size):
+                batch = profiles[batch_start:batch_start + batch_size]
+                logger.info(
+                    "Question batch %s-%s/%s",
+                    batch_start + 1,
+                    batch_start + len(batch),
+                    len(profiles),
+                )
+                for i, profile in enumerate(batch, batch_start + 1):
+                    if self.max_questions is not None and self.stats['total_questions'] >= self.max_questions:
+                        logger.info(
+                            "Reached max_questions=%s, stopping question generation",
+                            self.max_questions,
+                        )
+                        break
+                    logger.info(f"Generating questions for {i}/{len(profiles)}: {profile.qualified_name}")
+                    
+                    try:
+                        # 获取源码
+                        symbol = symbols_map.get(profile.symbol_id)
+                        if not symbol:
+                            logger.warning(f"Symbol not found for {profile.symbol_id}")
+                            continue
+                        
+                        # 生成问题
+                        questions = self._generate_questions(profile, symbol)
+                        
+                        # 去重
+                        for q in questions:
+                            if self.max_questions is not None and self.stats['total_questions'] >= self.max_questions:
+                                break
+                            q_hash = simple_hash(q.question)
+                            if q_hash not in question_hashes:
+                                question_hashes.add(q_hash)
+                                all_questions.append(q)
+                                
+                                # 写入文件
+                                f.write(q.model_dump_json() + '\n')
+                                f.flush()
+                                
+                                self.stats['total_questions'] += 1
+                            else:
+                                self.stats['duplicates_removed'] += 1
+                        
+                        if self.max_questions is not None and self.stats['total_questions'] >= self.max_questions:
+                            break
+                                
+                    except Exception as e:
+                        logger.error(f"Failed to generate questions for {profile.symbol_id}: {e}")
                         continue
-                    
-                    # 生成问题
-                    questions = self._generate_questions(profile, symbol)
-                    
-                    # 去重
-                    for q in questions:
-                        q_hash = simple_hash(q.question)
-                        if q_hash not in question_hashes:
-                            question_hashes.add(q_hash)
-                            all_questions.append(q)
-                            
-                            # 写入文件
-                            f.write(q.model_dump_json() + '\n')
-                            f.flush()
-                            
-                            self.stats['total_questions'] += 1
-                        else:
-                            self.stats['duplicates_removed'] += 1
-                    
-                except Exception as e:
-                    logger.error(f"Failed to generate questions for {profile.symbol_id}: {e}")
-                    continue
+                if self.max_questions is not None and self.stats['total_questions'] >= self.max_questions:
+                    break
         
         logger.info(f"Question generation completed: {self.stats['total_questions']} questions, {self.stats['duplicates_removed']} duplicates removed")
         return all_questions

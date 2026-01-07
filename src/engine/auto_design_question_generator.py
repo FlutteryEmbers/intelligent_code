@@ -61,11 +61,23 @@ class DesignQuestionGenerator:
         self.prompt_template = load_prompt_template(prompt_path)
 
         # 从配置读取参数
-        self.max_design_questions = self.config.get('generation.max_items', 50)
-        self.top_k_symbols = self.config.get('generation.retrieval_top_k', 6)
+        self.max_design_questions = self.config.get(
+            'design_questions.max_questions',
+            self.config.get('core.max_items', self.config.get('generation.max_items', 50)),
+        )
+        self.top_k_symbols = self.config.get(
+            'core.retrieval_top_k',
+            self.config.get('generation.retrieval_top_k', 6),
+        )
         self.min_evidence_refs = self.config.get('design_questions.min_evidence_refs', 1)
-        self.max_context_chars = self.config.get('generation.max_context_chars', 16000)
-        self.seed = self.config.get('generation.seed', 42)
+        self.max_context_chars = self.config.get(
+            'core.max_context_chars',
+            self.config.get('generation.max_context_chars', 16000),
+        )
+        self.seed = self.config.get(
+            'core.seed',
+            self.config.get('generation.seed', 42),
+        )
 
         # Method profiles 配置（可选增强）
         self.use_method_profiles = self.config.get('design_questions.use_method_profiles', False)
@@ -79,7 +91,10 @@ class DesignQuestionGenerator:
         # Batching 配置（可选）
         batching_config = self.config.get('design_questions.batching', {})
         self.batching_enabled = batching_config.get('enabled', False)
-        self.batch_size = self.config.get('generation.batch_size', 5)
+        self.batch_size = self.config.get(
+            'design_questions.batch_size',
+            self.config.get('core.batch_size', self.config.get('generation.batch_size', 5)),
+        )
         self.max_batches = batching_config.get('max_batches', 5)
 
         # 输出路径

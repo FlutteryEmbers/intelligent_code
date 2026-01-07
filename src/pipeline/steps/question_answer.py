@@ -41,6 +41,7 @@ class QuestionAnswerStep(BaseStep):
             "build_embeddings_in_user_mode",
             False,
         )
+        self.max_questions = qa_config.get("max_questions")
         self.user_questions_path = qa_config.get(
             "user_questions_path",
             "configs/user_questions.yaml"
@@ -145,6 +146,13 @@ class QuestionAnswerStep(BaseStep):
                     config_path=self.user_questions_path,
                     repo_commit=self.repo_commit
                 )
+                if self.max_questions is not None and len(questions) > self.max_questions:
+                    self.logger.info(
+                        "Truncating user questions to max_questions=%s (from %s)",
+                        self.max_questions,
+                        len(questions),
+                    )
+                    questions = questions[: self.max_questions]
                 missing_refs = sum(1 for q in questions if not q.evidence_refs)
                 if missing_refs:
                     self.logger.warning(
@@ -161,7 +169,10 @@ class QuestionAnswerStep(BaseStep):
                     self.logger.warning("No user questions loaded; questions.jsonl will be empty")
             
             # Step A4: Generate Answers with Vector Retrieval
-            top_k_context = self.config.get("generation", {}).get("retrieval_top_k", 6)
+            top_k_context = self.config.get("core", {}).get(
+                "retrieval_top_k",
+                self.config.get("generation", {}).get("retrieval_top_k", 6),
+            )
             self.logger.info(f"Step A4: Generating answers (top_k: {top_k_context})")
             answer_gen = AnswerGenerator(config_instance)
             qa_samples = answer_gen.generate_from_questions(

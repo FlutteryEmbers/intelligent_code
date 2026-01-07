@@ -44,7 +44,10 @@ class AutoMethodUnderstander:
             'method_understanding.max_methods',
             self.config.get('auto.max_methods', 50),
         )
-        self.max_context_chars = self.config.get('generation.max_context_chars', 16000)
+        self.max_context_chars = self.config.get(
+            'core.max_context_chars',
+            self.config.get('generation.max_context_chars', 16000),
+        )
         
         # 加载 prompt 模板
         template_path = self.config.get(

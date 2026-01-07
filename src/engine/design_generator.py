@@ -142,9 +142,18 @@ class DesignGenerator:
         self.user_prompt_template = load_prompt_template("design_user_prompt.txt")
         
         # 从配置读取参数
-        self.top_k_context = self.config.get('generation.retrieval_top_k', 6)
-        self.max_context_chars = self.config.get('generation.max_context_chars', 16000)
-        self.max_samples = self.config.get('generation.max_items', 50)
+        self.top_k_context = self.config.get(
+            'core.retrieval_top_k',
+            self.config.get('generation.retrieval_top_k', 6),
+        )
+        self.max_context_chars = self.config.get(
+            'core.max_context_chars',
+            self.config.get('generation.max_context_chars', 16000),
+        )
+        self.max_samples = self.config.get(
+            'core.max_items',
+            self.config.get('generation.max_items', 50),
+        )
         
         # 输出路径
         self.output_dir = Path(self.config.get('output.intermediate_dir', 'data/intermediate'))
