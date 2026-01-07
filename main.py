@@ -31,9 +31,16 @@ def main():
         help="Skip parsing step (use existing symbols.jsonl)"
     )
     parser.add_argument(
-        "--skip-auto",
+        "--skip-question-answer",
+        dest="skip_question_answer",
         action="store_true",
-        help="Skip auto module (method profiles + auto QA)"
+        help="Disable question/answer auto mode (use user-provided inputs)"
+    )
+    parser.add_argument(
+        "--skip-auto",
+        dest="skip_question_answer",
+        action="store_true",
+        help="Deprecated alias for --skip-question-answer"
     )
     parser.add_argument(
         "--skip-auto-design-questions",

@@ -1,5 +1,5 @@
 """
-Auto 模块 - 答案生成器
+答案生成器
 
 基于问题和检索的上下文生成最终的 TrainingSample。
 """
@@ -27,8 +27,8 @@ def load_prompt_template(template_path: str) -> str:
         return f.read()
 
 
-class AutoAnswerGenerator:
-    """Auto 答案生成器"""
+class AnswerGenerator:
+    """答案生成器"""
     
     def __init__(self, config: Config | None = None):
         """初始化"""
@@ -43,11 +43,11 @@ class AutoAnswerGenerator:
         # 从配置读取参数
         self.top_k_context = self.config.get('generation.retrieval_top_k', 6)
         self.max_context_chars = self.config.get('generation.max_context_chars', 16000)
-        self.embedding_model = self.config.get('auto.embedding_model', 'nomic-embed-text')
+        self.embedding_model = self.config.get('question_answer.embedding_model', 'nomic-embed-text')
         
         # 加载 prompt 模板
         template_path = self.config.get(
-            'prompts.auto.answer_generation',
+            'prompts.question_answer.answer_generation',
             'configs/prompts/auto_answer_generation.txt'
         )
         self.prompt_template = load_prompt_template(template_path)
@@ -109,6 +109,18 @@ class AutoAnswerGenerator:
         
         logger.info(f"Loaded {len(questions)} questions")
         self.stats['total_questions'] = len(questions)
+        self.embeddings_available = self.embeddings_jsonl.exists()
+        if not self.embeddings_available:
+            logger.warning(
+                "Embeddings file not found: %s (vector search disabled)",
+                self.embeddings_jsonl,
+            )
+            missing_refs = sum(1 for q in questions if not q.evidence_refs)
+            if missing_refs:
+                logger.warning(
+                    "Questions missing evidence_refs: %s (provide evidence_refs or enable auto mode)",
+                    missing_refs,
+                )
         
         # 为每个问题生成答案
         samples = []
@@ -185,6 +197,11 @@ class AutoAnswerGenerator:
 
         # 2. 如果缺少 evidence_refs 或未找到上下文，回退到向量检索
         if not context_parts:
+            if not self.embeddings_available:
+                raise ValueError(
+                    "Embeddings not found for vector search. Provide evidence_refs in user_questions.yaml, "
+                    "enable auto mode, or set question_answer.build_embeddings_in_user_mode=true."
+                )
             search_results = vector_index.search(
                 query_text=question.question,
                 embeddings_jsonl=self.embeddings_jsonl,

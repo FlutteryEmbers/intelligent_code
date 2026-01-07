@@ -56,21 +56,29 @@ llm:
 
 # Note: If not specified, all settings come from configs/language/{language}.yaml
 
-# ==================== Step 2: Auto Module (Method Understanding & QA) ====================
-# 自动理解方法并生成问答对
-auto:
-  enabled: true                                       # Enable auto module
+# ==================== Step 2a: Method Understanding ====================
+# 自动理解方法并生成 method profiles
+method_understanding:
+  enabled: true                                       # Enable method understanding
   max_methods: 200                                    # Maximum methods to process (cost control)
-  questions_per_method: 3                             # Number of questions per method
-  top_k_context: 6                                    # Top-K methods for context retrieval
-  embedding_model: "nomic-embed-text"                 # Ollama embedding model
-  prompts:
-    method_understanding: "configs/prompts/auto_method_understanding.txt"
-    question_generation: "configs/prompts/auto_question_generation.txt"
-    answer_generation: "configs/prompts/auto_answer_generation.txt"
+  prompt: "configs/prompts/auto_method_understanding.txt"
   outputs:
     method_profiles_jsonl: "data/intermediate/method_profiles.jsonl"
     method_understanding_rejected_jsonl: "data/intermediate/auto_method_understanding_rejected.jsonl"
+
+# ==================== Step 2b: Question/Answer ====================
+# 生成问题并回答（auto 或 user 模式）
+question_answer:
+  enabled: true
+  questions_per_method: 3                             # Number of questions per method
+  top_k_context: 6                                    # Top-K methods for context retrieval
+  embedding_model: "nomic-embed-text"                 # Ollama embedding model
+  user_questions_path: "configs/user_questions.yaml"
+  build_embeddings_in_user_mode: true                 # Allow vector retrieval for user questions
+  prompts:
+    question_generation: "configs/prompts/auto_question_generation.txt"
+    answer_generation: "configs/prompts/auto_answer_generation.txt"
+  outputs:
     questions_jsonl: "data/intermediate/questions.jsonl"
     embeddings_jsonl: "data/intermediate/method_embeddings.jsonl"
     auto_qa_raw_jsonl: "data/intermediate/auto_qa_raw.jsonl"

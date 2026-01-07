@@ -2,7 +2,11 @@
 Step 3: Design Generation (Auto Design Questions + Design Samples)
 """
 from src.engine.auto_design_question_generator import DesignQuestionGenerator
-from src.engine.design_generator import DesignGenerator, DesignQuestion
+from src.engine.design_generator import (
+    DesignGenerator,
+    DesignQuestion,
+    load_design_questions_config,
+)
 from src.pipeline.base_step import BaseStep
 from src.utils.config import Config
 
@@ -26,7 +30,13 @@ class DesignGenerationStep(BaseStep):
     
     def execute(self) -> dict:
         """Execute design generation with optional auto design questions."""
-        use_auto_design_questions = not self.args.skip_auto_design_questions
+        auto_enabled = not self.args.skip_question_answer
+        use_auto_design_questions = auto_enabled and not self.args.skip_auto_design_questions
+        design_questions_config = self.config.get("design_questions", {})
+        user_design_questions_path = design_questions_config.get(
+            "user_questions_path",
+            "configs/design_questions.yaml",
+        )
         
         custom_design_questions = None
         
@@ -77,12 +87,14 @@ class DesignGenerationStep(BaseStep):
             )
         else:
             if use_auto_design_questions:
-                self.logger.warning("Auto design questions enabled but none generated, falling back to default")
+                self.logger.warning("Auto design questions enabled but none generated, falling back to user config")
             else:
-                self.logger.info("Using default design questions from config")
+                self.logger.info("Using user design questions from config")
+            user_design_questions = load_design_questions_config(user_design_questions_path)
             design_samples = design_gen.generate_from_repo(
                 symbols_path=self.paths["symbols_jsonl"],
-                repo_commit=self.repo_commit
+                repo_commit=self.repo_commit,
+                design_questions=user_design_questions,
             )
         
         self.logger.info(f"Generated {len(design_samples)} design samples")

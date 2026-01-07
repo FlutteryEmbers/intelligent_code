@@ -21,9 +21,9 @@
 | Artifact 文件 | 每行/每条对象类型 | 主要生产者 | 主要消费者 |
 |---|---|---|---|
 | `data/raw/extracted/symbols.jsonl` | `CodeSymbol` | `ParseStep` → parser | QA/Design/Auto 引擎、Validation、Split |
-| `data/intermediate/*_raw.jsonl` | `TrainingSample`（dict 形态） | `QAGenerator` / `DesignGenerator` / `AutoAnswerGenerator` | Validation、Merge、Dedup、Safety、Split、Export |
+| `data/intermediate/*_raw.jsonl` | `TrainingSample`（dict 形态） | `DesignGenerator` / `AnswerGenerator` | Validation、Merge、Dedup、Safety、Split、Export |
 | `data/intermediate/method_profiles.jsonl` | `MethodProfile` | `AutoMethodUnderstander` | Auto QA（问/答）、Auto Design Questions（可选） |
-| `data/intermediate/questions.jsonl` | `QuestionSample` | `AutoQuestionGenerator` | `AutoAnswerGenerator` |
+| `data/intermediate/questions.jsonl` | `QuestionSample` | `AutoQuestionGenerator` | `AnswerGenerator` |
 | `data/final/*_sft.jsonl` | SFT messages（dict） | `ExportStep` | 训练框架/微调脚本 |
 
 ### 核心关系图
@@ -174,7 +174,7 @@ classDiagram
 - `symbol_id`：稳定主键，格式约定为 `{file_path}:{qualified_name}:{start_line}`（`make_symbol_id()`）。
   - 契约：后续 `EvidenceRef.symbol_id` 必须可在 symbols_map 中命中。
 - `symbol_type`：`class|method|field|file`。
-  - 契约：Auto 模块候选通常只选 `method`；Design 可能使用 class/method/file 组合拼上下文。
+  - 契约：Question/Answer 模块候选通常只选 `method`；Design 可能使用 class/method/file 组合拼上下文。
 - `name` / `qualified_name`：用于检索、分层识别、分组切分。
   - Split 的 `group_by=package` 从 `qualified_name` 提取包前缀。
 - `file_path`：相对路径；用于证据定位与 split 的 `group_by=path`。
@@ -260,7 +260,7 @@ classDiagram
 
 生产者/消费者：
 
-- 生产者：`QAGenerator` / `DesignGenerator` / `AutoAnswerGenerator`
+- 生产者：`DesignGenerator` / `AnswerGenerator`
 - 消费者：Validation、Dedup（基于 instruction+answer）、Safety（扫描 context+answer）、Split、Export
 
 ---
@@ -285,7 +285,7 @@ classDiagram
 
 ---
 
-### Schema: `MethodProfile`（Auto 模块）
+### Schema: `MethodProfile`（Question/Answer 模块）
 
 用途：方法级理解的中间表示（可视为“可检索的语义文档”），支撑 Auto QA 与自动设计问题增强。
 
@@ -305,7 +305,7 @@ classDiagram
 
 ---
 
-### Schema: `QuestionSample`（Auto 模块）
+### Schema: `QuestionSample`（Question/Answer 模块）
 
 用途：在“问题生成”与“答案生成”之间的桥接对象，承载问题类型与难度等标签。
 
@@ -321,7 +321,7 @@ classDiagram
 生产者/消费者：
 
 - 生产者：`AutoQuestionGenerator`
-- 消费者：`AutoAnswerGenerator`
+- 消费者：`AnswerGenerator`
 
 ---
 

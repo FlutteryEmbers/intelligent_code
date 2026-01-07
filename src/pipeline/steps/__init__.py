@@ -2,8 +2,8 @@
 Pipeline step modules.
 """
 from .parse import ParseStep
-from .auto_module import AutoModuleStep
-from .qa_generation import QAGenerationStep
+from .method_understanding import MethodUnderstandingStep
+from .question_answer import QuestionAnswerStep
 from .design_generation import DesignGenerationStep
 from .validation import ValidationStep
 from .merge import MergeStep
@@ -14,8 +14,8 @@ from .export import ExportStep
 
 __all__ = [
     "ParseStep",
-    "AutoModuleStep",
-    "QAGenerationStep",
+    "MethodUnderstandingStep",
+    "QuestionAnswerStep",
     "DesignGenerationStep",
     "ValidationStep",
     "MergeStep",

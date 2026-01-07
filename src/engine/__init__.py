@@ -3,14 +3,14 @@
 """
 
 from .llm_client import LLMClient
-from .qa_generator import QAGenerator
 from .design_generator import DesignGenerator
+from .answer_generator import AnswerGenerator
 
 # 待实现：
 # - QualityChecker: 质量检查器
 
 __all__ = [
     "LLMClient",
-    "QAGenerator",
     "DesignGenerator",
+    "AnswerGenerator",
 ]

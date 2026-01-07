@@ -1,36 +1,21 @@
-# User-provided questions for Auto QA (manual input)
-# Format aligns with src.utils.schemas.QuestionSample
+# User-provided questions for QA (manual input)
+# Generic questions are allowed; embeddings are used to retrieve context.
 
 user_questions:
-  - question: "What guarantees does this method provide about data consistency and rollback?"
+  - question: "What are the main consistency guarantees in this codebase?"
     question_type: "consistency"
     difficulty: "medium"
-    evidence_refs:
-      - symbol_id: "com.example.FooService.createOrder"
-        file_path: "src/main/java/com/example/FooService.java"
-        start_line: 42
-        end_line: 98
-        source_hash: "REPLACE_WITH_SOURCE_HASH"
+    evidence_refs: []
     repo_commit: "UNKNOWN_COMMIT"
 
-  - question: "How does this method handle partial failures and retries?"
+  - question: "How does the system handle partial failures and retries?"
     question_type: "error_handling"
     difficulty: "medium"
-    evidence_refs:
-      - symbol_id: "com.example.PaymentService.charge"
-        file_path: "src/main/java/com/example/PaymentService.java"
-        start_line: 120
-        end_line: 178
-        source_hash: "REPLACE_WITH_SOURCE_HASH"
+    evidence_refs: []
     repo_commit: "UNKNOWN_COMMIT"
 
-  - question: "What are the performance bottlenecks in this code path and how are they mitigated?"
+  - question: "What are the likely performance bottlenecks and how are they mitigated?"
     question_type: "performance"
     difficulty: "hard"
-    evidence_refs:
-      - symbol_id: "com.example.ReportService.generate"
-        file_path: "src/main/java/com/example/ReportService.java"
-        start_line: 15
-        end_line: 88
-        source_hash: "REPLACE_WITH_SOURCE_HASH"
+    evidence_refs: []
     repo_commit: "UNKNOWN_COMMIT"

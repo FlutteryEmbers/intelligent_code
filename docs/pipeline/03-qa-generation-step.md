@@ -1,4 +1,4 @@
-# Step 2 (Alternative) — QAGenerationStep Design
+# Step 2 (Deprecated) — QAGenerationStep Design
 
 ## 章节与重点内容
 
@@ -14,12 +14,12 @@
 
 ### 职责边界（Single Responsibility）
 
-QAGenerationStep 的唯一职责是：当 Auto 模式未启用时，调用 `QAGenerator` 从 `symbols.jsonl` 生成 `TrainingSample(scenario=qa_rule)` 并落盘。
+QAGenerationStep 已从当前流水线移除，QA 统一由 QuestionAnswerStep 负责；本节保留为历史设计参考。
 
 ### 触发条件（与 Auto 的关系）
 
-- 当 `auto.enabled=true` 且未设置 `--skip-llm/--skip-qa` 时，该 step 默认跳过（避免重复生成 QA）。
-- 当 Auto disabled 或被 skip 时，该 step 才会执行。
+- 当未设置 `--skip-question-answer` 且未设置 `--skip-llm/--skip-qa` 时，该 step 默认跳过（避免重复生成 QA）。
+- 当启用 `--skip-question-answer` 时，旧版 QA step 才会执行（当前已移除）。
 
 ### 输入/输出（Artifacts）
 

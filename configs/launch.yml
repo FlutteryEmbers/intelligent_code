@@ -21,24 +21,30 @@ generation:
   max_context_chars: 16000
   max_items: 50
 
-auto:
+method_understanding:
+  enabled: true
   max_methods: 5
+
+question_answer:
   questions_per_method: 1
   embedding_model: "nomic-embed-text"
+  user_questions_path: "configs/user_questions.yaml"
+  build_embeddings_in_user_mode: true
 
 design_questions:
   min_evidence_refs: 2
   use_method_profiles: true
   profiles_top_k: 20
   profiles_max_chars: 6000
+  user_questions_path: "configs/design_questions.yaml"
   batching:
     enabled: true
     max_batches: 5
     diversity_hint: true
 
 prompts:
-  auto:
-    method_understanding: "configs/prompts/auto_method_understanding.txt"
+  method_understanding: "configs/prompts/auto_method_understanding.txt"
+  question_answer:
     question_generation: "configs/prompts/auto_question_generation.txt"
     answer_generation: "configs/prompts/auto_answer_generation.txt"
   design_questions_generation: "configs/prompts/auto_design_question_generation.txt"

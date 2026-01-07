@@ -40,12 +40,15 @@ class AutoMethodUnderstander:
         logger.info(f"Loaded language profile: {self.profile.language}")
         
         # 从配置读取参数
-        self.max_methods = self.config.get('auto.max_methods', 50)
+        self.max_methods = self.config.get(
+            'method_understanding.max_methods',
+            self.config.get('auto.max_methods', 50),
+        )
         self.max_context_chars = self.config.get('generation.max_context_chars', 16000)
         
         # 加载 prompt 模板
         template_path = self.config.get(
-            'prompts.auto.method_understanding',
+            'prompts.method_understanding',
             'configs/prompts/auto_method_understanding.txt'
         )
         self.prompt_template = load_prompt_template(template_path)
@@ -138,7 +141,7 @@ class AutoMethodUnderstander:
         return profiles
     
     def _select_candidates(self, symbols: list[CodeSymbol]) -> list[CodeSymbol]:
-        """选择候选方法（复用 QAGenerator 的逻辑）"""
+        """选择候选方法（复用 QA 选择候选逻辑）"""
         # 只选择方法符号
         methods = [s for s in symbols if s.symbol_type == 'method']
         

@@ -30,7 +30,7 @@ MergeStep 的唯一职责是：把 QA 与 Design 的 raw 样本聚合到一个�
 
 ### Router（按模式路由输入源）
 
-MergeStep 通过 `auto.enabled` 决定 QA 输入源：
+MergeStep 通过 `--skip-question-answer` 决定 QA 输入源：
 
 - Auto enabled：读 `auto.outputs.auto_qa_raw_jsonl`（以文件名形式拼到 `paths["intermediate"]`）
 - Auto disabled：读 `paths["qa_raw_jsonl"]`
@@ -67,7 +67,7 @@ Auto outputs 可能配置为完整路径，MergeStep 会做“取 basename”的
 ## Coupling Points（与后续步骤的耦合）
 
 - DeduplicationStep 强依赖 `all_raw.jsonl` 存在且非空，否则会 skip。
-- 通过 `auto.enabled` 的模式选择，Merge 与 AutoModuleStep/QAGenerationStep 存在跨步耦合（开关改变输入契约）。
+- 通过 `--skip-question-answer` 的模式选择，Merge 与 QuestionAnswerStep 存在跨步耦合（开关改变输入契约）。
 
 ---
 

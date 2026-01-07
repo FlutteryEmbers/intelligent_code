@@ -10,8 +10,8 @@ from src.utils.config import Config
 from src.pipeline.helpers import get_repo_commit
 from src.pipeline.steps import (
     ParseStep,
-    AutoModuleStep,
-    QAGenerationStep,
+    MethodUnderstandingStep,
+    QuestionAnswerStep,
     DesignGenerationStep,
     ValidationStep,
     MergeStep,
@@ -154,8 +154,8 @@ class Pipeline:
         # Define pipeline steps
         steps = [
             ParseStep(self.config, args, self.paths, repo_commit),
-            AutoModuleStep(self.config, args, self.paths, repo_commit),
-            QAGenerationStep(self.config, args, self.paths, repo_commit),
+            MethodUnderstandingStep(self.config, args, self.paths, repo_commit),
+            QuestionAnswerStep(self.config, args, self.paths, repo_commit),
             DesignGenerationStep(self.config, args, self.paths, repo_commit),
             ValidationStep(self.config, args, self.paths, repo_commit),
             MergeStep(self.config, args, self.paths, repo_commit),

@@ -1,4 +1,4 @@
-# Step 2 — AutoModuleStep Design (Method-Level RAG)
+# Step 2 — QuestionAnswerStep Design (Method-Level RAG)
 
 ## 章节与重点内容
 
@@ -14,15 +14,15 @@
 
 ### 职责边界（Single Responsibility）
 
-AutoModuleStep 的职责是：在启用 Auto 模式时，执行“方法级理解 + RAG”链路，生成更高质量、更可解释的 QA 数据；同时可选地输出 method profiles 供自动设计问题生成增强上下文。
+QuestionAnswerStep 的职责是：在未设置 `--skip-question-answer` 时，执行“方法级理解 + RAG”链路，生成更高质量、更可解释的 QA 数据；同时可选地输出 method profiles 供自动设计问题生成增强上下文。
 
 ### 执行模式
 
-- **Auto QA 模式**：`auto.enabled=true` 且未设置 `--skip-llm/--skip-qa`
+- **Auto QA 模式**：未设置 `--skip-question-answer` 且未设置 `--skip-llm/--skip-qa`
   - 产生 `auto_qa_raw.jsonl`（TrainingSample）
 - **Profiles-only 模式**：Auto QA 不需要，但 auto design questions 需要 method profiles
   - 仅产生 `method_profiles.jsonl`
-- **Disabled/Skipped**：Auto 关闭或显式 skip
+- **Disabled/Skipped**：显式 `--skip-question-answer` 或其他 skip
 
 ### 输入/输出（Artifacts）
 
@@ -42,7 +42,7 @@ AutoModuleStep 的职责是：在启用 Auto 模式时，执行“方法级理�
 
 ### 1) RAG Pipeline（检索增强生成）
 
-Auto 模块把 QA 生成分解为：
+Question/Answer 模块把 QA 生成分解为：
 
 1. **理解（理解候选方法的业务语义）** → MethodProfile
 2. **索引（将 profiles 向量化）** → embeddings
@@ -71,7 +71,7 @@ flowchart TD
   C --> E[(method_embeddings.jsonl)]
   P --> D[AutoQuestionGenerator]
   D --> Q[(questions.jsonl)]
-  Q --> F[AutoAnswerGenerator]
+  Q --> F[AnswerGenerator]
   E --> F
   F --> O[(auto_qa_raw.jsonl)]
 ```
@@ -122,11 +122,11 @@ flowchart TD
 
 ### 1) 与 QAGenerationStep 的“互斥耦合”
 
-当 `auto.enabled=true` 时，标准 QA step 默认跳过；因此 Auto step 的成功与否将直接影响 Merge 能否获得 QA 输入。
+当未设置 `--skip-question-answer` 时，标准 QA step 默认跳过；因此 QuestionAnswerStep 的成功与否将直接影响 Merge 能否获得 QA 输入。
 
 ### 2) 与 MergeStep 的“路径/命名耦合”
 
-MergeStep 在 Auto 模式下会读取 `auto.outputs.auto_qa_raw_jsonl` 指定的文件名，并在 `paths["intermediate"]` 下定位；因此 Auto 模块输出路径必须与该定位逻辑一致。
+MergeStep 会读取 `artifacts.auto_qa_raw_jsonl` 指定的文件名，并在 `paths["intermediate"]` 下定位；因此 Question/Answer 模块输出路径必须与该定位逻辑一致。
 
 ### 3) 与 Split/Validation 的 schema 耦合
 

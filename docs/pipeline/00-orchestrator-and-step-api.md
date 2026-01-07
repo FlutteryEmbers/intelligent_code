@@ -30,7 +30,7 @@ flowchart TD
   A[CLI main.py args] --> B[Pipeline Orchestrator]
   B --> C[BaseStep.run Template Method]
   C --> D1[ParseStep]
-  C --> D2[AutoModuleStep (optional)]
+  C --> D2[QuestionAnswerStep (optional)]
   C --> D3[QAGenerationStep (optional)]
   C --> D4[DesignGenerationStep]
   C --> D5[ValidationStep (report-only)]

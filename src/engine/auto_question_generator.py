@@ -8,6 +8,8 @@ import hashlib
 from pathlib import Path
 from typing import List
 
+import yaml
+
 from src.utils.schemas import MethodProfile, QuestionSample, CodeSymbol, EvidenceRef
 from src.utils.config import Config
 from src.utils.logger import get_logger
@@ -31,6 +33,82 @@ def simple_hash(text: str) -> str:
     return hashlib.md5(text.lower().encode('utf-8')).hexdigest()[:16]
 
 
+def load_user_questions_config(
+    config_path: str | Path | None = None,
+    repo_commit: str = "UNKNOWN_COMMIT"
+) -> List[QuestionSample]:
+    """从 YAML 读取用户提供的问题列表"""
+    if config_path is None:
+        config_path = Path(__file__).parent.parent.parent / "configs" / "user_questions.yaml"
+    else:
+        config_path = Path(config_path)
+
+    if not config_path.exists():
+        logger.warning(f"User questions config not found: {config_path}")
+        return []
+
+    with open(config_path, 'r', encoding='utf-8') as f:
+        data = yaml.safe_load(f) or {}
+
+    items = data.get("user_questions", [])
+    if not isinstance(items, list):
+        logger.warning(f"Invalid user_questions format in {config_path}")
+        return []
+
+    questions: List[QuestionSample] = []
+    for idx, item in enumerate(items, 1):
+        if not isinstance(item, dict):
+            logger.warning(f"Skipping user question {idx}: invalid entry")
+            continue
+
+        question_text = item.get("question") or item.get("text")
+        if not question_text or not isinstance(question_text, str):
+            logger.warning(f"Skipping user question {idx}: missing question text")
+            continue
+
+        question_type = item.get("question_type") or "business_rule"
+        difficulty = item.get("difficulty") or "medium"
+
+        evidence_refs: list[EvidenceRef] = []
+        raw_refs = item.get("evidence_refs") or []
+        if isinstance(raw_refs, dict):
+            raw_refs = [raw_refs]
+        if isinstance(raw_refs, list):
+            for ref in raw_refs:
+                if not isinstance(ref, dict):
+                    continue
+                try:
+                    evidence_refs.append(EvidenceRef(**ref))
+                except Exception as e:
+                    logger.warning(f"Invalid evidence_ref in user question {idx}: {e}")
+        else:
+            logger.warning(f"Invalid evidence_refs for user question {idx}")
+
+        item_repo_commit = item.get("repo_commit") or repo_commit
+        if item_repo_commit == "UNKNOWN_COMMIT" and repo_commit:
+            item_repo_commit = repo_commit
+
+        question_data = {
+            "question": question_text,
+            "question_type": question_type,
+            "difficulty": difficulty,
+            "evidence_refs": evidence_refs,
+            "repo_commit": item_repo_commit,
+        }
+        if item.get("created_at"):
+            question_data["created_at"] = item["created_at"]
+        if item.get("question_id"):
+            question_data["question_id"] = item["question_id"]
+
+        try:
+            questions.append(QuestionSample(**question_data))
+        except Exception as e:
+            logger.warning(f"Skipping user question {idx}: {e}")
+
+    logger.info(f"Loaded {len(questions)} user questions from {config_path}")
+    return questions
+
+
 class AutoQuestionGenerator:
     """Auto 问题生成器"""
     
@@ -40,11 +118,11 @@ class AutoQuestionGenerator:
         self.llm_client = LLMClient()
         
         # 从配置读取参数
-        self.questions_per_method = self.config.get('auto.questions_per_method', 5)
+        self.questions_per_method = self.config.get('question_answer.questions_per_method', 5)
         
         # 加载 prompt 模板
         template_path = self.config.get(
-            'prompts.auto.question_generation',
+            'prompts.question_answer.question_generation',
             'configs/prompts/auto_question_generation.txt'
         )
         self.prompt_template = load_prompt_template(template_path)

@@ -23,19 +23,18 @@ class MergeStep(BaseStep):
         all_samples = []
         
         # Determine which QA source to use
-        if not self.args.skip_auto and not (self.args.skip_llm or self.args.skip_qa):
+        qa_path = None
+        if not (self.args.skip_llm or self.args.skip_qa):
             artifacts = self.config.get("artifacts", {})
             qa_path = Path(artifacts.get("auto_qa_raw_jsonl", "data/intermediate/auto_qa_raw.jsonl"))
-            self.logger.info(f"Using auto QA from {qa_path.name}")
-        else:
-            qa_path = self.paths["qa_raw_jsonl"]
+            self.logger.info(f"Using QA from {qa_path.name}")
         
         # Load QA samples
-        if qa_path.exists():
+        if qa_path and qa_path.exists():
             qa_samples = read_jsonl(qa_path)
             all_samples.extend(qa_samples)
             self.logger.info(f"Loaded {len(qa_samples)} QA samples")
-        else:
+        elif qa_path:
             self.logger.warning(f"QA samples not found: {qa_path}")
         
         # Load design samples
