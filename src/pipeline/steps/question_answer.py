@@ -80,7 +80,7 @@ class QuestionAnswerStep(BaseStep):
         # Prepare paths
         method_profiles_jsonl = Path(artifacts.get("method_profiles_jsonl", "data/intermediate/method_profiles.jsonl"))
         method_embeddings_jsonl = Path(artifacts.get("method_embeddings_jsonl", "data/intermediate/method_embeddings.jsonl"))
-        questions_jsonl = Path(artifacts.get("questions_jsonl", "data/intermediate/questions.jsonl"))
+        questions_jsonl = Path(artifacts.get("questions_jsonl", "data/intermediate/auto_questions/questions.jsonl"))
         
         # Following steps only if QA is needed
         if self.need_qa:

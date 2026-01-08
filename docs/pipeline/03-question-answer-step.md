@@ -33,7 +33,7 @@ QuestionAnswerStep 的职责是：在未设置 `--skip-question-answer` 时，�
   - `configs/user_questions.yaml`（User QA 模式）
 - 输出（默认路径由配置键控制）：
   - `data/intermediate/method_embeddings.jsonl`
-  - `data/intermediate/questions.jsonl`
+  - `data/intermediate/auto_questions/questions.jsonl`
   - `data/intermediate/auto_qa_raw.jsonl`
   - 各类 rejected/失败回收文件（便于调试）
 
@@ -67,7 +67,7 @@ Question/Answer 模块把 QA 生成分解为：
 flowchart TD
   P[(method_profiles.jsonl)] --> C[vector_index.build_embeddings]
   P --> D[AutoQuestionGenerator]
-  U[(user_questions.yaml)] --> Q[(questions.jsonl)]
+  U[(user_questions.yaml)] --> Q[(auto_questions/questions.jsonl)]
   D --> Q
   C --> E[(method_embeddings.jsonl)]
   Q --> F[AnswerGenerator]

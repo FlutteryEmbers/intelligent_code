@@ -92,9 +92,9 @@ class Pipeline:
             
             # Intermediate outputs
             "qa_raw_jsonl": intermediate / "qa_raw.jsonl",
-            "qa_rejected_jsonl": intermediate / "qa_rejected.jsonl",
+            "qa_rejected_jsonl": intermediate / "rejected" / "qa_rejected.jsonl",
             "design_raw_jsonl": intermediate / "design_raw.jsonl",
-            "design_rejected_jsonl": intermediate / "design_rejected.jsonl",
+            "design_rejected_jsonl": intermediate / "rejected" / "design_rejected.jsonl",
             "all_raw_jsonl": intermediate / "all_raw.jsonl",
             "all_dedup_jsonl": intermediate / "all_dedup.jsonl",
             

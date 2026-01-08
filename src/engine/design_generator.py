@@ -160,9 +160,17 @@ class DesignGenerator:
         self.output_dir = Path(self.config.get('output.intermediate_dir', 'data/intermediate'))
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        self.design_questions_path = self.output_dir / 'design_questions.jsonl'
+        self.design_questions_path = Path(self.config.get(
+            'artifacts.design_questions_snapshot_jsonl',
+            self.output_dir / 'auto_questions' / 'design_questions.jsonl',
+        ))
         self.raw_output_path = self.output_dir / 'design_raw.jsonl'
-        self.rejected_path = self.output_dir / 'design_rejected.jsonl'
+        self.rejected_path = Path(self.config.get(
+            'artifacts.design_rejected_jsonl',
+            self.output_dir / 'rejected' / 'design_rejected.jsonl',
+        ))
+        self.design_questions_path.parent.mkdir(parents=True, exist_ok=True)
+        self.rejected_path.parent.mkdir(parents=True, exist_ok=True)
         
         # 统计
         self.stats = {

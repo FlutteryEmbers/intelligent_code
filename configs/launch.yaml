@@ -54,13 +54,15 @@ prompts:
 
 artifacts:
   method_profiles_jsonl: "data/intermediate/method_profiles.jsonl"
-  auto_method_understanding_rejected_jsonl: "data/intermediate/auto_method_understanding_rejected.jsonl"
-  questions_jsonl: "data/intermediate/questions.jsonl"
+  auto_method_understanding_rejected_jsonl: "data/intermediate/rejected/auto_method_understanding_rejected.jsonl"
+  questions_jsonl: "data/intermediate/auto_questions/questions.jsonl"
   method_embeddings_jsonl: "data/intermediate/method_embeddings.jsonl"
   auto_qa_raw_jsonl: "data/intermediate/auto_qa_raw.jsonl"
-  auto_answer_rejected_jsonl: "data/intermediate/auto_answer_rejected.jsonl"
-  design_questions_jsonl: "data/intermediate/design_questions_auto.jsonl"
-  design_questions_rejected_jsonl: "data/intermediate/design_questions_auto_rejected.jsonl"
+  auto_answer_rejected_jsonl: "data/intermediate/rejected/auto_answer_rejected.jsonl"
+  design_questions_jsonl: "data/intermediate/auto_questions/design_questions_auto.jsonl"
+  design_questions_rejected_jsonl: "data/intermediate/rejected/design_questions_auto_rejected.jsonl"
+  design_questions_snapshot_jsonl: "data/intermediate/auto_questions/design_questions.jsonl"
+  design_rejected_jsonl: "data/intermediate/rejected/design_rejected.jsonl"
 
 quality:
   min_instruction_length: 10

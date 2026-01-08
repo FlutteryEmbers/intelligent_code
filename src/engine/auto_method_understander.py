@@ -63,10 +63,11 @@ class AutoMethodUnderstander:
         ))
         self.rejected_jsonl = Path(self.config.get(
             'artifacts.auto_method_understanding_rejected_jsonl',
-            'data/intermediate/auto_method_understanding_rejected.jsonl'
+            'data/intermediate/rejected/auto_method_understanding_rejected.jsonl'
         ))
         
         self.output_jsonl.parent.mkdir(parents=True, exist_ok=True)
+        self.rejected_jsonl.parent.mkdir(parents=True, exist_ok=True)
         
         # 统计
         self.stats = {

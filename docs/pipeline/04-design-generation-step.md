@@ -25,8 +25,8 @@ DesignGenerationStep 的职责是：为架构设计场景生成 `TrainingSample(
 
 - 输入：`symbols.jsonl`
 - 输出：
-  - design_questions：`data/intermediate/design_questions.jsonl`（DesignGenerator 默认）或 `design_questions_auto.jsonl`（design_questions 配置）
-  - design：`data/intermediate/design_raw.jsonl`、`data/intermediate/design_rejected.jsonl`
+  - design_questions：`data/intermediate/auto_questions/design_questions.jsonl`（DesignGenerator 默认）或 `auto_questions/design_questions_auto.jsonl`（design_questions 配置）
+  - design：`data/intermediate/design_raw.jsonl`、`data/intermediate/rejected/design_rejected.jsonl`
 
 ---
 
@@ -50,11 +50,11 @@ DesignGenerator 在生成设计方案前，会从 symbols 中选择与设计问�
 ```mermaid
 flowchart TD
   S[(symbols.jsonl)] -->|optional| R[AutoDesignQuestionGenerator]
-  R --> RA[(design_questions_auto.jsonl)]
+  R --> RA[(auto_questions/design_questions_auto.jsonl)]
   S --> D[DesignGenerator]
   RA --> D
   D --> O[(design_raw.jsonl)]
-  D --> X[(design_rejected.jsonl)]
+  D --> X[(rejected/design_rejected.jsonl)]
 ```
 
 ---

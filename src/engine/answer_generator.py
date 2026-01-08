@@ -67,7 +67,7 @@ class AnswerGenerator:
         ))
         self.rejected_jsonl = Path(self.config.get(
             'artifacts.auto_answer_rejected_jsonl',
-            'data/intermediate/auto_answer_rejected.jsonl'
+            'data/intermediate/rejected/auto_answer_rejected.jsonl'
         ))
         self.embeddings_jsonl = Path(self.config.get(
             'artifacts.method_embeddings_jsonl',
@@ -75,6 +75,7 @@ class AnswerGenerator:
         ))
         
         self.output_jsonl.parent.mkdir(parents=True, exist_ok=True)
+        self.rejected_jsonl.parent.mkdir(parents=True, exist_ok=True)
         
         # 统计
         self.stats = {
@@ -298,7 +299,7 @@ class AnswerGenerator:
             raw_output = response.content.strip()
             
             # 调试：保存原始输出到文件
-            debug_file = Path("data/intermediate/llm_raw_output_debug.txt")
+            debug_file = Path("data/intermediate/rejected/llm_answer_raw_output.txt")
             with open(debug_file, 'a', encoding='utf-8') as f:
                 f.write(f"\n{'='*80}\n")
                 f.write(f"Question: {question.question[:80]}\n")

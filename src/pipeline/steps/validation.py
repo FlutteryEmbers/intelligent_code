@@ -39,7 +39,7 @@ class ValidationStep(BaseStep):
                     qa_path,
                     symbols_map,
                     self.paths["qa_quality_json"],
-                    self.paths["intermediate"] / "qa_validation_rejected.jsonl"
+                    self.paths["intermediate"] / "rejected" / "qa_validation_rejected.jsonl"
                 )
                 break
         
@@ -50,7 +50,7 @@ class ValidationStep(BaseStep):
                 self.paths["design_raw_jsonl"],
                 symbols_map,
                 self.paths["design_quality_json"],
-                self.paths["intermediate"] / "design_validation_rejected.jsonl"
+                self.paths["intermediate"] / "rejected" / "design_validation_rejected.jsonl"
             )
         
         return {"status": "success"}

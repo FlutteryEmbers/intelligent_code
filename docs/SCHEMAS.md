@@ -23,7 +23,7 @@
 | `data/raw/extracted/symbols.jsonl` | `CodeSymbol` | `ParseStep` → parser | QA/Design/Auto 引擎、Validation、Split |
 | `data/intermediate/*_raw.jsonl` | `TrainingSample`（dict 形态） | `DesignGenerator` / `AnswerGenerator` | Validation、Merge、Dedup、Safety、Split、Export |
 | `data/intermediate/method_profiles.jsonl` | `MethodProfile` | `AutoMethodUnderstander` | Auto QA（问/答）、Auto Design Questions（可选） |
-| `data/intermediate/questions.jsonl` | `QuestionSample` | `AutoQuestionGenerator` | `AnswerGenerator` |
+| `data/intermediate/auto_questions/questions.jsonl` | `QuestionSample` | `AutoQuestionGenerator` | `AnswerGenerator` |
 | `data/final/*_sft.jsonl` | SFT messages（dict） | `ExportStep` | 训练框架/微调脚本 |
 
 ### 核心关系图

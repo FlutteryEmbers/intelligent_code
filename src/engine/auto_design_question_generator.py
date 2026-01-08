@@ -101,14 +101,15 @@ class DesignQuestionGenerator:
         # 输出路径
         self.output_jsonl = Path(self.config.get(
             'artifacts.design_questions_jsonl',
-            'data/intermediate/design_questions_auto.jsonl'
+            'data/intermediate/auto_questions/design_questions_auto.jsonl'
         ))
         self.rejected_jsonl = Path(self.config.get(
             'artifacts.design_questions_rejected_jsonl',
-            'data/intermediate/design_questions_auto_rejected.jsonl'
+            'data/intermediate/rejected/design_questions_auto_rejected.jsonl'
         ))
 
         self.output_jsonl.parent.mkdir(parents=True, exist_ok=True)
+        self.rejected_jsonl.parent.mkdir(parents=True, exist_ok=True)
 
         # 统计
         self.stats = {

@@ -61,7 +61,7 @@ class LLMClient:
         
         # 拒绝样本输出路径
         self.rejected_log_path = (
-            Path(config.get('output.intermediate_dir', 'data/intermediate')) / 'rejected_llm.jsonl'
+            Path(config.get('output.intermediate_dir', 'data/intermediate')) / 'rejected' / 'rejected_llm.jsonl'
         )
         self.rejected_log_path.parent.mkdir(parents=True, exist_ok=True)
         

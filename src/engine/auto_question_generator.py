@@ -133,7 +133,7 @@ class AutoQuestionGenerator:
         # 输出路径
         self.output_jsonl = Path(self.config.get(
             'artifacts.questions_jsonl',
-            'data/intermediate/questions.jsonl'
+            'data/intermediate/auto_questions/questions.jsonl'
         ))
         self.output_jsonl.parent.mkdir(parents=True, exist_ok=True)
         

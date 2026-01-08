@@ -27,8 +27,8 @@ ValidationStep 的唯一职责是：对已生成的样本做结构与证据一�
 - 输出：
   - `data/reports/qa_quality.json`
   - `data/reports/design_quality.json`
-  - `data/intermediate/qa_validation_rejected.jsonl`
-  - `data/intermediate/design_validation_rejected.jsonl`
+  - `data/intermediate/rejected/qa_validation_rejected.jsonl`
+  - `data/intermediate/rejected/design_validation_rejected.jsonl`
 
 ---
 
