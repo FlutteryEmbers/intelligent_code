@@ -21,22 +21,16 @@ from src.engine.llm_client import LLMClient
 logger = get_logger(__name__)
 
 
-def load_prompt_template(template_name: str) -> str:
+def load_prompt_template(template_path: str | Path) -> str:
     """加载prompt模板文件
     
     Args:
-        template_name: 模板文件名（不含路径）
+        template_path: 模板文件路径
         
     Returns:
         str: 模板内容
     """
-    template_path = (
-        Path(__file__).parent.parent.parent
-        / "configs"
-        / "prompts"
-        / "design"
-        / template_name
-    )
+    template_path = Path(template_path)
     if not template_path.exists():
         raise FileNotFoundError(f"Prompt template not found: {template_path}")
     
@@ -145,8 +139,16 @@ class DesignGenerator:
         logger.info(f"Loaded language profile: {self.profile.language}")
         
         # 加载prompt模板
-        self.system_prompt_template = load_prompt_template("design_system_prompt.txt")
-        self.user_prompt_template = load_prompt_template("design_user_prompt.txt")
+        system_prompt_path = self.config.get(
+            'design_questions.prompts.system_prompt',
+            'configs/prompts/design/design_system_prompt.txt',
+        )
+        user_prompt_path = self.config.get(
+            'design_questions.prompts.user_prompt',
+            'configs/prompts/design/design_user_prompt.txt',
+        )
+        self.system_prompt_template = load_prompt_template(system_prompt_path)
+        self.user_prompt_template = load_prompt_template(user_prompt_path)
         
         # 从配置读取参数
         self.top_k_context = self.config.get(

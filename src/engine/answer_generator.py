@@ -55,7 +55,7 @@ class AnswerGenerator:
         
         # 加载 prompt 模板
         template_path = self.config.get(
-            'prompts.question_answer.answer_generation',
+            'question_answer.prompts.answer_generation',
             'configs/prompts/question_answer/auto_answer_generation.txt'
         )
         self.prompt_template = load_prompt_template(template_path)

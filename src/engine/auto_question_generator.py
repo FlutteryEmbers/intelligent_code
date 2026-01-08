@@ -125,13 +125,16 @@ class AutoQuestionGenerator:
         self.batch_size = self.config.get('question_answer.batch_size', None)
         self.coverage_config = self.config.get('question_answer.coverage', {}) or {}
         self.coverage_mode = self.coverage_config.get('mode', 'hybrid')
+        self.constraint_strength = self.coverage_config.get('constraint_strength', 'hybrid')
         self.coverage_rng = random.Random(self.config.get('core.seed', 42))
         
         # 加载 prompt 模板
-        template_path = self.config.get(
-            'prompts.question_answer.question_generation',
+        coverage_prompt = self.config.get('question_answer.prompts.coverage_generation')
+        base_prompt = self.config.get(
+            'question_answer.prompts.question_generation',
             'configs/prompts/question_answer/auto_question_generation.txt'
         )
+        template_path = self._resolve_prompt_path(coverage_prompt, base_prompt)
         self.prompt_template = load_prompt_template(template_path)
         
         # 输出路径
@@ -147,6 +150,14 @@ class AutoQuestionGenerator:
             'total_questions': 0,
             'duplicates_removed': 0,
         }
+
+    def _resolve_prompt_path(self, preferred: str | None, fallback: str) -> str:
+        if preferred:
+            preferred_path = Path(preferred)
+            if preferred_path.exists():
+                return str(preferred_path)
+            logger.warning("Coverage prompt not found, fallback to base prompt: %s", preferred_path)
+        return fallback
     
     def generate_from_profiles(
         self,
@@ -272,6 +283,31 @@ class AutoQuestionGenerator:
             "how_to",
         )
         return bucket, intent
+
+    def _resolve_constraint_strength(self, bucket: str) -> str:
+        strength = self.constraint_strength
+        if strength == "hybrid":
+            return "strong" if bucket in ("mid", "hard") else "weak"
+        if strength in ("strong", "weak"):
+            return strength
+        return "weak"
+
+    def _build_constraint_rules(self, bucket: str) -> tuple[str, str]:
+        strength = self._resolve_constraint_strength(bucket)
+        if strength == "strong":
+            rules = (
+                "【强约束】\n"
+                "- 必须体现冲突/权衡/隐含约束/历史兼容/边界条件中的至少一类。\n"
+                "- 问题需指向方法的具体行为或风险，不要停留在泛泛概念。\n"
+                "- 至少包含一个明确的限制条件或失败场景。"
+            )
+        else:
+            rules = (
+                "【弱约束】\n"
+                "- 问题表达清晰、自然，聚焦单一目标或单一流程节点。\n"
+                "- 保持与代码上下文相关，但允许更通用的业务表述。"
+            )
+        return strength, rules
     
     def _generate_questions(
         self,
@@ -300,6 +336,7 @@ class AutoQuestionGenerator:
             source_hash = symbol.source_hash
         
         coverage_bucket, coverage_intent = self._sample_coverage_target()
+        constraint_strength, constraint_rules = self._build_constraint_rules(coverage_bucket)
 
         prompt = self.prompt_template.format(
             method_profile=method_profile_json,
@@ -313,6 +350,8 @@ class AutoQuestionGenerator:
             repo_commit=profile.repo_commit,
             coverage_bucket=coverage_bucket,
             coverage_intent=coverage_intent,
+            constraint_strength=constraint_strength,
+            constraint_rules=constraint_rules,
         )
         
         # 调用 LLM

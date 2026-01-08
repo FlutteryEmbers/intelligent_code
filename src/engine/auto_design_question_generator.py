@@ -55,10 +55,12 @@ class DesignQuestionGenerator:
         self.language_profile = load_language_profile(self.config)
 
         # 加载 prompt 模板
-        prompt_path = self.config.get(
-            'prompts.design_questions_generation',
-            'configs/prompts/design/auto_design_question_generation.txt'
+        coverage_prompt = self.config.get('design_questions.prompts.coverage_generation')
+        base_prompt = self.config.get(
+            'design_questions.prompts.question_generation',
+            'configs/prompts/design/auto_design_question_generation.txt',
         )
+        prompt_path = self._resolve_prompt_path(coverage_prompt, base_prompt)
         self.prompt_template = load_prompt_template(prompt_path)
 
         # 从配置读取参数
@@ -81,6 +83,7 @@ class DesignQuestionGenerator:
         )
         self.coverage_config = self.config.get('design_questions.coverage', {}) or {}
         self.coverage_mode = self.coverage_config.get('mode', 'hybrid')
+        self.constraint_strength = self.coverage_config.get('constraint_strength', 'hybrid')
         self.coverage_rng = random.Random(self.seed)
 
         # Method profiles 配置（可选增强）
@@ -132,6 +135,14 @@ class DesignQuestionGenerator:
             self.batching_enabled,
             self.batch_size,
         )
+
+    def _resolve_prompt_path(self, preferred: str | None, fallback: str) -> str:
+        if preferred:
+            preferred_path = Path(preferred)
+            if preferred_path.exists():
+                return str(preferred_path)
+            logger.warning("Coverage prompt not found, fallback to base prompt: %s", preferred_path)
+        return fallback
 
     def generate_from_repo(
         self,
@@ -538,9 +549,35 @@ class DesignQuestionGenerator:
         )
         return bucket, intent
 
+    def _resolve_constraint_strength(self, bucket: str) -> str:
+        strength = self.constraint_strength
+        if strength == "hybrid":
+            return "strong" if bucket in ("mid", "hard") else "weak"
+        if strength in ("strong", "weak"):
+            return strength
+        return "weak"
+
+    def _build_constraint_rules(self, bucket: str) -> tuple[str, str]:
+        strength = self._resolve_constraint_strength(bucket)
+        if strength == "strong":
+            rules = (
+                "Strong constraints:\n"
+                "- Include trade-offs, constraints, or implicit requirements.\n"
+                "- Highlight risks, boundary conditions, or backward compatibility.\n"
+                "- Keep the question specific to the evidence pool and design context."
+            )
+        else:
+            rules = (
+                "Weak constraints:\n"
+                "- Keep the question concise and focused on a single goal.\n"
+                "- Use natural wording but stay grounded in the evidence pool."
+            )
+        return strength, rules
+
     def _build_prompt(self, context: str, evidence_pool: str, max_design_questions: int) -> str:
         language_name = self.language_profile.get('language', 'java')
         coverage_bucket, coverage_intent = self._sample_coverage_target()
+        constraint_strength, constraint_rules = self._build_constraint_rules(coverage_bucket)
         return self.prompt_template.format(
             language=language_name.capitalize(),
             max_design_questions=max_design_questions,
@@ -549,6 +586,8 @@ class DesignQuestionGenerator:
             evidence_pool=evidence_pool,
             coverage_bucket=coverage_bucket,
             coverage_intent=coverage_intent,
+            constraint_strength=constraint_strength,
+            constraint_rules=constraint_rules,
         )
 
     def _call_llm(self, prompt: str) -> str:

@@ -51,7 +51,7 @@ class AutoMethodUnderstander:
         
         # 加载 prompt 模板
         template_path = self.config.get(
-            'prompts.method_understanding',
+            'method_understanding.prompts.generation',
             'configs/prompts/method_understanding/auto_method_understanding.txt'
         )
         self.prompt_template = load_prompt_template(template_path)

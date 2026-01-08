@@ -23,6 +23,8 @@ core:
 method_understanding:
   enabled: true
   max_methods: 5
+  prompts:
+    generation: "configs/prompts/method_understanding/auto_method_understanding.txt"
 
 question_answer:
   questions_per_method: 3
@@ -31,8 +33,13 @@ question_answer:
   embedding_model: "nomic-embed-text"
   user_questions_path: "configs/user_inputs/user_questions.yaml"
   build_embeddings_in_user_mode: true
+  prompts:
+    question_generation: "configs/prompts/question_answer/auto_question_generation.txt"
+    coverage_generation: "configs/prompts/question_answer/coverage_question_generation.txt"
+    answer_generation: "configs/prompts/question_answer/auto_answer_generation.txt"
   coverage:
     mode: "hybrid"                 # upstream | downstream | hybrid
+    constraint_strength: "strong"  # strong | weak | hybrid
     targets: {high: 0.8, mid: 0.15, hard: 0.05}
     intent_targets:
       how_to: 0.2
@@ -47,7 +54,7 @@ question_answer:
       compatibility: 0.02
       edge: 0.0
     labeler: "rule"
-    templates_path: "configs/user_inputs/qa_templates.yaml"
+    # templates_path: "configs/user_inputs/qa_templates.yaml"
 
 design_questions:
   min_evidence_refs: 2
@@ -58,22 +65,22 @@ design_questions:
   batch_size: 5
   max_questions: 20
   user_questions_path: "configs/user_inputs/design_questions.yaml"
+  prompts:
+    question_generation: "configs/prompts/design/auto_design_question_generation.txt"
+    coverage_generation: "configs/prompts/design/coverage_design_question_generation.txt"
+    system_prompt: "configs/prompts/design/design_system_prompt.txt"
+    user_prompt: "configs/prompts/design/design_user_prompt.txt"
   coverage:
     mode: "hybrid"
+    constraint_strength: "strong"
     targets: {high: 0.8, mid: 0.15, hard: 0.05}
     labeler: "rule"
-    templates_path: "configs/user_inputs/design_templates.yaml"
+    # templates_path: "configs/user_inputs/design_templates.yaml"
   batching:
     enabled: true
     max_batches: 5
     diversity_hint: true
 
-prompts:
-  method_understanding: "configs/prompts/method_understanding/auto_method_understanding.txt"
-  question_answer:
-    question_generation: "configs/prompts/question_answer/auto_question_generation.txt"
-    answer_generation: "configs/prompts/question_answer/auto_answer_generation.txt"
-  design_questions_generation: "configs/prompts/design/auto_design_question_generation.txt"
 
 artifacts:
   method_profiles_jsonl: "data/intermediate/method_profiles.jsonl"

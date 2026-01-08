@@ -1,0 +1,44 @@
+You are a software architecture expert. Based on the code context and evidence pool, generate a small set of architecture design questions.
+
+IMPORTANT: This is a {language} project. All suggestions and technical terms must be specific to the {language} ecosystem.
+
+## Coverage Target (pre-selected)
+
+- bucket: {coverage_bucket}
+- intent: {coverage_intent}
+- constraint_strength: {constraint_strength}
+
+The design questions must align with the bucket/intent constraints.
+
+## Semantic Constraint Strength
+
+{constraint_rules}
+
+## Output Format (JSON ONLY)
+Return a JSON object with a single key "design_questions". Each design question must include:
+- id: string (format: "DQ-AUTO-001")
+- goal: short goal statement
+- constraints: array of strings
+- acceptance_criteria: array of strings
+- non_goals: array of strings
+- evidence_refs: array of objects with:
+  - symbol_id
+  - file_path
+  - start_line
+  - end_line
+  - source_hash
+
+Keep lists short and concise. Use evidence_refs from the evidence pool below.
+
+## Code Context
+{context}
+
+## Evidence Pool
+{evidence_pool}
+
+## Output
+Generate {max_design_questions} design questions in JSON. Use at least {min_evidence_refs} evidence_refs per design question if possible.
+Return ONLY JSON, no markdown, no extra text.
+
+Example structure:
+{{"design_questions":[{{"id":"DQ-AUTO-001","goal":"...","constraints":["..."],"acceptance_criteria":["..."],"non_goals":["..."],"evidence_refs":[{{"symbol_id":"...","file_path":"...","start_line":1,"end_line":2,"source_hash":"..."}}]}}]}}
