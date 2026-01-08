@@ -14,6 +14,7 @@ from src.utils.logger import get_logger
 from src.utils.validator import normalize_path_separators
 from src.utils.language_profile import load_language_profile
 from src.utils import vector_index, write_json
+from src.utils.call_chain import expand_call_chain
 from src.engine.llm_client import LLMClient
 
 logger = get_logger(__name__)
@@ -65,6 +66,10 @@ class AnswerGenerator:
         self.retrieval_fallback_top_k = int(
             self.retrieval_config.get('fallback_top_k', self.top_k_context)
         )
+        call_chain_cfg = self.retrieval_config.get("call_chain", {}) or {}
+        self.call_chain_enabled = bool(call_chain_cfg.get("enabled", False))
+        self.call_chain_max_depth = int(call_chain_cfg.get("max_depth", 1))
+        self.call_chain_max_expansion = int(call_chain_cfg.get("max_expansion", 20))
         self.retrieval_stats = {
             "mode": self.retrieval_mode,
             "min_score": self.retrieval_min_score,
@@ -76,6 +81,7 @@ class AnswerGenerator:
             "vector_fallback_used": 0,
             "vector_empty": 0,
             "symbol_only_failures": 0,
+            "call_chain_expanded": 0,
             "negative_samples": 0,
             "positive_samples": 0,
         }
@@ -225,6 +231,8 @@ class AnswerGenerator:
         context_parts = []
         available_evidence = []
         total_chars = 0
+        seed_symbols = []
+        seen_symbol_ids = set()
 
         use_symbol = self.retrieval_mode in ("symbol_only", "hybrid")
         use_vector = self.retrieval_mode in ("vector_only", "hybrid")
@@ -253,6 +261,9 @@ class AnswerGenerator:
                     'end_line': symbol.end_line,
                     'source_hash': symbol.source_hash
                 })
+                if symbol.symbol_id not in seen_symbol_ids:
+                    seen_symbol_ids.add(symbol.symbol_id)
+                    seed_symbols.append(symbol)
             if context_parts:
                 self.retrieval_stats["symbol_evidence_used"] += 1
 
@@ -316,6 +327,37 @@ class AnswerGenerator:
                     'end_line': symbol.end_line,
                     'source_hash': symbol.source_hash
                 })
+                if symbol.symbol_id not in seen_symbol_ids:
+                    seen_symbol_ids.add(symbol.symbol_id)
+                    seed_symbols.append(symbol)
+
+        if self.call_chain_enabled and seed_symbols:
+            expanded = expand_call_chain(
+                seed_symbols,
+                symbols_map.values(),
+                max_depth=self.call_chain_max_depth,
+                max_expansion=self.call_chain_max_expansion,
+            )
+            added = 0
+            for symbol in expanded:
+                if symbol.symbol_id in seen_symbol_ids:
+                    continue
+                if total_chars + len(symbol.source) > self.max_context_chars:
+                    break
+                context_parts.append(f"// Method: {symbol.qualified_name}")
+                context_parts.append(symbol.source)
+                context_parts.append("")
+                total_chars += len(symbol.source)
+                available_evidence.append({
+                    'symbol_id': symbol.symbol_id,
+                    'file_path': symbol.file_path,
+                    'start_line': symbol.start_line,
+                    'end_line': symbol.end_line,
+                    'source_hash': symbol.source_hash
+                })
+                seen_symbol_ids.add(symbol.symbol_id)
+                added += 1
+            self.retrieval_stats["call_chain_expanded"] += added
         
         if not context_parts and self.retrieval_mode == "symbol_only":
             self.retrieval_stats["symbol_only_failures"] += 1

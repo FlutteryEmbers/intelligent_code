@@ -274,12 +274,14 @@ def _plot_retrieval(report: dict, scope: str, output_dir: Path) -> None:
             ("vector_fallback_used", _label("回退使用", "Fallback Used")),
             ("vector_empty", _label("向量空召回", "Vector Empty")),
             ("symbol_only_failures", _label("仅证据失败", "Symbol-only Failures")),
+            ("call_chain_expanded", _label("调用链扩展", "Call-chain Expanded")),
         ]
     else:
         mapping = [
             ("scored_non_empty", _label("关键词命中", "Keyword Hit")),
             ("fallback_used", _label("候选回退", "Fallback Used")),
             ("candidates_empty", _label("候选为空", "No Candidates")),
+            ("call_chain_expanded", _label("调用链扩展", "Call-chain Expanded")),
         ]
 
     for key, label in mapping:
@@ -406,15 +408,22 @@ def main() -> int:
 
     output_dir = _resolve_path(REPO_ROOT, args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    coverage_dir = output_dir / "coverage"
+    quality_dir = output_dir / "quality"
+    parsing_dir = output_dir / "parsing"
+    retrieval_dir = output_dir / "retrieval"
+    dedup_dir = output_dir / "dedup"
+    for path in (coverage_dir, quality_dir, parsing_dir, retrieval_dir, dedup_dir):
+        path.mkdir(parents=True, exist_ok=True)
 
     coverage_report = _read_json(_resolve_path(REPO_ROOT, coverage_path))
     if coverage_report:
         qa_data = coverage_report.get("qa", {})
         design_data = coverage_report.get("design", {})
         if qa_data:
-            _plot_coverage("qa", qa_data, output_dir)
+            _plot_coverage("qa", qa_data, coverage_dir)
         if design_data:
-            _plot_coverage("design", design_data, output_dir)
+            _plot_coverage("design", design_data, coverage_dir)
 
         errors = []
         if qa_clean_path:
@@ -447,27 +456,27 @@ def main() -> int:
 
     qa_quality = _read_json(_resolve_path(REPO_ROOT, qa_quality_path))
     if qa_quality:
-        _plot_quality(qa_quality, "qa", output_dir)
+        _plot_quality(qa_quality, "qa", quality_dir)
 
     design_quality = _read_json(_resolve_path(REPO_ROOT, design_quality_path))
     if design_quality:
-        _plot_quality(design_quality, "design", output_dir)
+        _plot_quality(design_quality, "design", quality_dir)
 
     parsing_report = _read_json(_resolve_path(REPO_ROOT, parsing_path))
     if parsing_report:
-        _plot_parsing(parsing_report, output_dir)
+        _plot_parsing(parsing_report, parsing_dir)
 
     qa_retrieval = _read_json(reports_path / "qa_retrieval_report.json")
     if qa_retrieval:
-        _plot_retrieval(qa_retrieval, "qa", output_dir)
+        _plot_retrieval(qa_retrieval, "qa", retrieval_dir)
 
     design_retrieval = _read_json(reports_path / "design_retrieval_report.json")
     if design_retrieval:
-        _plot_retrieval(design_retrieval, "design", output_dir)
+        _plot_retrieval(design_retrieval, "design", retrieval_dir)
 
     dedup_report = _read_json(reports_path / "dedup_mapping.json")
     if dedup_report:
-        _plot_dedup(dedup_report, output_dir)
+        _plot_dedup(dedup_report, dedup_dir)
 
     print(f"Rendered reports to {output_dir}")
     return 0

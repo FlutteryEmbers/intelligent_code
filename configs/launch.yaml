@@ -41,6 +41,10 @@ question_answer:
     mode: "symbol_only"  # hybrid | vector_only | symbol_only
     min_score: 0.2
     fallback_top_k: 6
+    call_chain:
+      enabled: true
+      max_depth: 1
+      max_expansion: 20
   coverage:
     mode: "hybrid"                 # upstream | downstream | hybrid
     constraint_strength: "strong"  # strong | weak | hybrid
@@ -102,6 +106,10 @@ design_questions:
   retrieval:
     mode: "hybrid"       # hybrid | symbol_only
     fallback_top_k: 8
+    call_chain:
+      enabled: true
+      max_depth: 1
+      max_expansion: 20
   coverage:
     mode: "hybrid"
     constraint_strength: "strong"

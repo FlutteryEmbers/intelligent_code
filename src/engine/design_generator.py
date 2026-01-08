@@ -14,6 +14,7 @@ import yaml
 
 from src.utils.schemas import CodeSymbol, TrainingSample, ReasoningTrace, EvidenceRef, sha256_text
 from src.utils import write_json
+from src.utils.call_chain import expand_call_chain
 from src.utils.validator import normalize_path_separators
 from src.utils.config import Config
 from src.utils.logger import get_logger
@@ -176,6 +177,10 @@ class DesignGenerator:
         self.retrieval_fallback_top_k = int(
             self.retrieval_config.get('fallback_top_k', self.top_k_context)
         )
+        call_chain_cfg = self.retrieval_config.get("call_chain", {}) or {}
+        self.call_chain_enabled = bool(call_chain_cfg.get("enabled", False))
+        self.call_chain_max_depth = int(call_chain_cfg.get("max_depth", 1))
+        self.call_chain_max_expansion = int(call_chain_cfg.get("max_expansion", 20))
         self.retrieval_stats = {
             "mode": self.retrieval_mode,
             "fallback_top_k": self.retrieval_fallback_top_k,
@@ -183,6 +188,7 @@ class DesignGenerator:
             "candidates_empty": 0,
             "scored_non_empty": 0,
             "fallback_used": 0,
+            "call_chain_expanded": 0,
             "negative_samples": 0,
             "positive_samples": 0,
         }
@@ -492,7 +498,26 @@ class DesignGenerator:
         
         # 确保包含不同层级
         top_symbols = self._balance_layers(top_symbols, candidates)
-        
+
+        if self.call_chain_enabled and top_symbols:
+            expanded = expand_call_chain(
+                top_symbols,
+                symbols,
+                max_depth=self.call_chain_max_depth,
+                max_expansion=self.call_chain_max_expansion,
+            )
+            added = 0
+            existing = {symbol.symbol_id for symbol in top_symbols}
+            for symbol in expanded:
+                if symbol.symbol_id in existing:
+                    continue
+                top_symbols.append(symbol)
+                existing.add(symbol.symbol_id)
+                added += 1
+                if added >= self.call_chain_max_expansion:
+                    break
+            self.retrieval_stats["call_chain_expanded"] += added
+
         return top_symbols
     
     def _filter_candidates(self, symbols: list[CodeSymbol]) -> list[CodeSymbol]:
