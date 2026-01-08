@@ -4,6 +4,7 @@
 从代码仓库中检索相关上下文，为给定设计问题生成架构设计方案。
 """
 import json
+import random
 import time
 from pathlib import Path
 from typing import Generator
@@ -163,6 +164,12 @@ class DesignGenerator:
             'core.max_items',
             self.config.get('generation.max_items', 50),
         )
+        self.coverage_config = self.config.get('design_questions.coverage', {}) or {}
+        self.negative_ratio = self.coverage_config.get('negative_ratio')
+        self.negative_types = self.coverage_config.get('negative_types', [])
+        if not isinstance(self.negative_types, list):
+            self.negative_types = []
+        self.negative_rng = random.Random(self.config.get('core.seed', 42))
         
         # 输出路径
         self.output_dir = Path(self.config.get('output.intermediate_dir', 'data/intermediate'))
@@ -251,7 +258,8 @@ class DesignGenerator:
             )
             
             try:
-                sample = self._generate_single(question, symbols, repo_commit)
+                negative_type = self._sample_negative_type()
+                sample = self._generate_single(question, symbols, repo_commit, negative_type)
                 if sample:
                     samples.append(sample)
                     self.stats['generated_samples'] += 1
@@ -304,10 +312,11 @@ class DesignGenerator:
         logger.info(f"Saved {len(design_questions)} design questions to {self.design_questions_path}")
     
     def _generate_single(
-        self,
+        self, 
         design_question: DesignQuestion,
         symbols: list[CodeSymbol],
-        repo_commit: str
+        repo_commit: str,
+        negative_type: str | None = None
     ) -> TrainingSample | None:
         """为单个设计问题生成设计方案"""
         # 1. RAG：检索相关上下文
@@ -326,6 +335,7 @@ class DesignGenerator:
         # 3. 构造 prompts
         system_prompt = self._build_system_prompt()
         user_prompt = self._build_user_prompt(design_question, context, relevant_symbols, repo_commit)
+        user_prompt = self._inject_negative_rules(user_prompt, negative_type)
         
         # 4. 调用 LLM（最小结构输出：answer + thought）
         raw_output = ""
@@ -382,6 +392,7 @@ class DesignGenerator:
             return None
 
         # 5. 构造 TrainingSample（其余字段由系统填充）
+        quality = self._build_quality(negative_type, design_question.id, len(relevant_symbols))
         sample = TrainingSample(
             scenario="arch_design",
             instruction=design_question.goal,
@@ -389,6 +400,7 @@ class DesignGenerator:
             thought=reasoning_trace,
             answer=answer_value,
             repo_commit=repo_commit,
+            quality=quality,
         )
         
         # 6. 校验样本
@@ -408,13 +420,6 @@ class DesignGenerator:
             return None
         
         # 7. 添加质量标记
-        sample.quality = {
-            "schema_ok": True,
-            "evidence_ok": True,
-            "design_question_id": design_question.id,
-            "context_symbols": len(relevant_symbols)
-        }
-
         return sample
     
     def _retrieve_context(
@@ -718,6 +723,71 @@ Service 核心逻辑：
         )
         
         return prompt
+
+    def _sample_negative_type(self) -> str | None:
+        if not self.negative_types:
+            return None
+        if not isinstance(self.negative_ratio, (int, float)):
+            return None
+        if self.negative_ratio <= 0:
+            return None
+        if self.negative_rng.random() >= float(self.negative_ratio):
+            return None
+        return self.negative_rng.choice(self.negative_types)
+
+    def _inject_negative_rules(self, prompt: str, negative_type: str | None) -> str:
+        rules = self._build_negative_rules(negative_type)
+        if not rules:
+            return prompt
+        marker = "# 输出要求"
+        if marker in prompt:
+            return prompt.replace(marker, f"{rules}\n\n{marker}", 1)
+        return f"{prompt}\n\n{rules}"
+
+    def _build_negative_rules(self, negative_type: str | None) -> str:
+        if not negative_type:
+            return ""
+        rules_map = {
+            "insufficient_evidence": [
+                "说明证据不足，无法给出完整设计方案。",
+                "列出需要补充的关键信息或代码位置。",
+                "不得编造不存在的组件或配置。",
+            ],
+            "wrong_premise": [
+                "指出问题前提不成立，并给出正确前提。",
+                "基于证据解释前提错误的原因。",
+            ],
+            "conflict_spec": [
+                "指出代码实现与需求描述存在冲突。",
+                "以代码证据为准，并说明潜在风险。",
+            ],
+            "ambiguous_question": [
+                "指出问题过于模糊或范围过大。",
+                "给出需要澄清的关键点清单。",
+            ],
+        }
+        rules = rules_map.get(negative_type, [])
+        if not rules:
+            return ""
+        lines = "\n".join(f"- {rule}" for rule in rules)
+        return (
+            "## 负向样本要求\n"
+            f"类型: {negative_type}\n"
+            "请按以下规则回答：\n"
+            f"{lines}"
+        )
+
+    def _build_quality(self, negative_type: str | None, design_question_id: str, context_symbols: int) -> dict:
+        coverage = {"polarity": "positive"}
+        if negative_type:
+            coverage = {"polarity": "negative", "negative_type": negative_type}
+        return {
+            "schema_ok": True,
+            "evidence_ok": True,
+            "design_question_id": design_question_id,
+            "context_symbols": context_symbols,
+            "coverage": coverage,
+        }
 
     def _clean_json_output(self, output: str) -> str:
         """清理 LLM 输出，提取纯 JSON"""

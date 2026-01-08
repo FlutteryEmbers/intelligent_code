@@ -4,6 +4,7 @@
 基于问题和检索的上下文生成最终的 TrainingSample。
 """
 import json
+import random
 from pathlib import Path
 from typing import List
 
@@ -52,6 +53,12 @@ class AnswerGenerator:
         )
         self.batch_size = self.config.get('question_answer.batch_size', None)
         self.embedding_model = self.config.get('question_answer.embedding_model', 'nomic-embed-text')
+        self.coverage_config = self.config.get('question_answer.coverage', {}) or {}
+        self.negative_ratio = self.coverage_config.get('negative_ratio')
+        self.negative_types = self.coverage_config.get('negative_types', [])
+        if not isinstance(self.negative_types, list):
+            self.negative_types = []
+        self.negative_rng = random.Random(self.config.get('core.seed', 42))
         
         # 加载 prompt 模板
         template_path = self.config.get(
@@ -150,7 +157,8 @@ class AnswerGenerator:
                     logger.info(f"Generating answer for {i}/{len(questions)}: {question.question[:60]}...")
                     
                     try:
-                        sample = self._generate_answer(question, symbols_map)
+                        negative_type = self._sample_negative_type()
+                        sample = self._generate_answer(question, symbols_map, negative_type)
                         
                         # 写入成功的样本
                         f_out.write(sample.model_dump_json() + '\n')
@@ -183,7 +191,8 @@ class AnswerGenerator:
     def _generate_answer(
         self,
         question: QuestionSample,
-        symbols_map: dict[str, CodeSymbol]
+        symbols_map: dict[str, CodeSymbol],
+        negative_type: str | None = None
     ) -> TrainingSample:
         """为单个问题生成答案"""
         # 1. 构造上下文（优先使用问题自带的 evidence_refs）
@@ -282,6 +291,7 @@ class AnswerGenerator:
             format_constraints=format_constraints,
             common_mistakes_examples=mistakes_text
         )
+        prompt = self._inject_negative_rules(prompt, negative_type)
         
         # 7. 调用 LLM
         language_display = self.language.capitalize()
@@ -372,6 +382,7 @@ class AnswerGenerator:
             reasoning_trace = ReasoningTrace(**thought_dict)
 
             # 创建 TrainingSample（其余字段由系统填充）
+            quality = self._build_quality(negative_type)
             sample = TrainingSample(
                 scenario="qa_rule",
                 instruction=question.question,
@@ -379,6 +390,7 @@ class AnswerGenerator:
                 thought=reasoning_trace,
                 answer=answer_value,
                 repo_commit=question.repo_commit,
+                quality=quality,
             )
             
             return sample
@@ -406,6 +418,69 @@ class AnswerGenerator:
             parts.append("")
         
         return "\n".join(parts)
+
+    def _sample_negative_type(self) -> str | None:
+        if not self.negative_types:
+            return None
+        if not isinstance(self.negative_ratio, (int, float)):
+            return None
+        if self.negative_ratio <= 0:
+            return None
+        if self.negative_rng.random() >= float(self.negative_ratio):
+            return None
+        return self.negative_rng.choice(self.negative_types)
+
+    def _inject_negative_rules(self, prompt: str, negative_type: str | None) -> str:
+        rules = self._build_negative_rules(negative_type)
+        if not rules:
+            return prompt
+        marker = "## 输出要求"
+        if marker in prompt:
+            return prompt.replace(marker, f"{rules}\n\n{marker}", 1)
+        return f"{prompt}\n\n{rules}"
+
+    def _build_negative_rules(self, negative_type: str | None) -> str:
+        if not negative_type:
+            return ""
+        rules_map = {
+            "insufficient_evidence": [
+                "明确说明证据不足、无法给出完整结论。",
+                "指出需要补充的具体上下文或代码位置。",
+                "不要编造未出现的实现细节。",
+            ],
+            "wrong_premise": [
+                "先指出问题前提不成立，再给出正确前提。",
+                "基于证据解释为何前提错误。",
+            ],
+            "conflict_spec": [
+                "指出代码实现与描述存在冲突。",
+                "以代码证据为准并说明风险。",
+            ],
+            "ambiguous_question": [
+                "说明问题过于模糊或范围过大。",
+                "提出需要澄清的关键点。",
+            ],
+        }
+        rules = rules_map.get(negative_type, [])
+        if not rules:
+            return ""
+        lines = "\n".join(f"- {rule}" for rule in rules)
+        return (
+            "## 负向样本要求\n"
+            f"类型: {negative_type}\n"
+            "请按以下规则回答：\n"
+            f"{lines}"
+        )
+
+    def _build_quality(self, negative_type: str | None) -> dict:
+        if not negative_type:
+            return {"coverage": {"polarity": "positive"}}
+        return {
+            "coverage": {
+                "polarity": "negative",
+                "negative_type": negative_type,
+            }
+        }
     
     def _clean_json_output(self, output: str) -> str:
         """清理 LLM 输出，提取纯 JSON"""

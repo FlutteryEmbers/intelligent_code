@@ -100,8 +100,23 @@ def validate_sample_obj(
         evidence_refs = trace.evidence_refs or []
 
     if not evidence_refs:
-        errors.append(_quality_issue("EVIDENCE_MISSING", "Missing thought.evidence_refs"))
-        _set_check(checks, "evidence", "fail")
+        allow_negative_no_evidence = bool(quality_cfg.get("allow_negative_without_evidence", False))
+        is_negative = (
+            sample.quality.get("coverage", {}).get("polarity") == "negative"
+            if isinstance(sample.quality, dict)
+            else False
+        )
+        if allow_negative_no_evidence and is_negative:
+            warnings.append(
+                _quality_issue(
+                    "EVIDENCE_MISSING_NEGATIVE",
+                    "Missing thought.evidence_refs for negative sample",
+                )
+            )
+            _set_check(checks, "evidence", "warn")
+        else:
+            errors.append(_quality_issue("EVIDENCE_MISSING", "Missing thought.evidence_refs"))
+            _set_check(checks, "evidence", "fail")
     else:
         for idx, ref in enumerate(evidence_refs):
             ref_id = f"evidence_refs[{idx}]"

@@ -40,6 +40,8 @@ question_answer:
   coverage:
     mode: "hybrid"                 # upstream | downstream | hybrid
     constraint_strength: "strong"  # strong | weak | hybrid
+    negative_ratio: 0.1
+    negative_types: ["insufficient_evidence", "wrong_premise", "conflict_spec"]
     targets: {high: 0.8, mid: 0.15, hard: 0.05}
     intent_targets:
       how_to: 0.2
@@ -73,6 +75,8 @@ design_questions:
   coverage:
     mode: "hybrid"
     constraint_strength: "strong"
+    negative_ratio: 0.05
+    negative_types: ["conflict_spec", "ambiguous_question"]
     targets: {high: 0.8, mid: 0.15, hard: 0.05}
     labeler: "rule"
     # templates_path: "configs/user_inputs/design_templates.yaml"
@@ -101,6 +105,7 @@ quality:
   gate_mode: "gate"
   write_clean: true
   allow_fallback_in_report: true
+  allow_negative_without_evidence: false
   fail_on_warnings: false
   trace_rules:
     mode: "warning"               # warning | reject

@@ -58,16 +58,19 @@ def _compute_distributions(samples: list[dict]) -> dict:
     bucket_counts: dict[str, int] = defaultdict(int)
     intent_counts: dict[str, int] = defaultdict(int)
     module_counts: dict[str, int] = defaultdict(int)
+    polarity_counts: dict[str, int] = defaultdict(int)
 
     for sample in samples:
         coverage = sample.get("quality", {}).get("coverage", {})
         bucket = coverage.get("bucket") or "high"
         intent = coverage.get("intent") or "unknown"
         module_span = coverage.get("module_span") or "unknown"
+        polarity = coverage.get("polarity") or "positive"
 
         bucket_counts[bucket] += 1
         intent_counts[intent] += 1
         module_counts[module_span] += 1
+        polarity_counts[polarity] += 1
 
     def ratios(counts: dict[str, int]) -> dict[str, float]:
         if total == 0:
@@ -87,6 +90,10 @@ def _compute_distributions(samples: list[dict]) -> dict:
             "counts": dict(module_counts),
             "ratios": ratios(module_counts),
         },
+        "polarity_distribution": {
+            "counts": dict(polarity_counts),
+            "ratios": ratios(polarity_counts),
+        },
     }
 
 
@@ -96,6 +103,7 @@ def _sample_by_targets(
     seed: int,
     logger=None,
     scope: str | None = None,
+    negative_ratio: float | None = None,
 ) -> tuple[list[dict], dict]:
     rng = random.Random(seed)
     total = len(samples)
@@ -122,10 +130,38 @@ def _sample_by_targets(
 
     selected: dict[str, list[dict]] = {}
     remaining: dict[str, list[dict]] = {}
+    polarity_deficits: dict[str, int] = {}
     for bucket in BUCKETS:
-        picks, rest = _pick_samples(rng, grouped.get(bucket, []).copy(), desired[bucket])
+        bucket_samples = grouped.get(bucket, []).copy()
+        if negative_ratio is None:
+            picks, rest = _pick_samples(rng, bucket_samples, desired[bucket])
+            selected[bucket] = picks
+            remaining[bucket] = rest
+            continue
+
+        negatives = [
+            sample for sample in bucket_samples
+            if sample.get("quality", {}).get("coverage", {}).get("polarity") == "negative"
+        ]
+        positives = [sample for sample in bucket_samples if sample not in negatives]
+        desired_neg = int(round(desired[bucket] * float(negative_ratio)))
+        desired_pos = max(0, desired[bucket] - desired_neg)
+
+        neg_picks, neg_rest = _pick_samples(rng, negatives, desired_neg)
+        pos_picks, pos_rest = _pick_samples(rng, positives, desired_pos)
+
+        picks = neg_picks + pos_picks
+        rest_pool = neg_rest + pos_rest
+
+        remaining_needed = max(0, desired[bucket] - len(picks))
+        if remaining_needed:
+            extra_picks, extra_rest = _pick_samples(rng, rest_pool, remaining_needed)
+            picks.extend(extra_picks)
+            rest_pool = extra_rest
+
         selected[bucket] = picks
-        remaining[bucket] = rest
+        remaining[bucket] = rest_pool
+        polarity_deficits[bucket] = max(0, desired_neg - len(neg_picks))
 
     borrowed = defaultdict(lambda: defaultdict(int))
     deficits = {
@@ -165,6 +201,8 @@ def _sample_by_targets(
         "final_counts": final_counts,
         "deficits": deficits,
         "borrowed": {k: dict(v) for k, v in borrowed.items()},
+        "negative_ratio": negative_ratio,
+        "negative_deficits": polarity_deficits,
     }
     report.update(_compute_distributions(final_samples))
     return final_samples, report
@@ -188,6 +226,7 @@ class CoverageSamplerStep(BaseStep):
         seed: int,
         mode: str,
         min_sample_size: int,
+        negative_ratio: float | None,
     ) -> tuple[list[dict], dict]:
         if not path.exists():
             self.logger.info("Coverage sampling skipped, file not found: %s", path)
@@ -227,7 +266,14 @@ class CoverageSamplerStep(BaseStep):
             report.update(_compute_distributions(samples))
             return samples, report
 
-        sampled, report = _sample_by_targets(samples, targets, seed, self.logger, path.name)
+        sampled, report = _sample_by_targets(
+            samples,
+            targets,
+            seed,
+            self.logger,
+            path.name,
+            negative_ratio=negative_ratio,
+        )
         report["path"] = str(path)
         return sampled, report
 
@@ -266,6 +312,8 @@ class CoverageSamplerStep(BaseStep):
         design_targets = design_cov.get("targets", {})
         qa_min_samples = int(qa_cov.get("min_sample_size", 30))
         design_min_samples = int(design_cov.get("min_sample_size", 30))
+        qa_negative_ratio = qa_cov.get("negative_ratio")
+        design_negative_ratio = design_cov.get("negative_ratio")
 
         qa_samples, qa_report = self._sample_file(
             qa_clean_path,
@@ -273,6 +321,7 @@ class CoverageSamplerStep(BaseStep):
             seed,
             qa_mode,
             qa_min_samples,
+            qa_negative_ratio,
         )
         if qa_samples and qa_mode != "upstream":
             write_jsonl(qa_clean_path, qa_samples)
@@ -283,6 +332,7 @@ class CoverageSamplerStep(BaseStep):
             seed,
             design_mode,
             design_min_samples,
+            design_negative_ratio,
         )
         if design_samples and design_mode != "upstream":
             write_jsonl(design_clean_path, design_samples)
