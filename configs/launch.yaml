@@ -22,13 +22,13 @@ core:
 
 method_understanding:
   enabled: true
-  max_methods: 5
+  max_methods: 10
   prompts:
     generation: "configs/prompts/method_understanding/auto_method_understanding.txt"
 
 question_answer:
   questions_per_method: 3
-  max_questions: 20
+  max_questions: 25
   batch_size: 5
   embedding_model: "nomic-embed-text"
   user_questions_path: "configs/user_inputs/user_questions.yaml"
@@ -37,6 +37,10 @@ question_answer:
     question_generation: "configs/prompts/question_answer/auto_question_generation.txt"
     coverage_generation: "configs/prompts/question_answer/coverage_question_generation.txt"
     answer_generation: "configs/prompts/question_answer/auto_answer_generation.txt"
+  retrieval:
+    mode: "hybrid"       # hybrid | vector_only | symbol_only
+    min_score: 0.2
+    fallback_top_k: 6
   coverage:
     mode: "hybrid"                 # upstream | downstream | hybrid
     constraint_strength: "strong"  # strong | weak | hybrid
@@ -65,13 +69,16 @@ design_questions:
   profiles_max_chars: 6000
   require_layer_coverage: true
   batch_size: 5
-  max_questions: 20
+  max_questions: 30
   user_questions_path: "configs/user_inputs/design_questions.yaml"
   prompts:
     question_generation: "configs/prompts/design/auto_design_question_generation.txt"
     coverage_generation: "configs/prompts/design/coverage_design_question_generation.txt"
     system_prompt: "configs/prompts/design/design_system_prompt.txt"
     user_prompt: "configs/prompts/design/design_user_prompt.txt"
+  retrieval:
+    mode: "hybrid"       # hybrid | symbol_only
+    fallback_top_k: 8
   coverage:
     mode: "hybrid"
     constraint_strength: "strong"

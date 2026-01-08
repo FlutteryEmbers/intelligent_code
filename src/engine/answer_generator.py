@@ -13,7 +13,7 @@ from src.utils.config import Config
 from src.utils.logger import get_logger
 from src.utils.validator import normalize_path_separators
 from src.utils.language_profile import load_language_profile
-from src.utils import vector_index
+from src.utils import vector_index, write_json
 from src.engine.llm_client import LLMClient
 
 logger = get_logger(__name__)
@@ -59,6 +59,26 @@ class AnswerGenerator:
         if not isinstance(self.negative_types, list):
             self.negative_types = []
         self.negative_rng = random.Random(self.config.get('core.seed', 42))
+        self.retrieval_config = self.config.get('question_answer.retrieval', {}) or {}
+        self.retrieval_mode = self.retrieval_config.get('mode', 'hybrid')
+        self.retrieval_min_score = float(self.retrieval_config.get('min_score', 0.0))
+        self.retrieval_fallback_top_k = int(
+            self.retrieval_config.get('fallback_top_k', self.top_k_context)
+        )
+        self.retrieval_stats = {
+            "mode": self.retrieval_mode,
+            "min_score": self.retrieval_min_score,
+            "fallback_top_k": self.retrieval_fallback_top_k,
+            "total_questions": 0,
+            "symbol_evidence_used": 0,
+            "vector_used": 0,
+            "vector_filtered": 0,
+            "vector_fallback_used": 0,
+            "vector_empty": 0,
+            "symbol_only_failures": 0,
+            "negative_samples": 0,
+            "positive_samples": 0,
+        }
         
         # 加载 prompt 模板
         template_path = self.config.get(
@@ -125,6 +145,7 @@ class AnswerGenerator:
         
         logger.info(f"Loaded {len(questions)} questions")
         self.stats['total_questions'] = len(questions)
+        self.retrieval_stats["total_questions"] = len(questions)
         self.embeddings_available = self.embeddings_jsonl.exists()
         if not self.embeddings_available:
             logger.warning(
@@ -158,6 +179,10 @@ class AnswerGenerator:
                     
                     try:
                         negative_type = self._sample_negative_type()
+                        if negative_type:
+                            self.retrieval_stats["negative_samples"] += 1
+                        else:
+                            self.retrieval_stats["positive_samples"] += 1
                         sample = self._generate_answer(question, symbols_map, negative_type)
                         
                         # 写入成功的样本
@@ -186,6 +211,7 @@ class AnswerGenerator:
                         self.stats['failed'] += 1
         
         logger.info(f"Answer generation completed: {self.stats['success']} success, {self.stats['failed']} failed")
+        self._write_retrieval_report()
         return samples
     
     def _generate_answer(
@@ -200,7 +226,10 @@ class AnswerGenerator:
         available_evidence = []
         total_chars = 0
 
-        if question.evidence_refs:
+        use_symbol = self.retrieval_mode in ("symbol_only", "hybrid")
+        use_vector = self.retrieval_mode in ("vector_only", "hybrid")
+
+        if use_symbol and question.evidence_refs and self.retrieval_mode != "vector_only":
             for ref in question.evidence_refs:
                 # 标准化路径以支持跨平台
                 normalized_symbol_id = normalize_path_separators(ref.symbol_id)
@@ -224,9 +253,11 @@ class AnswerGenerator:
                     'end_line': symbol.end_line,
                     'source_hash': symbol.source_hash
                 })
+            if context_parts:
+                self.retrieval_stats["symbol_evidence_used"] += 1
 
         # 2. 如果缺少 evidence_refs 或未找到上下文，回退到向量检索
-        if not context_parts:
+        if not context_parts and use_vector:
             if not self.embeddings_available:
                 raise ValueError(
                     "Embeddings not found for vector search. Provide evidence_refs in user_questions.yaml, "
@@ -236,13 +267,30 @@ class AnswerGenerator:
                 query_text=question.question,
                 embeddings_jsonl=self.embeddings_jsonl,
                 embedding_model=self.embedding_model,
-                top_k=self.top_k_context
+                top_k=self.retrieval_fallback_top_k
             )
 
             if not search_results:
+                self.retrieval_stats["vector_empty"] += 1
                 raise ValueError("No relevant methods found in vector search")
 
-            for symbol_id, score in search_results:
+            filtered_results = search_results
+            if self.retrieval_min_score > 0:
+                filtered_results = [
+                    (symbol_id, score)
+                    for symbol_id, score in search_results
+                    if score >= self.retrieval_min_score
+                ]
+                if len(filtered_results) != len(search_results):
+                    self.retrieval_stats["vector_filtered"] += 1
+                if not filtered_results and self.retrieval_mode == "hybrid":
+                    filtered_results = search_results[: self.retrieval_fallback_top_k]
+                    if filtered_results:
+                        self.retrieval_stats["vector_fallback_used"] += 1
+
+            if filtered_results:
+                self.retrieval_stats["vector_used"] += 1
+            for symbol_id, score in filtered_results:
                 # 标准化路径以支持跨平台
                 normalized_symbol_id = normalize_path_separators(symbol_id)
                 symbol = symbols_map.get(normalized_symbol_id)
@@ -269,6 +317,10 @@ class AnswerGenerator:
                     'source_hash': symbol.source_hash
                 })
         
+        if not context_parts and self.retrieval_mode == "symbol_only":
+            self.retrieval_stats["symbol_only_failures"] += 1
+            raise ValueError("Symbol-only retrieval requires evidence_refs on questions")
+
         context = "\n".join(context_parts)
         
         # 3. 格式化可用证据引用
@@ -418,6 +470,12 @@ class AnswerGenerator:
             parts.append("")
         
         return "\n".join(parts)
+
+    def _write_retrieval_report(self) -> None:
+        reports_dir = Path(self.config.get('output.reports_dir', 'data/reports'))
+        reports_dir.mkdir(parents=True, exist_ok=True)
+        report_path = reports_dir / "qa_retrieval_report.json"
+        write_json(report_path, self.retrieval_stats)
 
     def _sample_negative_type(self) -> str | None:
         if not self.negative_types:

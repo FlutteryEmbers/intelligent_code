@@ -13,6 +13,7 @@ from collections import Counter
 import yaml
 
 from src.utils.schemas import CodeSymbol, TrainingSample, ReasoningTrace, EvidenceRef, sha256_text
+from src.utils import write_json
 from src.utils.validator import normalize_path_separators
 from src.utils.config import Config
 from src.utils.logger import get_logger
@@ -170,6 +171,21 @@ class DesignGenerator:
         if not isinstance(self.negative_types, list):
             self.negative_types = []
         self.negative_rng = random.Random(self.config.get('core.seed', 42))
+        self.retrieval_config = self.config.get('design_questions.retrieval', {}) or {}
+        self.retrieval_mode = self.retrieval_config.get('mode', 'hybrid')
+        self.retrieval_fallback_top_k = int(
+            self.retrieval_config.get('fallback_top_k', self.top_k_context)
+        )
+        self.retrieval_stats = {
+            "mode": self.retrieval_mode,
+            "fallback_top_k": self.retrieval_fallback_top_k,
+            "total_questions": 0,
+            "candidates_empty": 0,
+            "scored_non_empty": 0,
+            "fallback_used": 0,
+            "negative_samples": 0,
+            "positive_samples": 0,
+        }
         
         # 输出路径
         self.output_dir = Path(self.config.get('output.intermediate_dir', 'data/intermediate'))
@@ -234,6 +250,7 @@ class DesignGenerator:
             design_questions = load_design_questions_config()
         
         self.stats['total_design_questions'] = len(design_questions)
+        self.retrieval_stats["total_questions"] = len(design_questions)
         
         # 保存设计问题到文件
         self._save_design_questions(design_questions)
@@ -259,6 +276,10 @@ class DesignGenerator:
             
             try:
                 negative_type = self._sample_negative_type()
+                if negative_type:
+                    self.retrieval_stats["negative_samples"] += 1
+                else:
+                    self.retrieval_stats["positive_samples"] += 1
                 sample = self._generate_single(question, symbols, repo_commit, negative_type)
                 if sample:
                     samples.append(sample)
@@ -277,6 +298,7 @@ class DesignGenerator:
         logger.info(f"  - Generated samples: {self.stats['generated_samples']}")
         logger.info(f"  - Rejected samples: {self.stats['rejected_samples']}")
         
+        self._write_retrieval_report()
         return samples
     
     def _load_symbols(self, symbols_path: Path | str) -> list[CodeSymbol]:
@@ -438,6 +460,7 @@ class DesignGenerator:
         
         if not candidates:
             logger.warning("No candidates after filtering")
+            self.retrieval_stats["candidates_empty"] += 1
             return []
         
         logger.debug(f"Filtered to {len(candidates)} candidates")
@@ -448,16 +471,24 @@ class DesignGenerator:
         # 提取设计问题关键词
         req_keywords = self._extract_keywords(design_question.goal)
         
-        for symbol in candidates:
-            score = self._calculate_relevance_score(symbol, req_keywords)
-            if score > 0:
-                scored_candidates.append((symbol, score))
+        if self.retrieval_mode != "symbol_only":
+            for symbol in candidates:
+                score = self._calculate_relevance_score(symbol, req_keywords)
+                if score > 0:
+                    scored_candidates.append((symbol, score))
         
         # 按分数排序
         scored_candidates.sort(key=lambda x: x[1], reverse=True)
-        
-        # 返回 top_k
-        top_symbols = [s for s, _ in scored_candidates[:self.top_k_context]]
+
+        if scored_candidates:
+            self.retrieval_stats["scored_non_empty"] += 1
+            top_symbols = [s for s, _ in scored_candidates[:self.top_k_context]]
+        else:
+            if self.retrieval_mode == "symbol_only" or self.retrieval_mode == "hybrid":
+                self.retrieval_stats["fallback_used"] += 1
+                top_symbols = candidates[: self.retrieval_fallback_top_k]
+            else:
+                top_symbols = []
         
         # 确保包含不同层级
         top_symbols = self._balance_layers(top_symbols, candidates)
@@ -788,6 +819,12 @@ Service 核心逻辑：
             "context_symbols": context_symbols,
             "coverage": coverage,
         }
+
+    def _write_retrieval_report(self) -> None:
+        reports_dir = Path(self.config.get('output.reports_dir', 'data/reports'))
+        reports_dir.mkdir(parents=True, exist_ok=True)
+        report_path = reports_dir / "design_retrieval_report.json"
+        write_json(report_path, self.retrieval_stats)
 
     def _clean_json_output(self, output: str) -> str:
         """清理 LLM 输出，提取纯 JSON"""

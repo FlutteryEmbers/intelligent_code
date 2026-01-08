@@ -261,6 +261,42 @@ def _plot_parsing(report: dict, output_dir: Path) -> None:
         )
 
 
+def _plot_retrieval(report: dict, scope: str, output_dir: Path) -> None:
+    if not report:
+        return
+    labels = []
+    values = []
+    if scope == "qa":
+        mapping = [
+            ("symbol_evidence_used", _label("证据命中", "Symbol Evidence")),
+            ("vector_used", _label("向量检索", "Vector Search")),
+            ("vector_filtered", _label("阈值过滤", "Filtered by Score")),
+            ("vector_fallback_used", _label("回退使用", "Fallback Used")),
+            ("vector_empty", _label("向量空召回", "Vector Empty")),
+            ("symbol_only_failures", _label("仅证据失败", "Symbol-only Failures")),
+        ]
+    else:
+        mapping = [
+            ("scored_non_empty", _label("关键词命中", "Keyword Hit")),
+            ("fallback_used", _label("候选回退", "Fallback Used")),
+            ("candidates_empty", _label("候选为空", "No Candidates")),
+        ]
+
+    for key, label in mapping:
+        if key in report:
+            labels.append(label)
+            values.append(report.get(key, 0))
+
+    if labels:
+        _plot_bar(
+            _label(f"{scope.upper()} 检索统计", f"{scope.upper()} Retrieval Stats"),
+            labels,
+            values,
+            output_dir / f"{scope}_retrieval_stats.png",
+            _label("数量", "Count"),
+        )
+
+
 def _resolve_path(base: Path, value: str) -> Path:
     path = Path(value)
     return path if path.is_absolute() else base / path
@@ -389,6 +425,14 @@ def main() -> int:
     parsing_report = _read_json(_resolve_path(REPO_ROOT, parsing_path))
     if parsing_report:
         _plot_parsing(parsing_report, output_dir)
+
+    qa_retrieval = _read_json(reports_path / "qa_retrieval_report.json")
+    if qa_retrieval:
+        _plot_retrieval(qa_retrieval, "qa", output_dir)
+
+    design_retrieval = _read_json(reports_path / "design_retrieval_report.json")
+    if design_retrieval:
+        _plot_retrieval(design_retrieval, "design", output_dir)
 
     print(f"Rendered reports to {output_dir}")
     return 0
