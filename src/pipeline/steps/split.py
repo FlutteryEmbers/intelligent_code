@@ -101,20 +101,38 @@ class SplitStep(BaseStep):
         write_jsonl(self.paths["design_train_jsonl"], design_train)
         write_jsonl(self.paths["design_val_jsonl"], design_val)
         write_jsonl(self.paths["design_test_jsonl"], design_test)
+
+        qa_train_combined = [s for s in train_samples if s.get("scenario") == "qa_rule"]
+        qa_val_combined = [s for s in val_samples if s.get("scenario") == "qa_rule"]
+        qa_test_combined = [s for s in test_samples if s.get("scenario") == "qa_rule"]
+        design_train_combined = [s for s in train_samples if s.get("scenario") == "arch_design"]
+        design_val_combined = [s for s in val_samples if s.get("scenario") == "arch_design"]
+        design_test_combined = [s for s in test_samples if s.get("scenario") == "arch_design"]
         
         return {
             "status": "success",
             "train_count": len(train_samples),
             "val_count": len(val_samples),
             "test_count": len(test_samples),
+            "split_mode": "independent",
             "qa": {
                 "train_count": len(qa_train),
                 "val_count": len(qa_val),
                 "test_count": len(qa_test)
             },
+            "qa_from_combined": {
+                "train_count": len(qa_train_combined),
+                "val_count": len(qa_val_combined),
+                "test_count": len(qa_test_combined)
+            },
             "design": {
                 "train_count": len(design_train),
                 "val_count": len(design_val),
                 "test_count": len(design_test)
+            },
+            "design_from_combined": {
+                "train_count": len(design_train_combined),
+                "val_count": len(design_val_combined),
+                "test_count": len(design_test_combined)
             }
         }

@@ -6,8 +6,24 @@ You are a software architecture expert. Based on the code context and evidence p
 
 - bucket: {coverage_bucket}
 - intent: {coverage_intent}
+- question_type: {question_type}
 
 The design questions must align with the bucket/intent constraints.
+
+## Scenario Injection (optional)
+
+{scenario_constraints}
+If "None", ignore this section.
+
+## Question Type (must align with question_type)
+
+- architecture
+- integration
+- consistency
+- error_handling
+- performance
+- security
+- maintenance
 
 ## Output Format (JSON ONLY)
 Return a JSON object with a single key "design_questions". Each design question must include:

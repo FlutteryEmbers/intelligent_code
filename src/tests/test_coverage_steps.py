@@ -61,8 +61,14 @@ def test_coverage_tagger_infers_labels(tmp_path: Path) -> None:
     write_jsonl(design_path, [design_sample])
 
     config = {
-        "question_answer.coverage": {"labeler": "rule"},
-        "design_questions.coverage": {"labeler": "rule"},
+        "question_answer.coverage": {
+            "labeler": "rule",
+            "evidence_refs": {"mode": "assist", "mid_min": 2, "hard_min": 3},
+        },
+        "design_questions.coverage": {
+            "labeler": "rule",
+            "evidence_refs": {"mode": "assist", "mid_min": 2, "hard_min": 3},
+        },
         "artifacts": {
             "qa_clean_jsonl": str(qa_path),
             "design_clean_jsonl": str(design_path),
@@ -84,6 +90,79 @@ def test_coverage_tagger_infers_labels(tmp_path: Path) -> None:
     assert design_out["intent"] == "compatibility"
     assert design_out["bucket"] == "hard"
 
+
+def test_coverage_tagger_uses_evidence_refs_assist(tmp_path: Path) -> None:
+    qa_path = tmp_path / "qa_clean.jsonl"
+
+    qa_sample = {
+        "scenario": "qa_rule",
+        "instruction": "如何使用这个功能",
+        "context": "context",
+        "thought": {
+            "observations": [],
+            "inferences": [],
+            "assumptions": [],
+            "evidence_refs": [
+                {"file_path": "module_a/Foo.java"},
+                {"file_path": "module_a/Bar.java"},
+            ],
+        },
+        "answer": "answer",
+        "repo_commit": "UNKNOWN_COMMIT",
+    }
+    write_jsonl(qa_path, [qa_sample])
+
+    config = {
+        "question_answer.coverage": {
+            "labeler": "rule",
+            "evidence_refs": {"mode": "assist", "mid_min": 2, "hard_min": 3},
+        },
+        "design_questions.coverage": {"labeler": "rule"},
+        "artifacts": {"qa_clean_jsonl": str(qa_path)},
+    }
+    paths = {"qa_clean_jsonl": qa_path}
+    step = CoverageTaggerStep(config, _Args(), paths, repo_commit="UNKNOWN_COMMIT")
+    step.execute()
+
+    coverage = read_jsonl(qa_path)[0]["quality"]["coverage"]
+    assert coverage["module_span"] == "single"
+    assert coverage["bucket"] == "mid"
+
+
+def test_coverage_tagger_evidence_refs_assist_no_downgrade(tmp_path: Path) -> None:
+    qa_path = tmp_path / "qa_clean.jsonl"
+
+    qa_sample = {
+        "scenario": "qa_rule",
+        "instruction": "兼容性策略说明",
+        "context": "context",
+        "thought": {
+            "observations": [],
+            "inferences": [],
+            "assumptions": [],
+            "evidence_refs": [
+                {"file_path": "module_a/Foo.java"},
+            ],
+        },
+        "answer": "answer",
+        "repo_commit": "UNKNOWN_COMMIT",
+    }
+    write_jsonl(qa_path, [qa_sample])
+
+    config = {
+        "question_answer.coverage": {
+            "labeler": "rule",
+            "evidence_refs": {"mode": "assist", "mid_min": 2, "hard_min": 3},
+        },
+        "artifacts": {"qa_clean_jsonl": str(qa_path)},
+    }
+    paths = {"qa_clean_jsonl": qa_path}
+    step = CoverageTaggerStep(config, _Args(), paths, repo_commit="UNKNOWN_COMMIT")
+    step.execute()
+
+    coverage = read_jsonl(qa_path)[0]["quality"]["coverage"]
+    assert coverage["intent"] == "compatibility"
+    assert coverage["bucket"] == "hard"
 
 def test_coverage_sampler_applies_targets_and_writes_report(tmp_path: Path) -> None:
     qa_path = tmp_path / "qa_clean.jsonl"

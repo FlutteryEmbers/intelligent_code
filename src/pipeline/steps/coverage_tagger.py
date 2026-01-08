@@ -73,7 +73,44 @@ def _infer_bucket(intent: str, module_span: str, text: str) -> str:
     return "high"
 
 
-def _apply_coverage(sample: dict, default_source: str) -> dict:
+def _apply_evidence_bucket(
+    bucket: str,
+    evidence_count: int,
+    evidence_cfg: dict,
+) -> str:
+    mode = evidence_cfg.get("mode", "off")
+    if mode not in ("assist", "strict"):
+        return bucket
+
+    try:
+        mid_min = int(evidence_cfg.get("mid_min", 0))
+    except (TypeError, ValueError):
+        mid_min = 0
+    try:
+        hard_min = int(evidence_cfg.get("hard_min", 0))
+    except (TypeError, ValueError):
+        hard_min = 0
+
+    if mode == "strict":
+        if hard_min and evidence_count >= hard_min:
+            return "hard"
+        if mid_min and evidence_count >= mid_min:
+            return "mid"
+        return "high"
+
+    candidate = bucket
+    if hard_min and evidence_count >= hard_min:
+        candidate = "hard"
+    elif mid_min and evidence_count >= mid_min:
+        candidate = "mid"
+
+    rank = {"high": 0, "mid": 1, "hard": 2}
+    base_rank = rank.get(bucket, 0)
+    cand_rank = rank.get(candidate, base_rank)
+    return candidate if cand_rank > base_rank else bucket
+
+
+def _apply_coverage(sample: dict, default_source: str, evidence_cfg: dict) -> dict:
     quality = sample.get("quality") or {}
     coverage = quality.get("coverage") or {}
 
@@ -83,6 +120,7 @@ def _apply_coverage(sample: dict, default_source: str) -> dict:
         if isinstance(sample.get("thought"), dict)
         else []
     ) or []
+    evidence_count = len(evidence_refs) if isinstance(evidence_refs, list) else 0
 
     if "intent" not in coverage:
         text = f"{sample.get('instruction', '')} {sample.get('answer', '')}"
@@ -93,11 +131,12 @@ def _apply_coverage(sample: dict, default_source: str) -> dict:
 
     if "bucket" not in coverage:
         text = f"{sample.get('instruction', '')} {sample.get('answer', '')}"
-        coverage["bucket"] = _infer_bucket(
+        bucket = _infer_bucket(
             coverage.get("intent", "how_to"),
             coverage.get("module_span", "single"),
             text,
         )
+        coverage["bucket"] = _apply_evidence_bucket(bucket, evidence_count, evidence_cfg)
 
     coverage.setdefault("source", default_source)
     coverage.setdefault("scenario", scenario)
@@ -118,7 +157,7 @@ class CoverageTaggerStep(BaseStep):
     def display_name(self) -> str:
         return "Step 6: Coverage Tagging"
 
-    def _tag_file(self, path: Path, default_source: str) -> dict:
+    def _tag_file(self, path: Path, default_source: str, evidence_cfg: dict) -> dict:
         if not path.exists():
             self.logger.info("Coverage tagging skipped, file not found: %s", path)
             return {"path": str(path), "tagged": 0, "total": 0}
@@ -128,7 +167,7 @@ class CoverageTaggerStep(BaseStep):
             self.logger.info("Coverage tagging skipped, empty file: %s", path)
             return {"path": str(path), "tagged": 0, "total": 0}
 
-        tagged = [_apply_coverage(sample, default_source) for sample in samples]
+        tagged = [_apply_coverage(sample, default_source, evidence_cfg) for sample in samples]
         write_jsonl(path, tagged)
 
         counts = defaultdict(int)
@@ -163,14 +202,16 @@ class CoverageTaggerStep(BaseStep):
 
         qa_cov = self.config.get("question_answer.coverage", {}) or {}
         design_cov = self.config.get("design_questions.coverage", {}) or {}
+        qa_evidence_cfg = qa_cov.get("evidence_refs", {}) or {}
+        design_evidence_cfg = design_cov.get("evidence_refs", {}) or {}
 
         qa_result = (
-            self._tag_file(qa_clean_path, "auto")
+            self._tag_file(qa_clean_path, "auto", qa_evidence_cfg)
             if qa_cov.get("labeler", "rule") == "rule"
             else {"path": str(qa_clean_path), "tagged": 0, "total": 0, "skipped": True}
         )
         design_result = (
-            self._tag_file(design_clean_path, "auto")
+            self._tag_file(design_clean_path, "auto", design_evidence_cfg)
             if design_cov.get("labeler", "rule") == "rule"
             else {"path": str(design_clean_path), "tagged": 0, "total": 0, "skipped": True}
         )

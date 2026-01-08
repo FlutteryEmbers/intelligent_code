@@ -16,6 +16,7 @@ from src.utils.logger import get_logger
 from src.utils.validator import normalize_path_separators
 from src.utils.language_profile import load_language_profile
 from src.engine.llm_client import LLMClient
+from src.engine.auto_question_generator import load_scenario_templates
 
 logger = get_logger(__name__)
 
@@ -85,6 +86,15 @@ class DesignQuestionGenerator:
         self.coverage_mode = self.coverage_config.get('mode', 'hybrid')
         self.constraint_strength = self.coverage_config.get('constraint_strength', 'hybrid')
         self.coverage_rng = random.Random(self.seed)
+        self.diversity_config = self.coverage_config.get('diversity', {}) or {}
+        self.diversity_mode = self.diversity_config.get('mode', 'off')
+        self.question_type_targets = self.diversity_config.get('question_type_targets', {}) or {}
+        self.scenario_config = self.coverage_config.get('scenario_injection', {}) or {}
+        self.scenario_mode = self.scenario_config.get('mode', 'off')
+        self.fuzzy_ratio = float(self.scenario_config.get('fuzzy_ratio', 0) or 0)
+        self.scenario_templates = load_scenario_templates(
+            self.scenario_config.get('templates_path')
+        )
 
         # Method profiles 配置（可选增强）
         self.use_method_profiles = self.config.get('design_questions.use_method_profiles', False)
@@ -549,6 +559,20 @@ class DesignQuestionGenerator:
         )
         return bucket, intent
 
+    def _sample_question_type(self) -> str:
+        if self.diversity_mode != "quota":
+            return "architecture"
+        return self._weighted_choice(self.question_type_targets, "architecture")
+
+    def _build_scenario_constraints(self) -> str:
+        if self.scenario_mode != "ratio":
+            return ""
+        if not self.scenario_templates or self.fuzzy_ratio <= 0:
+            return ""
+        if self.coverage_rng.random() >= self.fuzzy_ratio:
+            return ""
+        return self.coverage_rng.choice(self.scenario_templates)
+
     def _resolve_constraint_strength(self, bucket: str) -> str:
         strength = self.constraint_strength
         if strength == "hybrid":
@@ -577,6 +601,8 @@ class DesignQuestionGenerator:
     def _build_prompt(self, context: str, evidence_pool: str, max_design_questions: int) -> str:
         language_name = self.language_profile.get('language', 'java')
         coverage_bucket, coverage_intent = self._sample_coverage_target()
+        question_type = self._sample_question_type()
+        scenario_constraints = self._build_scenario_constraints()
         constraint_strength, constraint_rules = self._build_constraint_rules(coverage_bucket)
         return self.prompt_template.format(
             language=language_name.capitalize(),
@@ -586,6 +612,8 @@ class DesignQuestionGenerator:
             evidence_pool=evidence_pool,
             coverage_bucket=coverage_bucket,
             coverage_intent=coverage_intent,
+            question_type=question_type,
+            scenario_constraints=scenario_constraints or "None",
             constraint_strength=constraint_strength,
             constraint_rules=constraint_rules,
         )

@@ -69,5 +69,6 @@ Controller 入口：
 1. ❌ 不要修改 symbol_id、start_line、end_line、source_hash - 必须逐字复制上面提供的值！
 2. ❌ 不要在 JSON 外添加任何文字或 Markdown 标记！
 3. ✅ answer 必须严格按照 6 个章节组织内容
+4. ✅ answer 的关键结论必须能在 observations/inferences 中找到支撑
 
 现在请输出完整的 JSON：

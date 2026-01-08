@@ -1,7 +1,7 @@
 """
 Step 6: Deduplication
 """
-from src.utils import dedup_jsonl_by_simhash
+from src.utils import dedup_jsonl_by_simhash, dedup_jsonl_by_semantic, read_json, write_json
 from src.pipeline.base_step import BaseStep
 
 
@@ -39,5 +39,23 @@ class DeduplicationStep(BaseStep):
             seed=generation_config.get("seed", 42),
             max_hamming=dedup_config.get("max_hamming", 3)
         )
+
+        semantic_cfg = dedup_config.get("semantic", {}) or {}
+        if semantic_cfg.get("enabled", False):
+            embedding_model = semantic_cfg.get("embedding_model")
+            if not embedding_model:
+                embedding_model = self.config.get("question_answer.embedding_model", "nomic-embed-text")
+            semantic_mapping = dedup_jsonl_by_semantic(
+                input_jsonl=self.paths["all_dedup_jsonl"],
+                output_jsonl=self.paths["all_dedup_jsonl"],
+                embedding_model=embedding_model,
+                threshold=float(semantic_cfg.get("threshold", 0.92)),
+                batch_size=int(semantic_cfg.get("batch_size", 64)),
+                max_candidates=int(semantic_cfg.get("max_candidates", 2000)),
+            )
+            mapping_path = self.paths["dedup_mapping_json"]
+            mapping = read_json(mapping_path) if mapping_path.exists() else {}
+            mapping["semantic"] = semantic_mapping
+            write_json(mapping_path, mapping)
         
         return {"status": "success"}

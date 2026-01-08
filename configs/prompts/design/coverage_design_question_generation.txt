@@ -7,12 +7,28 @@ IMPORTANT: This is a {language} project. All suggestions and technical terms mus
 - bucket: {coverage_bucket}
 - intent: {coverage_intent}
 - constraint_strength: {constraint_strength}
+- question_type: {question_type}
 
 The design questions must align with the bucket/intent constraints.
 
 ## Semantic Constraint Strength
 
 {constraint_rules}
+
+## Scenario Injection (optional)
+
+{scenario_constraints}
+If "None", ignore this section.
+
+## Question Type (must align with question_type)
+
+- architecture
+- integration
+- consistency
+- error_handling
+- performance
+- security
+- maintenance
 
 ## Output Format (JSON ONLY)
 Return a JSON object with a single key "design_questions". Each design question must include:

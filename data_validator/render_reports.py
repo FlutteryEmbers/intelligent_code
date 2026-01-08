@@ -297,6 +297,37 @@ def _plot_retrieval(report: dict, scope: str, output_dir: Path) -> None:
         )
 
 
+def _plot_dedup(report: dict, output_dir: Path) -> None:
+    if not report:
+        return
+
+    def _plot_block(label: str, data: dict, filename: str) -> None:
+        total = data.get("total_input", 0)
+        kept = data.get("total_kept", 0)
+        dropped = data.get("total_dropped", 0)
+        title = label
+        if data.get("skipped"):
+            reason = data.get("reason", "skipped")
+            title = _label(f"{label}（跳过：{reason}）", f"{label} (skipped: {reason})")
+        _plot_bar(
+            title,
+            [_label("总量", "Total"), _label("保留", "Kept"), _label("删除", "Dropped")],
+            [total, kept, dropped],
+            output_dir / filename,
+            _label("数量", "Count"),
+        )
+
+    _plot_block(_label("去重概览（SimHash）", "Dedup Overview (SimHash)"), report, "dedup_simhash_overview.png")
+
+    semantic = report.get("semantic")
+    if isinstance(semantic, dict):
+        _plot_block(
+            _label("去重概览（语义）", "Dedup Overview (Semantic)"),
+            semantic,
+            "dedup_semantic_overview.png",
+        )
+
+
 def _resolve_path(base: Path, value: str) -> Path:
     path = Path(value)
     return path if path.is_absolute() else base / path
@@ -433,6 +464,10 @@ def main() -> int:
     design_retrieval = _read_json(reports_path / "design_retrieval_report.json")
     if design_retrieval:
         _plot_retrieval(design_retrieval, "design", output_dir)
+
+    dedup_report = _read_json(reports_path / "dedup_mapping.json")
+    if dedup_report:
+        _plot_dedup(dedup_report, output_dir)
 
     print(f"Rendered reports to {output_dir}")
     return 0

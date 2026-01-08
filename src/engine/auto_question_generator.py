@@ -30,6 +30,25 @@ def load_prompt_template(template_path: str) -> str:
         return f.read()
 
 
+def load_scenario_templates(template_path: str | None) -> list[str]:
+    if not template_path:
+        return []
+    path = Path(template_path)
+    if not path.exists():
+        logger.warning("Scenario templates not found: %s", path)
+        return []
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f) or {}
+    except Exception as e:
+        logger.warning("Failed to load scenario templates: %s", e)
+        return []
+    templates = data.get("templates") if isinstance(data, dict) else data
+    if not isinstance(templates, list):
+        return []
+    return [t for t in templates if isinstance(t, str) and t.strip()]
+
+
 def simple_hash(text: str) -> str:
     """简单哈希去重"""
     return hashlib.md5(text.lower().encode('utf-8')).hexdigest()[:16]
@@ -127,6 +146,15 @@ class AutoQuestionGenerator:
         self.coverage_mode = self.coverage_config.get('mode', 'hybrid')
         self.constraint_strength = self.coverage_config.get('constraint_strength', 'hybrid')
         self.coverage_rng = random.Random(self.config.get('core.seed', 42))
+        self.diversity_config = self.coverage_config.get('diversity', {}) or {}
+        self.diversity_mode = self.diversity_config.get('mode', 'off')
+        self.question_type_targets = self.diversity_config.get('question_type_targets', {}) or {}
+        self.scenario_config = self.coverage_config.get('scenario_injection', {}) or {}
+        self.scenario_mode = self.scenario_config.get('mode', 'off')
+        self.fuzzy_ratio = float(self.scenario_config.get('fuzzy_ratio', 0) or 0)
+        self.scenario_templates = load_scenario_templates(
+            self.scenario_config.get('templates_path')
+        )
         
         # 加载 prompt 模板
         coverage_prompt = self.config.get('question_answer.prompts.coverage_generation')
@@ -284,6 +312,20 @@ class AutoQuestionGenerator:
         )
         return bucket, intent
 
+    def _sample_question_type(self) -> str:
+        if self.diversity_mode != "quota":
+            return "how_to"
+        return self._weighted_choice(self.question_type_targets, "how_to")
+
+    def _build_scenario_constraints(self) -> str:
+        if self.scenario_mode != "ratio":
+            return ""
+        if not self.scenario_templates or self.fuzzy_ratio <= 0:
+            return ""
+        if self.coverage_rng.random() >= self.fuzzy_ratio:
+            return ""
+        return self.coverage_rng.choice(self.scenario_templates)
+
     def _resolve_constraint_strength(self, bucket: str) -> str:
         strength = self.constraint_strength
         if strength == "hybrid":
@@ -334,8 +376,18 @@ class AutoQuestionGenerator:
             start_line = symbol.start_line
             end_line = symbol.end_line
             source_hash = symbol.source_hash
+
+        default_ref = EvidenceRef(
+            symbol_id=symbol_id,
+            file_path=file_path,
+            start_line=start_line,
+            end_line=end_line,
+            source_hash=source_hash,
+        )
         
         coverage_bucket, coverage_intent = self._sample_coverage_target()
+        question_type = self._sample_question_type()
+        scenario_constraints = self._build_scenario_constraints()
         constraint_strength, constraint_rules = self._build_constraint_rules(coverage_bucket)
 
         prompt = self.prompt_template.format(
@@ -350,6 +402,8 @@ class AutoQuestionGenerator:
             repo_commit=profile.repo_commit,
             coverage_bucket=coverage_bucket,
             coverage_intent=coverage_intent,
+            question_type=question_type,
+            scenario_constraints=scenario_constraints or "无",
             constraint_strength=constraint_strength,
             constraint_rules=constraint_rules,
         )
@@ -382,11 +436,10 @@ class AutoQuestionGenerator:
             # 转换为 QuestionSample
             questions = []
             for q_data in questions_data:
-                # 转换 evidence_refs
-                evidence_refs = []
-                for ref in q_data.get('evidence_refs', []):
-                    evidence_refs.append(EvidenceRef(**ref))
-                q_data['evidence_refs'] = evidence_refs
+                if 'question_type' not in q_data or not q_data.get('question_type'):
+                    q_data['question_type'] = question_type
+                # 强制使用已知的证据引用，避免 LLM 产出无效 symbol_id。
+                q_data['evidence_refs'] = [default_ref]
                 
                 # 确保 repo_commit 存在
                 if 'repo_commit' not in q_data:

@@ -182,6 +182,102 @@ def test_trace_mode_rejects_on_empty_trace(tmp_path: Path) -> None:
     assert checks["trace"] == "warn"
 
 
+def test_trace_evidence_anchor_warns_for_negative(tmp_path: Path) -> None:
+    symbols_path = tmp_path / "symbols.jsonl"
+    input_path = tmp_path / "qa_raw.jsonl"
+    report_path = tmp_path / "qa_quality.json"
+    rejected_path = tmp_path / "qa_validation_rejected.jsonl"
+    clean_path = tmp_path / "qa_clean.jsonl"
+
+    symbol = _make_symbol(
+        symbol_id="src/trace_anchor/Demo.java:Demo:1",
+        file_path="src/trace_anchor/Demo.java",
+    )
+    write_jsonl(symbols_path, [symbol])
+
+    sample = {
+        "scenario": "qa_rule",
+        "instruction": "Need negative sample",
+        "context": "context",
+        "thought": {
+            "observations": ["Missing evidence"],
+            "inferences": [],
+            "assumptions": [],
+            "evidence_refs": [],
+        },
+        "answer": "Insufficient evidence.",
+        "repo_commit": "UNKNOWN_COMMIT",
+        "quality": {"coverage": {"polarity": "negative"}},
+    }
+    write_jsonl(input_path, [sample])
+
+    config = {
+        "quality": {
+            "allow_negative_without_evidence": True,
+            "trace_rules": {
+                "mode": "warning",
+                "require_non_empty": False,
+                "require_evidence_alignment": False,
+                "require_evidence_anchor": True,
+            },
+        }
+    }
+    symbols_map = load_symbols_map(symbols_path)
+    validate_dataset(input_path, symbols_map, report_path, rejected_path, clean_path, config)
+
+    clean = read_jsonl(clean_path)
+    assert clean, "Expected clean samples"
+    warning_codes = {warn["code"] for warn in clean[0]["quality"]["warnings"]}
+    assert "TRACE_EVIDENCE_ANCHOR" in warning_codes
+
+
+def test_trace_answer_alignment_warns(tmp_path: Path) -> None:
+    symbols_path = tmp_path / "symbols.jsonl"
+    input_path = tmp_path / "qa_raw.jsonl"
+    report_path = tmp_path / "qa_quality.json"
+    rejected_path = tmp_path / "qa_validation_rejected.jsonl"
+    clean_path = tmp_path / "qa_clean.jsonl"
+
+    symbol = _make_symbol(
+        symbol_id="src/trace_align/Demo.java:Demo:1",
+        file_path="src/trace_align/Demo.java",
+    )
+    write_jsonl(symbols_path, [symbol])
+
+    sample = {
+        "scenario": "qa_rule",
+        "instruction": "Answer alignment check",
+        "context": "context",
+        "thought": {
+            "observations": ["Uses CacheManager"],
+            "inferences": ["Cache is initialized"],
+            "assumptions": [],
+            "evidence_refs": [_make_evidence_ref(symbol)],
+        },
+        "answer": "Requires audit logging before execution.",
+        "repo_commit": "UNKNOWN_COMMIT",
+    }
+    write_jsonl(input_path, [sample])
+
+    config = {
+        "quality": {
+            "trace_rules": {
+                "mode": "warning",
+                "require_non_empty": False,
+                "require_evidence_alignment": False,
+                "require_answer_alignment": True,
+            }
+        }
+    }
+    symbols_map = load_symbols_map(symbols_path)
+    validate_dataset(input_path, symbols_map, report_path, rejected_path, clean_path, config)
+
+    clean = read_jsonl(clean_path)
+    assert clean, "Expected clean samples"
+    warning_codes = {warn["code"] for warn in clean[0]["quality"]["warnings"]}
+    assert "TRACE_ANSWER_ALIGNMENT" in warning_codes
+
+
 def test_blacklist_modes(tmp_path: Path) -> None:
     sample = {
         "scenario": "qa_rule",
@@ -233,6 +329,8 @@ def _run() -> None:
         test_validator_rejects_invalid_evidence,
         test_design_warnings_written_to_clean,
         test_trace_mode_rejects_on_empty_trace,
+        test_trace_evidence_anchor_warns_for_negative,
+        test_trace_answer_alignment_warns,
         test_blacklist_modes,
     ]
     for test in tests:

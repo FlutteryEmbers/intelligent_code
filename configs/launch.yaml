@@ -38,14 +38,37 @@ question_answer:
     coverage_generation: "configs/prompts/question_answer/coverage_question_generation.txt"
     answer_generation: "configs/prompts/question_answer/auto_answer_generation.txt"
   retrieval:
-    mode: "hybrid"       # hybrid | vector_only | symbol_only
+    mode: "symbol_only"  # hybrid | vector_only | symbol_only
     min_score: 0.2
     fallback_top_k: 6
   coverage:
     mode: "hybrid"                 # upstream | downstream | hybrid
     constraint_strength: "strong"  # strong | weak | hybrid
+    min_sample_size: 1
     negative_ratio: 0.1
     negative_types: ["insufficient_evidence", "wrong_premise", "conflict_spec"]
+    evidence_refs:
+      mode: "assist"     # off | assist | strict
+      mid_min: 2
+      hard_min: 3
+    diversity:
+      mode: "quota"      # off | quota
+      question_type_targets:
+        how_to: 0.2
+        config: 0.15
+        flow: 0.15
+        auth: 0.1
+        error: 0.15
+        deploy: 0.1
+        impact: 0.05
+        perf: 0.05
+        consistency: 0.03
+        compatibility: 0.02
+        edge: 0.0
+    scenario_injection:
+      mode: "ratio"      # off | ratio
+      fuzzy_ratio: 0.2
+      templates_path: "configs/user_inputs/qa_scenario_templates.yaml"
     targets: {high: 0.8, mid: 0.15, hard: 0.05}
     intent_targets:
       how_to: 0.2
@@ -67,7 +90,7 @@ design_questions:
   use_method_profiles: true
   profiles_top_k: 20
   profiles_max_chars: 6000
-  require_layer_coverage: true
+  require_layer_coverage: false
   batch_size: 5
   max_questions: 30
   user_questions_path: "configs/user_inputs/design_questions.yaml"
@@ -82,8 +105,27 @@ design_questions:
   coverage:
     mode: "hybrid"
     constraint_strength: "strong"
+    min_sample_size: 1
     negative_ratio: 0.05
     negative_types: ["conflict_spec", "ambiguous_question"]
+    evidence_refs:
+      mode: "assist"
+      mid_min: 2
+      hard_min: 3
+    diversity:
+      mode: "quota"
+      question_type_targets:
+        architecture: 0.25
+        integration: 0.2
+        consistency: 0.15
+        error_handling: 0.15
+        performance: 0.1
+        security: 0.1
+        maintenance: 0.1
+    scenario_injection:
+      mode: "ratio"
+      fuzzy_ratio: 0.15
+      templates_path: "configs/user_inputs/design_scenario_templates.yaml"
     targets: {high: 0.8, mid: 0.15, hard: 0.05}
     labeler: "rule"
     # templates_path: "configs/user_inputs/design_templates.yaml"
@@ -118,6 +160,9 @@ quality:
     mode: "warning"               # warning | reject
     scope: "all"                  # all | arch_design
     require_evidence_refs: false  # false=所有样本校验
+    require_trace_structure: true
+    require_evidence_anchor: true
+    require_answer_alignment: false
     require_non_empty: true
     require_evidence_alignment: true
     min_observations: 1
@@ -132,6 +177,12 @@ quality:
 dedup:
   simhash_bits: 64
   max_hamming: 3
+  semantic:
+    enabled: false
+    embedding_model: ""
+    threshold: 0.92
+    batch_size: 64
+    max_candidates: 2000
 
 split:
   train_ratio: 0.8

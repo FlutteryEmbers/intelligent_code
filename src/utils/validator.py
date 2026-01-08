@@ -3,6 +3,7 @@ Dataset quality validation utilities.
 Provides sample validation and dataset quality gates.
 """
 import json
+import re
 from pathlib import Path
 from typing import Any
 from collections import Counter
@@ -57,6 +58,13 @@ def load_symbols_map(symbols_jsonl: Path | str) -> dict[str, CodeSymbol]:
 
 def _quality_issue(code: str, message: str) -> dict[str, str]:
     return {"code": code, "message": message}
+
+
+def _extract_alignment_tokens(text: str) -> set[str]:
+    if not text:
+        return set()
+    tokens = re.findall(r"[A-Za-z0-9_]{4,}|[\u4e00-\u9fff]{2,}", text)
+    return {token.lower() for token in tokens}
 
 
 def _set_check(checks: dict[str, str], key: str, status: str) -> None:
@@ -254,6 +262,9 @@ def validate_sample_obj(
     trace_mode = trace_cfg.get("mode", "warning")
     trace_scope = trace_cfg.get("scope", "all")
     require_evidence_refs = bool(trace_cfg.get("require_evidence_refs", False))
+    require_trace_structure = bool(trace_cfg.get("require_trace_structure", False))
+    require_evidence_anchor = bool(trace_cfg.get("require_evidence_anchor", False))
+    require_answer_alignment = bool(trace_cfg.get("require_answer_alignment", False))
 
     trace_enabled = trace_scope == "all" or (
         trace_scope == "arch_design" and sample.scenario == "arch_design"
@@ -262,6 +273,33 @@ def validate_sample_obj(
         observations = trace.observations if trace else []
         inferences = trace.inferences if trace else []
         assumptions = trace.assumptions if trace else []
+
+        if require_trace_structure:
+            if trace is None:
+                warnings.append(
+                    _quality_issue(
+                        "TRACE_MISSING",
+                        "thought is missing",
+                    )
+                )
+                _set_check(checks, "trace", "warn")
+            elif not all(isinstance(value, list) for value in (observations, inferences, assumptions)):
+                warnings.append(
+                    _quality_issue(
+                        "TRACE_STRUCTURE_INVALID",
+                        "observations/inferences/assumptions must be arrays",
+                    )
+                )
+                _set_check(checks, "trace", "warn")
+
+        if require_evidence_anchor and not evidence_refs:
+            warnings.append(
+                _quality_issue(
+                    "TRACE_EVIDENCE_ANCHOR",
+                    "evidence_refs missing for trace anchoring",
+                )
+            )
+            _set_check(checks, "trace", "warn")
 
         if trace_cfg.get("require_non_empty", True):
             if not observations and not inferences:
@@ -279,6 +317,18 @@ def validate_sample_obj(
                     _quality_issue(
                         "TRACE_EVIDENCE_ALIGNMENT",
                         "evidence_refs present but trace steps are empty",
+                    )
+                )
+                _set_check(checks, "trace", "warn")
+
+        if require_answer_alignment:
+            trace_text = " ".join(observations + inferences).lower()
+            answer_tokens = _extract_alignment_tokens(sample.answer or "")
+            if answer_tokens and not any(token in trace_text for token in answer_tokens):
+                warnings.append(
+                    _quality_issue(
+                        "TRACE_ANSWER_ALIGNMENT",
+                        "trace content does not align with answer keywords",
                     )
                 )
                 _set_check(checks, "trace", "warn")
@@ -434,7 +484,13 @@ def validate_dataset(
         
         # Validate sample content
         quality = validate_sample_obj(sample, symbols_map, config)
-        
+
+        # Preserve generation metadata (e.g., coverage polarity) for downstream reporting.
+        if isinstance(sample.quality, dict):
+            coverage = sample.quality.get("coverage")
+            if isinstance(coverage, dict):
+                quality["coverage"] = coverage
+
         # Track warnings regardless of pass/fail
         for warning in quality["warnings"]:
             warning_counter[warning["code"]] += 1

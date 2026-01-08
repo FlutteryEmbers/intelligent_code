@@ -53,6 +53,7 @@
 1. **evidence_refs 必须准确**: 只能使用上面"可用的证据引用"中列出的 symbol_id、file_path、start_line、end_line、source_hash
 2. **不要捏造信息**: 如果代码上下文不足以回答问题，在 answer 中说明需要更多上下文
 3. **基于证据推理**: 所有推断必须有代码依据，记录在 observations 中
+4. **Answer 对齐**: answer 的结论必须能够在 observations/inferences 中找到支撑
 
 ## JSON 输出格式严格要求
 

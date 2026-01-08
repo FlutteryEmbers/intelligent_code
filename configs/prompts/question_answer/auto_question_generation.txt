@@ -16,31 +16,39 @@
 
 - bucket: {coverage_bucket}
 - intent: {coverage_intent}
+- question_type: {question_type}
 
 说明：
 1. 问题内容必须符合 bucket/intent 的语义范围。
 2. difficulty 建议与 bucket 对齐：high→easy，mid→medium，hard→hard（如冲突，以 bucket 为准）。
 
+## 场景化要求（可为空）
+
+{scenario_constraints}
+如为“无”，无需额外场景化要求。
+
 ## 任务要求
 
 生成 **恰好 {questions_per_method} 个** 业务问题，要求：
 
-1. **多样化**: 覆盖不同的问题类型（见下方类型说明）
+1. **多样化**: 在 question_type 约束下保持表述与角度多样
 2. **针对性**: 每个问题必须针对该方法的具体特征
 3. **深度**: 不要问"这个方法做什么"这种浅层问题
 4. **业务视角**: 关注业务规则、架构设计、风险控制等
 
-## 问题类型（每次生成时尽量覆盖多种）
+## 问题类型（必须与 question_type 对齐）
 
-- `business_rule`: 业务规则和约束条件
-- `consistency`: 数据一致性和事务管理
-- `error_handling`: 异常处理和容错机制
-- `performance`: 性能优化和资源管理
-- `security`: 安全性和权限控制
-- `architecture`: 架构设计和模式使用
-- `integration`: 外部集成和依赖管理
-- `testing`: 测试策略和可测试性
-- `maintenance`: 可维护性和代码质量
+- `how_to`: 上手/调用/使用流程
+- `config`: 配置项、默认值、开关影响
+- `flow`: 流程步骤、状态流转
+- `auth`: 权限/鉴权/访问控制
+- `error`: 异常处理与错误码
+- `deploy`: 部署/发布/迁移
+- `impact`: 变更影响/兼容性风险
+- `perf`: 性能/吞吐/延迟
+- `consistency`: 一致性/事务
+- `compatibility`: 历史兼容/老版本约束
+- `edge`: 边界条件/极端场景
 
 ## 难度级别
 
@@ -100,28 +108,28 @@
     }},
     {{
       "question": "该方法如何处理用户名重复的情况？异常处理策略是什么？",
-      "question_type": "error_handling",
+      "question_type": "error",
       "difficulty": "easy",
       "evidence_refs": [{{ "symbol_id": "...", ... }}],
       "repo_commit": "..."
     }},
     {{
       "question": "邮件发送失败是否会影响用户创建？如何保证核心功能的可靠性？",
-      "question_type": "error_handling",
+      "question_type": "error",
       "difficulty": "medium",
       "evidence_refs": [{{ "symbol_id": "...", ... }}],
       "repo_commit": "..."
     }},
     {{
       "question": "该方法依赖了哪些外部服务？如何管理这些依赖的生命周期？",
-      "question_type": "integration",
+      "question_type": "flow",
       "difficulty": "medium",
       "evidence_refs": [{{ "symbol_id": "...", ... }}],
       "repo_commit": "..."
     }},
     {{
       "question": "如何测试该方法的事务行为和异常分支？需要哪些 mock 策略？",
-      "question_type": "testing",
+      "question_type": "how_to",
       "difficulty": "hard",
       "evidence_refs": [{{ "symbol_id": "...", ... }}],
       "repo_commit": "..."
