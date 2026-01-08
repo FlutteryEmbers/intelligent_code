@@ -37,6 +37,7 @@ design_questions:
   use_method_profiles: true
   profiles_top_k: 20
   profiles_max_chars: 6000
+  require_layer_coverage: true
   batch_size: 5
   max_questions: 20
   user_questions_path: "configs/user_inputs/design_questions.yaml"
@@ -59,12 +60,18 @@ artifacts:
   method_embeddings_jsonl: "data/intermediate/method_embeddings.jsonl"
   auto_qa_raw_jsonl: "data/intermediate/auto_qa_raw.jsonl"
   auto_answer_rejected_jsonl: "data/intermediate/rejected/auto_answer_rejected.jsonl"
+  qa_clean_jsonl: "data/intermediate/clean/qa_clean.jsonl"
   design_questions_jsonl: "data/intermediate/auto_questions/design_questions_auto.jsonl"
   design_questions_rejected_jsonl: "data/intermediate/rejected/design_questions_auto_rejected.jsonl"
   design_questions_snapshot_jsonl: "data/intermediate/auto_questions/design_questions.jsonl"
   design_rejected_jsonl: "data/intermediate/rejected/design_rejected.jsonl"
+  design_clean_jsonl: "data/intermediate/clean/design_clean.jsonl"
 
 quality:
+  gate_mode: "gate"
+  write_clean: true
+  allow_fallback_in_report: true
+  fail_on_warnings: false
   min_instruction_length: 10
   min_answer_length: 20
   max_answer_length: 6000

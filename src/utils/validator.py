@@ -55,103 +55,208 @@ def load_symbols_map(symbols_jsonl: Path | str) -> dict[str, CodeSymbol]:
     return symbols_map
 
 
+def _quality_issue(code: str, message: str) -> dict[str, str]:
+    return {"code": code, "message": message}
+
+
+def _set_check(checks: dict[str, str], key: str, status: str) -> None:
+    current = checks.get(key, "pass")
+    if current == "fail":
+        return
+    if current == "warn" and status == "pass":
+        return
+    checks[key] = status
+
+
 def validate_sample_obj(
-    sample: TrainingSample, 
-    symbols_map: dict[str, CodeSymbol]
+    sample: TrainingSample,
+    symbols_map: dict[str, CodeSymbol],
+    config: dict | None = None,
 ) -> dict[str, Any]:
     """
     Validate a single TrainingSample against symbols map.
-    
-    Args:
-        sample: TrainingSample to validate
-        symbols_map: symbol_id -> CodeSymbol mapping
-        
-    Returns:
-        Dict with:
-        - schema_ok: bool - Sample passed schema validation
-        - evidence_ok: bool - All evidence refs are valid
-        - commit_ok: bool - Repo commits match
-        - errors: list[str] - List of validation errors
-        - warnings: list[str] - List of warnings
+
+    Returns a quality dict with gate results.
     """
-    result = {
-        "schema_ok": True,  # If we got here, schema is OK
-        "evidence_ok": True,
-        "commit_ok": True,
-        "errors": [],
-        "warnings": []
+    config = config or {}
+    quality_cfg = config.get("quality", {})
+    design_cfg = config.get("design_questions", {})
+
+    errors: list[dict[str, str]] = []
+    warnings: list[dict[str, str]] = []
+    checks = {
+        "schema": "pass",
+        "evidence": "pass",
+        "commit": "pass",
+        "length": "pass",
+        "scenario_rules": "pass",
     }
-    
-    # Check if sample has thought and evidence_refs
-    if not sample.thought or not sample.thought.evidence_refs:
-        result["evidence_ok"] = False
-        result["errors"].append("Missing thought.evidence_refs")
-        return result
-    
-    # Validate each evidence ref
-    for idx, ref in enumerate(sample.thought.evidence_refs):
-        ref_id = f"evidence_refs[{idx}]"
-        
-        # Normalize symbol_id for cross-platform path comparison
-        normalized_symbol_id = normalize_path_separators(ref.symbol_id)
-        
-        # Check if symbol_id exists
-        if normalized_symbol_id not in symbols_map:
-            result["evidence_ok"] = False
-            result["errors"].append(f"{ref_id}: symbol_id '{ref.symbol_id}' not found in symbols map")
-            continue
-        
-        symbol = symbols_map[normalized_symbol_id]
-        
-        # Check source_hash matches
-        if ref.source_hash != symbol.source_hash:
-            result["evidence_ok"] = False
-            result["errors"].append(
-                f"{ref_id}: source_hash mismatch (expected {symbol.source_hash[:8]}..., "
-                f"got {ref.source_hash[:8]}...)"
-            )
-        
-        # Check line range is valid
-        if ref.start_line < 1 or ref.end_line < ref.start_line:
-            result["evidence_ok"] = False
-            result["errors"].append(
-                f"{ref_id}: invalid line range [{ref.start_line}, {ref.end_line}]"
-            )
-        
-        # Check if line range is within symbol bounds
-        # Assume symbol has line info in symbol_id (format: file:class:line)
-        # This is a soft check - just warn if suspicious
-        if ref.end_line - ref.start_line > 500:
-            result["warnings"].append(
-                f"{ref_id}: suspiciously large line range ({ref.end_line - ref.start_line} lines)"
-            )
-        
-        # Check file_path matches symbol
-        normalized_ref_path = normalize_path_separators(ref.file_path)
-        normalized_symbol_path = normalize_path_separators(symbol.file_path)
-        if normalized_ref_path != normalized_symbol_path:
-            result["evidence_ok"] = False
-            result["errors"].append(
-                f"{ref_id}: file_path mismatch (expected {symbol.file_path}, got {ref.file_path})"
-            )
-        
-        # Check commit consistency (skip if UNKNOWN_COMMIT)
-        if sample.repo_commit != "UNKNOWN_COMMIT" and symbol.repo_commit != "UNKNOWN_COMMIT":
-            if sample.repo_commit != symbol.repo_commit:
-                result["commit_ok"] = False
-                result["errors"].append(
-                    f"{ref_id}: repo_commit mismatch "
-                    f"(sample: {sample.repo_commit[:8]}..., symbol: {symbol.repo_commit[:8]}...)"
+
+    evidence_refs = []
+    if sample.thought:
+        evidence_refs = sample.thought.evidence_refs or []
+
+    if not evidence_refs:
+        errors.append(_quality_issue("EVIDENCE_MISSING", "Missing thought.evidence_refs"))
+        _set_check(checks, "evidence", "fail")
+    else:
+        for idx, ref in enumerate(evidence_refs):
+            ref_id = f"evidence_refs[{idx}]"
+            normalized_symbol_id = normalize_path_separators(ref.symbol_id)
+            if normalized_symbol_id not in symbols_map:
+                errors.append(
+                    _quality_issue(
+                        "EVIDENCE_SYMBOL_NOT_FOUND",
+                        f"{ref_id}: symbol_id '{ref.symbol_id}' not found in symbols map",
+                    )
                 )
-    
-    return result
+                _set_check(checks, "evidence", "fail")
+                continue
+
+            symbol = symbols_map[normalized_symbol_id]
+
+            if ref.source_hash != symbol.source_hash:
+                errors.append(
+                    _quality_issue(
+                        "EVIDENCE_SOURCE_HASH_MISMATCH",
+                        f"{ref_id}: source_hash mismatch (expected {symbol.source_hash[:8]}..., "
+                        f"got {ref.source_hash[:8]}...)",
+                    )
+                )
+                _set_check(checks, "evidence", "fail")
+
+            if ref.start_line < 1 or ref.end_line < ref.start_line:
+                errors.append(
+                    _quality_issue(
+                        "EVIDENCE_LINE_RANGE_INVALID",
+                        f"{ref_id}: invalid line range [{ref.start_line}, {ref.end_line}]",
+                    )
+                )
+                _set_check(checks, "evidence", "fail")
+
+            if ref.end_line - ref.start_line > 500:
+                warnings.append(
+                    _quality_issue(
+                        "EVIDENCE_RANGE_LARGE",
+                        f"{ref_id}: suspiciously large line range ({ref.end_line - ref.start_line} lines)",
+                    )
+                )
+                _set_check(checks, "evidence", "warn")
+
+            normalized_ref_path = normalize_path_separators(ref.file_path)
+            normalized_symbol_path = normalize_path_separators(symbol.file_path)
+            if normalized_ref_path != normalized_symbol_path:
+                errors.append(
+                    _quality_issue(
+                        "EVIDENCE_FILE_PATH_MISMATCH",
+                        f"{ref_id}: file_path mismatch (expected {symbol.file_path}, got {ref.file_path})",
+                    )
+                )
+                _set_check(checks, "evidence", "fail")
+
+            if sample.repo_commit != "UNKNOWN_COMMIT" and symbol.repo_commit != "UNKNOWN_COMMIT":
+                if sample.repo_commit != symbol.repo_commit:
+                    warnings.append(
+                        _quality_issue(
+                            "COMMIT_MISMATCH",
+                            f"{ref_id}: repo_commit mismatch "
+                            f"(sample: {sample.repo_commit[:8]}..., symbol: {symbol.repo_commit[:8]}...)",
+                        )
+                    )
+                    _set_check(checks, "commit", "warn")
+
+    instruction_len = len(sample.instruction or "")
+    answer_len = len(sample.answer or "")
+    min_instruction = int(quality_cfg.get("min_instruction_length", 0))
+    min_answer = int(quality_cfg.get("min_answer_length", 0))
+    max_answer = int(quality_cfg.get("max_answer_length", 0))
+
+    if min_instruction and instruction_len < min_instruction:
+        warnings.append(
+            _quality_issue(
+                "INSTRUCTION_TOO_SHORT",
+                f"instruction length {instruction_len} < min {min_instruction}",
+            )
+        )
+        _set_check(checks, "length", "warn")
+
+    if min_answer and answer_len < min_answer:
+        warnings.append(
+            _quality_issue(
+                "ANSWER_TOO_SHORT",
+                f"answer length {answer_len} < min {min_answer}",
+            )
+        )
+        _set_check(checks, "length", "warn")
+
+    if max_answer and answer_len > max_answer:
+        warnings.append(
+            _quality_issue(
+                "ANSWER_TOO_LONG",
+                f"answer length {answer_len} > max {max_answer}",
+            )
+        )
+        _set_check(checks, "length", "warn")
+
+    if sample.scenario == "arch_design":
+        min_evidence_refs = int(design_cfg.get("min_evidence_refs", 2))
+        if evidence_refs and len(evidence_refs) < min_evidence_refs:
+            warnings.append(
+                _quality_issue(
+                    "DESIGN_EVIDENCE_TOO_FEW",
+                    f"evidence_refs {len(evidence_refs)} < min {min_evidence_refs}",
+                )
+            )
+            _set_check(checks, "scenario_rules", "warn")
+
+        if design_cfg.get("require_layer_coverage", False) and evidence_refs:
+            top_levels = {
+                normalize_path_separators(ref.file_path).split("/")[0]
+                for ref in evidence_refs
+                if ref.file_path
+            }
+            if len(top_levels) < 2:
+                warnings.append(
+                    _quality_issue(
+                        "DESIGN_LAYER_COVERAGE_LOW",
+                        "evidence_refs lack multi-layer coverage",
+                    )
+                )
+                _set_check(checks, "scenario_rules", "warn")
+    else:
+        if evidence_refs and len(evidence_refs) < 1:
+            warnings.append(
+                _quality_issue(
+                    "QA_EVIDENCE_TOO_FEW",
+                    "evidence_refs < 1",
+                )
+            )
+            _set_check(checks, "scenario_rules", "warn")
+
+    fail_on_warnings = bool(quality_cfg.get("fail_on_warnings", False))
+    passed = not errors and (not warnings or not fail_on_warnings) and checks["evidence"] != "fail"
+
+    return {
+        "gate_version": "v1",
+        "passed": passed,
+        "errors": errors,
+        "warnings": warnings,
+        "checks": checks,
+        "stats": {
+            "context_chars": len(sample.context or ""),
+            "answer_chars": answer_len,
+            "evidence_refs": len(evidence_refs),
+        },
+    }
 
 
 def validate_dataset(
     input_jsonl: Path | str,
     symbols_map: dict[str, CodeSymbol],
     report_path: Path | str,
-    rejected_path: Path | str
+    rejected_path: Path | str,
+    clean_path: Path | str | None = None,
+    config: dict | None = None,
 ) -> None:
     """
     Validate entire dataset and generate quality report.
@@ -165,6 +270,10 @@ def validate_dataset(
     input_jsonl = Path(input_jsonl)
     report_path = Path(report_path)
     rejected_path = Path(rejected_path)
+    clean_path = Path(clean_path) if clean_path else None
+    config = config or {}
+    quality_cfg = config.get("quality", {})
+    write_clean = bool(quality_cfg.get("write_clean", True))
     
     # Statistics
     total = 0
@@ -173,9 +282,11 @@ def validate_dataset(
     error_counter = Counter()
     warning_counter = Counter()
     
-    # Ensure rejected file is empty
+    # Ensure rejected/clean files are empty
     if rejected_path.exists():
         rejected_path.unlink()
+    if clean_path and clean_path.exists() and write_clean:
+        clean_path.unlink()
     
     # Read and validate each sample
     raw_lines = read_jsonl(input_jsonl)
@@ -191,42 +302,52 @@ def validate_dataset(
             # Schema validation failed
             schema_ok = False
             error_msg = f"Schema validation failed: {str(e)}"
-            error_counter[error_msg] += 1
+            error_counter["SCHEMA_INVALID"] += 1
+            quality = {
+                "gate_version": "v1",
+                "passed": False,
+                "errors": [_quality_issue("SCHEMA_INVALID", error_msg)],
+                "warnings": [],
+                "checks": {
+                    "schema": "fail",
+                    "evidence": "fail",
+                    "commit": "pass",
+                    "length": "pass",
+                    "scenario_rules": "pass",
+                },
+                "stats": {},
+            }
             
             # Write to rejected
             append_jsonl(rejected_path, {
                 "line": idx,
                 "error": error_msg,
-                "quality": {
-                    "schema_ok": False,
-                    "evidence_ok": False,
-                    "commit_ok": False,
-                    "errors": [error_msg]
-                },
+                "quality": quality,
                 "raw": raw_obj
             })
             failed += 1
             continue
         
         # Validate sample content
-        quality = validate_sample_obj(sample, symbols_map)
+        quality = validate_sample_obj(sample, symbols_map, config)
         
+        # Track warnings regardless of pass/fail
+        for warning in quality["warnings"]:
+            warning_counter[warning["code"]] += 1
+
         # Check if passed all validations
-        if quality["evidence_ok"] and quality["commit_ok"] and not quality["errors"]:
+        if quality["passed"]:
             passed += 1
+            if clean_path and write_clean:
+                sample_dict = sample.model_dump()
+                sample_dict["quality"] = quality
+                append_jsonl(clean_path, sample_dict)
         else:
             failed += 1
             
             # Count errors
             for error in quality["errors"]:
-                # Extract error type (first part before ':')
-                error_type = error.split(":")[0] if ":" in error else error
-                error_counter[error_type] += 1
-            
-            # Count warnings
-            for warning in quality["warnings"]:
-                warning_type = warning.split(":")[0] if ":" in warning else warning
-                warning_counter[warning_type] += 1
+                error_counter[error["code"]] += 1
             
             # Write to rejected
             append_jsonl(rejected_path, {
@@ -255,6 +376,7 @@ def validate_dataset(
     report = {
         "input_file": str(input_jsonl),
         "symbols_count": len(symbols_map),
+        "gate_version": "v1",
         "validation_stats": {
             "total": total,
             "passed": passed,
@@ -265,7 +387,8 @@ def validate_dataset(
         "top_warnings": top_warnings,
         "output_files": {
             "rejected": str(rejected_path),
-            "report": str(report_path)
+            "report": str(report_path),
+            "clean": str(clean_path) if clean_path and write_clean else ""
         }
     }
     

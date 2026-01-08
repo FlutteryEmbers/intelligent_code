@@ -21,10 +21,18 @@ class ValidationStep(BaseStep):
     def execute(self) -> dict:
         """Execute validation."""
         symbols_map = load_symbols_map(self.paths["symbols_jsonl"])
+        artifacts = self.config.get("artifacts", {})
+        qa_clean_path = artifacts.get(
+            "qa_clean_jsonl",
+            str(self.paths.get("qa_clean_jsonl", self.paths["intermediate"] / "clean" / "qa_clean.jsonl")),
+        )
+        design_clean_path = artifacts.get(
+            "design_clean_jsonl",
+            str(self.paths.get("design_clean_jsonl", self.paths["intermediate"] / "clean" / "design_clean.jsonl")),
+        )
         
         # Validate QA
         qa_paths = []
-        artifacts = self.config.get("artifacts", {})
         qa_paths.append(
             artifacts.get("auto_qa_raw_jsonl", "data/intermediate/auto_qa_raw.jsonl")
         )
@@ -39,7 +47,9 @@ class ValidationStep(BaseStep):
                     qa_path,
                     symbols_map,
                     self.paths["qa_quality_json"],
-                    self.paths["intermediate"] / "rejected" / "qa_validation_rejected.jsonl"
+                    self.paths["intermediate"] / "rejected" / "qa_validation_rejected.jsonl",
+                    qa_clean_path,
+                    self.config,
                 )
                 break
         
@@ -50,7 +60,9 @@ class ValidationStep(BaseStep):
                 self.paths["design_raw_jsonl"],
                 symbols_map,
                 self.paths["design_quality_json"],
-                self.paths["intermediate"] / "rejected" / "design_validation_rejected.jsonl"
+                self.paths["intermediate"] / "rejected" / "design_validation_rejected.jsonl",
+                design_clean_path,
+                self.config,
             )
         
         return {"status": "success"}

@@ -75,6 +75,8 @@ class Pipeline:
         for directory in [raw_extracted, raw_repo_meta, intermediate, final, reports, qa_final, design_final]:
             directory.mkdir(parents=True, exist_ok=True)
         
+        artifacts = cfg.get("artifacts", {})
+
         # Define all file paths
         paths = {
             # Directories
@@ -93,8 +95,14 @@ class Pipeline:
             # Intermediate outputs
             "qa_raw_jsonl": intermediate / "qa_raw.jsonl",
             "qa_rejected_jsonl": intermediate / "rejected" / "qa_rejected.jsonl",
+            "qa_clean_jsonl": Path(
+                artifacts.get("qa_clean_jsonl", intermediate / "clean" / "qa_clean.jsonl")
+            ),
             "design_raw_jsonl": intermediate / "design_raw.jsonl",
             "design_rejected_jsonl": intermediate / "rejected" / "design_rejected.jsonl",
+            "design_clean_jsonl": Path(
+                artifacts.get("design_clean_jsonl", intermediate / "clean" / "design_clean.jsonl")
+            ),
             "all_raw_jsonl": intermediate / "all_raw.jsonl",
             "all_dedup_jsonl": intermediate / "all_dedup.jsonl",
             
