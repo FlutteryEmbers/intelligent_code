@@ -12,6 +12,15 @@
 {source_code}
 ```
 
+## 覆盖目标（由系统预先抽取）
+
+- bucket: {coverage_bucket}
+- intent: {coverage_intent}
+
+说明：
+1. 问题内容必须符合 bucket/intent 的语义范围。
+2. difficulty 建议与 bucket 对齐：high→easy，mid→medium，hard→hard（如冲突，以 bucket 为准）。
+
 ## 任务要求
 
 生成 **恰好 {questions_per_method} 个** 业务问题，要求：

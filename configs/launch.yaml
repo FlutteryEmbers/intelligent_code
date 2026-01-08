@@ -31,6 +31,23 @@ question_answer:
   embedding_model: "nomic-embed-text"
   user_questions_path: "configs/user_inputs/user_questions.yaml"
   build_embeddings_in_user_mode: true
+  coverage:
+    mode: "hybrid"                 # upstream | downstream | hybrid
+    targets: {high: 0.8, mid: 0.15, hard: 0.05}
+    intent_targets:
+      how_to: 0.2
+      config: 0.15
+      flow: 0.15
+      auth: 0.1
+      error: 0.15
+      deploy: 0.1
+      impact: 0.05
+      perf: 0.05
+      consistency: 0.03
+      compatibility: 0.02
+      edge: 0.0
+    labeler: "rule"
+    templates_path: "configs/user_inputs/qa_templates.yaml"
 
 design_questions:
   min_evidence_refs: 2
@@ -41,6 +58,11 @@ design_questions:
   batch_size: 5
   max_questions: 20
   user_questions_path: "configs/user_inputs/design_questions.yaml"
+  coverage:
+    mode: "hybrid"
+    targets: {high: 0.8, mid: 0.15, hard: 0.05}
+    labeler: "rule"
+    templates_path: "configs/user_inputs/design_templates.yaml"
   batching:
     enabled: true
     max_batches: 5
@@ -66,6 +88,7 @@ artifacts:
   design_questions_snapshot_jsonl: "data/intermediate/auto_questions/design_questions.jsonl"
   design_rejected_jsonl: "data/intermediate/rejected/design_rejected.jsonl"
   design_clean_jsonl: "data/intermediate/clean/design_clean.jsonl"
+  coverage_report_json: "data/reports/coverage_report.json"
 
 quality:
   gate_mode: "gate"

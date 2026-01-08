@@ -5,6 +5,7 @@ Auto 模块 - 问题生成器
 """
 import json
 import hashlib
+import random
 from pathlib import Path
 from typing import List
 
@@ -122,6 +123,9 @@ class AutoQuestionGenerator:
         self.questions_per_method = self.config.get('question_answer.questions_per_method', 5)
         self.max_questions = self.config.get('question_answer.max_questions', None)
         self.batch_size = self.config.get('question_answer.batch_size', None)
+        self.coverage_config = self.config.get('question_answer.coverage', {}) or {}
+        self.coverage_mode = self.coverage_config.get('mode', 'hybrid')
+        self.coverage_rng = random.Random(self.config.get('core.seed', 42))
         
         # 加载 prompt 模板
         template_path = self.config.get(
@@ -241,6 +245,33 @@ class AutoQuestionGenerator:
         
         logger.info(f"Question generation completed: {self.stats['total_questions']} questions, {self.stats['duplicates_removed']} duplicates removed")
         return all_questions
+
+    def _weighted_choice(self, weights: dict[str, float], default: str) -> str:
+        if not isinstance(weights, dict):
+            return default
+        total = sum(float(value) for value in weights.values())
+        if total <= 0:
+            return default
+        threshold = self.coverage_rng.random() * total
+        cumulative = 0.0
+        for key, value in weights.items():
+            cumulative += float(value)
+            if threshold <= cumulative:
+                return key
+        return default
+
+    def _sample_coverage_target(self) -> tuple[str, str]:
+        if self.coverage_mode not in ("upstream", "hybrid"):
+            return "high", "how_to"
+        bucket = self._weighted_choice(
+            self.coverage_config.get("targets", {}),
+            "high",
+        )
+        intent = self._weighted_choice(
+            self.coverage_config.get("intent_targets", {}),
+            "how_to",
+        )
+        return bucket, intent
     
     def _generate_questions(
         self,
@@ -268,6 +299,8 @@ class AutoQuestionGenerator:
             end_line = symbol.end_line
             source_hash = symbol.source_hash
         
+        coverage_bucket, coverage_intent = self._sample_coverage_target()
+
         prompt = self.prompt_template.format(
             method_profile=method_profile_json,
             source_code=source_code,
@@ -277,7 +310,9 @@ class AutoQuestionGenerator:
             start_line=start_line,
             end_line=end_line,
             source_hash=source_hash,
-            repo_commit=profile.repo_commit
+            repo_commit=profile.repo_commit,
+            coverage_bucket=coverage_bucket,
+            coverage_intent=coverage_intent,
         )
         
         # 调用 LLM

@@ -6,6 +6,8 @@ from .method_understanding import MethodUnderstandingStep
 from .question_answer import QuestionAnswerStep
 from .design_generation import DesignGenerationStep
 from .validation import ValidationStep
+from .coverage_tagger import CoverageTaggerStep
+from .coverage_sampler import CoverageSamplerStep
 from .merge import MergeStep
 from .deduplication import DeduplicationStep
 from .secrets_scan import SecretsScanStep
@@ -18,6 +20,8 @@ __all__ = [
     "QuestionAnswerStep",
     "DesignGenerationStep",
     "ValidationStep",
+    "CoverageTaggerStep",
+    "CoverageSamplerStep",
     "MergeStep",
     "DeduplicationStep",
     "SecretsScanStep",

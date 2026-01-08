@@ -79,6 +79,9 @@ class DesignQuestionGenerator:
             'core.seed',
             self.config.get('generation.seed', 42),
         )
+        self.coverage_config = self.config.get('design_questions.coverage', {}) or {}
+        self.coverage_mode = self.coverage_config.get('mode', 'hybrid')
+        self.coverage_rng = random.Random(self.seed)
 
         # Method profiles 配置（可选增强）
         self.use_method_profiles = self.config.get('design_questions.use_method_profiles', False)
@@ -508,14 +511,44 @@ class DesignQuestionGenerator:
             result = result[:self.profiles_max_chars] + "\n\n... (profiles truncated)"
         return result
 
+    def _weighted_choice(self, weights: dict[str, float], default: str) -> str:
+        if not isinstance(weights, dict):
+            return default
+        total = sum(float(value) for value in weights.values())
+        if total <= 0:
+            return default
+        threshold = self.coverage_rng.random() * total
+        cumulative = 0.0
+        for key, value in weights.items():
+            cumulative += float(value)
+            if threshold <= cumulative:
+                return key
+        return default
+
+    def _sample_coverage_target(self) -> tuple[str, str]:
+        if self.coverage_mode not in ("upstream", "hybrid"):
+            return "high", "design"
+        bucket = self._weighted_choice(
+            self.coverage_config.get("targets", {}),
+            "high",
+        )
+        intent = self._weighted_choice(
+            self.coverage_config.get("intent_targets", {}),
+            "design",
+        )
+        return bucket, intent
+
     def _build_prompt(self, context: str, evidence_pool: str, max_design_questions: int) -> str:
         language_name = self.language_profile.get('language', 'java')
+        coverage_bucket, coverage_intent = self._sample_coverage_target()
         return self.prompt_template.format(
             language=language_name.capitalize(),
             max_design_questions=max_design_questions,
             min_evidence_refs=self.min_evidence_refs,
             context=context,
-            evidence_pool=evidence_pool
+            evidence_pool=evidence_pool,
+            coverage_bucket=coverage_bucket,
+            coverage_intent=coverage_intent,
         )
 
     def _call_llm(self, prompt: str) -> str:
