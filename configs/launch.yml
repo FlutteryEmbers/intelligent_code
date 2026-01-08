@@ -25,7 +25,7 @@ method_understanding:
   max_methods: 5
 
 question_answer:
-  questions_per_method: 1
+  questions_per_method: 3
   max_questions: 20
   batch_size: 5
   embedding_model: "nomic-embed-text"
@@ -38,7 +38,7 @@ design_questions:
   profiles_top_k: 20
   profiles_max_chars: 6000
   batch_size: 5
-  max_questions: 5
+  max_questions: 20
   user_questions_path: "configs/design_questions.yaml"
   batching:
     enabled: true

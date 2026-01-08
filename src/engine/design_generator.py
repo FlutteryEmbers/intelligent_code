@@ -12,6 +12,7 @@ from collections import Counter
 import yaml
 
 from src.utils.schemas import CodeSymbol, TrainingSample, ReasoningTrace, EvidenceRef, sha256_text
+from src.utils.validator import normalize_path_separators
 from src.utils.config import Config
 from src.utils.logger import get_logger
 from src.utils.language_profile import load_language_profile
@@ -310,22 +311,69 @@ class DesignGenerator:
         system_prompt = self._build_system_prompt()
         user_prompt = self._build_user_prompt(design_question, context, relevant_symbols, repo_commit)
         
-        # 4. 调用 LLM
+        # 4. 调用 LLM（最小结构输出：answer + thought）
+        raw_output = ""
         try:
-            sample = self.llm_client.generate_training_sample(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                scenario="arch_design",
-                repo_commit=repo_commit
+            response = self.llm_client.llm.invoke(
+                [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                max_tokens=self.llm_client.max_tokens,
             )
+            raw_output = response.content.strip()
+            cleaned_output = self._clean_json_output(raw_output)
+            minimal_dict = json.loads(cleaned_output)
         except Exception as e:
             logger.warning(f"LLM generation failed for {design_question.id}: {e}")
-            self._log_rejected(design_question, f"LLM error: {e}", None)
+            self._log_rejected(
+                design_question,
+                f"LLM error: {e}",
+                {"raw_output": raw_output},
+            )
             return None
-        
-        # 5. 强制设置必填字段
-        sample.scenario = "arch_design"
-        sample.repo_commit = repo_commit
+
+        try:
+            answer_value = minimal_dict.get("answer")
+            if answer_value is None:
+                raise ValueError("LLM output missing 'answer' field")
+            if isinstance(answer_value, dict):
+                answer_value = json.dumps(answer_value, ensure_ascii=False)
+            elif not isinstance(answer_value, str):
+                answer_value = str(answer_value)
+
+            thought_dict = minimal_dict.get("thought")
+            if not isinstance(thought_dict, dict):
+                raise ValueError("LLM output missing 'thought' object")
+            for key in ("observations", "inferences", "assumptions"):
+                if key not in thought_dict or not isinstance(thought_dict[key], list):
+                    thought_dict[key] = []
+            raw_refs = thought_dict.get("evidence_refs", [])
+            if not isinstance(raw_refs, list) or len(raw_refs) < 2:
+                raise ValueError("thought.evidence_refs must have at least 2 items")
+            evidence_refs = []
+            for ref in raw_refs:
+                evidence_refs.append(EvidenceRef(**ref))
+            thought_dict["evidence_refs"] = evidence_refs
+            reasoning_trace = ReasoningTrace(**thought_dict)
+        except Exception as e:
+            logger.warning(f"LLM output invalid for {design_question.id}: {e}")
+            self._log_rejected(
+                design_question,
+                f"LLM output invalid: {e}",
+                {"raw_output": raw_output},
+            )
+            return None
+
+        # 5. 构造 TrainingSample（其余字段由系统填充）
+        sample = TrainingSample(
+            scenario="arch_design",
+            instruction=design_question.goal,
+            context=context,
+            thought=reasoning_trace,
+            answer=answer_value,
+            repo_commit=repo_commit,
+        )
         
         # 6. 校验样本
         is_valid, errors = self._validate_sample(sample, design_question, repo_commit, symbols)
@@ -602,20 +650,30 @@ class DesignGenerator:
         acceptance_criteria_text = '\n'.join([f'- {a}' for a in design_question.acceptance_criteria])
         non_goals_text = '\n'.join([f'- {n}' for n in design_question.non_goals])
         
+        # 统一路径分隔符以避免 JSON 转义问题
+        controller_symbol_id = normalize_path_separators(controller_symbol.symbol_id)
+        controller_file_path = normalize_path_separators(controller_symbol.file_path)
+
+        service_symbol_id = None
+        service_file_path = None
+        if service_symbol:
+            service_symbol_id = normalize_path_separators(service_symbol.symbol_id)
+            service_file_path = normalize_path_separators(service_symbol.file_path)
+
         # 准备service evidence文本
         if service_symbol:
             service_evidence = f"""
 Service 核心逻辑：
-- symbol_id: "{service_symbol.symbol_id}"
-- file_path: "{service_symbol.file_path}"
+- symbol_id: "{service_symbol_id}"
+- file_path: "{service_file_path}"
 - start_line: {service_symbol.start_line}
 - end_line: {service_symbol.end_line}
 - source_hash: "{service_symbol.source_hash}"
 """
             service_evidence_json = f""",
       {{
-        "symbol_id": "{service_symbol.symbol_id}",
-        "file_path": "{service_symbol.file_path}",
+        "symbol_id": "{service_symbol_id}",
+        "file_path": "{service_file_path}",
         "start_line": {service_symbol.start_line},
         "end_line": {service_symbol.end_line},
         "source_hash": "{service_symbol.source_hash}"
@@ -632,8 +690,8 @@ Service 核心逻辑：
             acceptance_criteria=acceptance_criteria_text,
             non_goals=non_goals_text,
             context=context,
-            controller_symbol_id=controller_symbol.symbol_id,
-            controller_file_path=controller_symbol.file_path,
+            controller_symbol_id=controller_symbol_id,
+            controller_file_path=controller_file_path,
             controller_start_line=controller_symbol.start_line,
             controller_end_line=controller_symbol.end_line,
             controller_source_hash=controller_symbol.source_hash,
@@ -644,6 +702,27 @@ Service 核心逻辑：
         )
         
         return prompt
+
+    def _clean_json_output(self, output: str) -> str:
+        """清理 LLM 输出，提取纯 JSON"""
+        output = output.strip()
+
+        if output.startswith("```json"):
+            output = output[7:]
+        elif output.startswith("```"):
+            output = output[3:]
+
+        if output.endswith("```"):
+            output = output[:-3]
+
+        output = output.strip()
+
+        start_idx = output.find("{")
+        end_idx = output.rfind("}")
+        if start_idx != -1 and end_idx != -1:
+            output = output[start_idx:end_idx + 1]
+
+        return output
     
     def _validate_sample(
         self,
@@ -656,7 +735,7 @@ Service 核心逻辑：
         errors = []
         
         # 创建符号索引
-        symbol_index = {s.symbol_id: s for s in symbols}
+        symbol_index = {normalize_path_separators(s.symbol_id): s for s in symbols}
         
         # 1. 检查 repo_commit
         if sample.repo_commit != repo_commit:
@@ -680,13 +759,20 @@ Service 核心逻辑：
         # 4. 检查 evidence_refs
         if sample.thought and sample.thought.evidence_refs:
             for ref in sample.thought.evidence_refs:
-                if ref.symbol_id not in symbol_index:
+                normalized_symbol_id = normalize_path_separators(ref.symbol_id)
+                if normalized_symbol_id not in symbol_index:
                     errors.append(f"evidence_ref symbol_id not found: {ref.symbol_id}")
                 else:
-                    ref_symbol = symbol_index[ref.symbol_id]
+                    ref_symbol = symbol_index[normalized_symbol_id]
                     if ref.source_hash != ref_symbol.source_hash:
                         errors.append(
                             f"evidence_ref source_hash mismatch for {ref.symbol_id}"
+                        )
+                    normalized_ref_path = normalize_path_separators(ref.file_path)
+                    normalized_symbol_path = normalize_path_separators(ref_symbol.file_path)
+                    if normalized_ref_path != normalized_symbol_path:
+                        errors.append(
+                            f"evidence_ref file_path mismatch for {ref.symbol_id}"
                         )
         
         # 5. 检查 answer 结构（是否包含必要章节）

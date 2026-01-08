@@ -318,61 +318,67 @@ class AnswerGenerator:
                 logger.error(f"JSON parsing failed: {json_err}")
                 logger.error(f"Cleaned output that failed to parse: {cleaned_output[:500]}")
                 raise ValueError(f"Invalid JSON from LLM: {json_err}") from json_err
-            
-            # 修复answer字段：如果是字典，转换为字符串
-            if 'answer' in sample_dict:
-                if isinstance(sample_dict['answer'], dict):
-                    logger.warning(f"Answer field is dict with keys: {list(sample_dict['answer'].keys())}, converting to string")
-                    answer_dict = sample_dict['answer']
-                    answer_parts = []
-                    
-                    # 常见的中文键
-                    key_order = ['结论', '结论性陈述', '机制', '机制说明', '规则说明', '注意事项', '风险点']
-                    
-                    # 按顺序处理已知键
-                    for key in key_order:
-                        if key in answer_dict:
-                            value = answer_dict[key]
-                            if isinstance(value, list):
-                                value = '\n'.join(f"- {item}" for item in value)
-                            answer_parts.append(f"**{key}**:\n{value}")
-                    
-                    # 处理其他未知键
-                    for key, value in answer_dict.items():
-                        if key not in key_order:
-                            if isinstance(value, list):
-                                value = '\n'.join(f"- {item}" for item in value)
-                            answer_parts.append(f"**{key}**:\n{value}")
-                    
-                    sample_dict['answer'] = '\n\n'.join(answer_parts)
-                    logger.info(f"Converted answer to string, length: {len(sample_dict['answer'])}")
-                elif not isinstance(sample_dict['answer'], str):
-                    # 其他非字符串类型，强制转换
-                    logger.warning(f"Answer field is {type(sample_dict['answer'])}, converting to string")
-                    sample_dict['answer'] = str(sample_dict['answer'])
-            else:
-                # answer字段缺失
+
+            # 只读取最小结构：answer + thought
+            answer_value = sample_dict.get("answer")
+            if answer_value is None:
                 logger.error("Answer field is missing from LLM output!")
                 raise ValueError("LLM output missing 'answer' field")
+            if isinstance(answer_value, dict):
+                logger.warning(
+                    "Answer field is dict with keys: %s, converting to string",
+                    list(answer_value.keys()),
+                )
+                answer_parts = []
 
-            # 强制对齐关键字段，避免模板/示例污染
-            sample_dict['instruction'] = question.question
-            sample_dict['context'] = context
-            sample_dict['scenario'] = "qa_rule"
-            sample_dict['repo_commit'] = question.repo_commit
-            
-            # 转换 thought
-            thought_dict = sample_dict.get('thought', {})
+                # 常见的中文键
+                key_order = ['结论', '结论性陈述', '机制', '机制说明', '规则说明', '注意事项', '风险点']
+
+                # 按顺序处理已知键
+                for key in key_order:
+                    if key in answer_value:
+                        value = answer_value[key]
+                        if isinstance(value, list):
+                            value = '\n'.join(f"- {item}" for item in value)
+                        answer_parts.append(f"**{key}**:\n{value}")
+
+                # 处理其他未知键
+                for key, value in answer_value.items():
+                    if key not in key_order:
+                        if isinstance(value, list):
+                            value = '\n'.join(f"- {item}" for item in value)
+                        answer_parts.append(f"**{key}**:\n{value}")
+
+                answer_value = '\n\n'.join(answer_parts)
+                logger.info("Converted answer to string, length: %s", len(answer_value))
+            elif not isinstance(answer_value, str):
+                logger.warning("Answer field is %s, converting to string", type(answer_value))
+                answer_value = str(answer_value)
+
+            thought_dict = sample_dict.get("thought")
+            if not isinstance(thought_dict, dict):
+                raise ValueError("LLM output missing 'thought' object")
+            for key in ("observations", "inferences", "assumptions"):
+                if key not in thought_dict or not isinstance(thought_dict[key], list):
+                    thought_dict[key] = []
+            raw_refs = thought_dict.get("evidence_refs", [])
+            if not isinstance(raw_refs, list) or not raw_refs:
+                raise ValueError("LLM output missing thought.evidence_refs")
             evidence_refs = []
-            for ref in thought_dict.get('evidence_refs', []):
+            for ref in raw_refs:
                 evidence_refs.append(EvidenceRef(**ref))
-            thought_dict['evidence_refs'] = evidence_refs
-            
+            thought_dict["evidence_refs"] = evidence_refs
             reasoning_trace = ReasoningTrace(**thought_dict)
-            sample_dict['thought'] = reasoning_trace
-            
-            # 创建 TrainingSample
-            sample = TrainingSample(**sample_dict)
+
+            # 创建 TrainingSample（其余字段由系统填充）
+            sample = TrainingSample(
+                scenario="qa_rule",
+                instruction=question.question,
+                context=context,
+                thought=reasoning_trace,
+                answer=answer_value,
+                repo_commit=question.repo_commit,
+            )
             
             return sample
             

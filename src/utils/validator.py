@@ -127,7 +127,9 @@ def validate_sample_obj(
             )
         
         # Check file_path matches symbol
-        if ref.file_path != symbol.file_path:
+        normalized_ref_path = normalize_path_separators(ref.file_path)
+        normalized_symbol_path = normalize_path_separators(symbol.file_path)
+        if normalized_ref_path != normalized_symbol_path:
             result["evidence_ok"] = False
             result["errors"].append(
                 f"{ref_id}: file_path mismatch (expected {symbol.file_path}, got {ref.file_path})"
