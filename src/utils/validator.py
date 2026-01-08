@@ -81,6 +81,7 @@ def validate_sample_obj(
     config = config or {}
     quality_cfg = config.get("quality", {})
     design_cfg = config.get("design_questions", {})
+    trace_cfg = quality_cfg.get("trace_rules", {}) if isinstance(quality_cfg, dict) else {}
 
     errors: list[dict[str, str]] = []
     warnings: list[dict[str, str]] = []
@@ -90,11 +91,13 @@ def validate_sample_obj(
         "commit": "pass",
         "length": "pass",
         "scenario_rules": "pass",
+        "trace": "pass",
     }
 
     evidence_refs = []
-    if sample.thought:
-        evidence_refs = sample.thought.evidence_refs or []
+    trace = sample.thought
+    if trace:
+        evidence_refs = trace.evidence_refs or []
 
     if not evidence_refs:
         errors.append(_quality_issue("EVIDENCE_MISSING", "Missing thought.evidence_refs"))
@@ -233,8 +236,93 @@ def validate_sample_obj(
             )
             _set_check(checks, "scenario_rules", "warn")
 
+    trace_mode = trace_cfg.get("mode", "warning")
+    trace_scope = trace_cfg.get("scope", "all")
+    require_evidence_refs = bool(trace_cfg.get("require_evidence_refs", False))
+
+    trace_enabled = trace_scope == "all" or (
+        trace_scope == "arch_design" and sample.scenario == "arch_design"
+    )
+    if trace_enabled and (not require_evidence_refs or evidence_refs):
+        observations = trace.observations if trace else []
+        inferences = trace.inferences if trace else []
+        assumptions = trace.assumptions if trace else []
+
+        if trace_cfg.get("require_non_empty", True):
+            if not observations and not inferences:
+                warnings.append(
+                    _quality_issue(
+                        "TRACE_EMPTY",
+                        "observations and inferences are both empty",
+                    )
+                )
+                _set_check(checks, "trace", "warn")
+
+        if trace_cfg.get("require_evidence_alignment", True):
+            if evidence_refs and (not observations and not inferences):
+                warnings.append(
+                    _quality_issue(
+                        "TRACE_EVIDENCE_ALIGNMENT",
+                        "evidence_refs present but trace steps are empty",
+                    )
+                )
+                _set_check(checks, "trace", "warn")
+
+        min_observations = trace_cfg.get("min_observations", 0)
+        min_inferences = trace_cfg.get("min_inferences", 0)
+        if len(observations) < min_observations:
+            warnings.append(
+                _quality_issue(
+                    "TRACE_MIN_OBSERVATIONS",
+                    f"observations {len(observations)} < min {min_observations}",
+                )
+            )
+            _set_check(checks, "trace", "warn")
+        if len(inferences) < min_inferences:
+            warnings.append(
+                _quality_issue(
+                    "TRACE_MIN_INFERENCES",
+                    f"inferences {len(inferences)} < min {min_inferences}",
+                )
+            )
+            _set_check(checks, "trace", "warn")
+
+        max_observations = trace_cfg.get("max_observations")
+        max_inferences = trace_cfg.get("max_inferences")
+        max_assumptions = trace_cfg.get("max_assumptions")
+        if max_observations is not None and len(observations) > max_observations:
+            warnings.append(
+                _quality_issue(
+                    "TRACE_MAX_OBSERVATIONS",
+                    f"observations {len(observations)} > max {max_observations}",
+                )
+            )
+            _set_check(checks, "trace", "warn")
+        if max_inferences is not None and len(inferences) > max_inferences:
+            warnings.append(
+                _quality_issue(
+                    "TRACE_MAX_INFERENCES",
+                    f"inferences {len(inferences)} > max {max_inferences}",
+                )
+            )
+            _set_check(checks, "trace", "warn")
+        if max_assumptions is not None and len(assumptions) > max_assumptions:
+            warnings.append(
+                _quality_issue(
+                    "TRACE_MAX_ASSUMPTIONS",
+                    f"assumptions {len(assumptions)} > max {max_assumptions}",
+                )
+            )
+            _set_check(checks, "trace", "warn")
+
     fail_on_warnings = bool(quality_cfg.get("fail_on_warnings", False))
-    passed = not errors and (not warnings or not fail_on_warnings) and checks["evidence"] != "fail"
+    trace_is_error = trace_mode == "reject" and checks.get("trace") == "warn"
+    passed = (
+        not errors
+        and (not warnings or not fail_on_warnings)
+        and checks["evidence"] != "fail"
+        and not trace_is_error
+    )
 
     return {
         "gate_version": "v1",
@@ -281,6 +369,7 @@ def validate_dataset(
     failed = 0
     error_counter = Counter()
     warning_counter = Counter()
+    trace_warning_samples = 0
     
     # Ensure rejected/clean files are empty
     if rejected_path.exists():
@@ -334,6 +423,8 @@ def validate_dataset(
         # Track warnings regardless of pass/fail
         for warning in quality["warnings"]:
             warning_counter[warning["code"]] += 1
+        if quality.get("checks", {}).get("trace") == "warn":
+            trace_warning_samples += 1
 
         # Check if passed all validations
         if quality["passed"]:
@@ -372,6 +463,12 @@ def validate_dataset(
         for warning, count in warning_counter.most_common(10)
     ]
     
+    trace_warning_counts = {
+        code: count
+        for code, count in warning_counter.items()
+        if code.startswith("TRACE_")
+    }
+
     # Generate report
     report = {
         "input_file": str(input_jsonl),
@@ -385,6 +482,11 @@ def validate_dataset(
         },
         "top_failures": top_failures,
         "top_warnings": top_warnings,
+        "trace_summary": {
+            "warning_samples": trace_warning_samples,
+            "warning_rate": round(trace_warning_samples / total, 4) if total else 0.0,
+            "warning_counts": trace_warning_counts,
+        },
         "output_files": {
             "rejected": str(rejected_path),
             "report": str(report_path),

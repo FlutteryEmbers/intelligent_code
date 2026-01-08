@@ -95,6 +95,17 @@ quality:
   write_clean: true
   allow_fallback_in_report: true
   fail_on_warnings: false
+  trace_rules:
+    mode: "warning"               # warning | reject
+    scope: "all"                  # all | arch_design
+    require_evidence_refs: false  # false=所有样本校验
+    require_non_empty: true
+    require_evidence_alignment: true
+    min_observations: 1
+    min_inferences: 1
+    max_observations: 8
+    max_inferences: 8
+    max_assumptions: 5
   min_instruction_length: 10
   min_answer_length: 20
   max_answer_length: 6000
