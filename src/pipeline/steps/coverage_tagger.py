@@ -15,7 +15,7 @@ INTENT_KEYWORDS = {
     "config": ["config", "yaml", "properties", "flag", "env", "配置", "开关"],
     "error": ["error", "exception", "fail", "timeout", "retry", "code", "错误", "异常", "失败", "超时", "重试", "错误码"],
     "deploy": ["deploy", "rollout", "release", "migration", "部署", "发布", "上线", "迁移"],
-    "impact": ["impact", "change", "break", "compatibility", "影响", "变更", "兼容"],
+    "impact": ["impact", "change", "break", "影响", "变更"],
     "perf": ["latency", "throughput", "performance", "perf", "性能", "吞吐", "延迟"],
     "consistency": ["consistency", "transaction", "一致性", "事务"],
     "auth": ["auth", "authorize", "permission", "权限", "鉴权", "认证"],

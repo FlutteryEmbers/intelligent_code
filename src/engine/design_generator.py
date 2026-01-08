@@ -73,7 +73,7 @@ def load_design_questions_config(config_path: str | Path | None = None) -> list[
                 goal=question_data['goal'],
                 constraints=question_data.get('constraints', []),
                 acceptance_criteria=question_data.get('acceptance_criteria', []),
-                non_goals=question_data.get('non_goals', [])
+                non_goals=question_data.get('non_goals', []),
             )
             design_questions.append(question)
         
@@ -412,7 +412,7 @@ class DesignGenerator:
             "design_question_id": design_question.id,
             "context_symbols": len(relevant_symbols)
         }
-        
+
         return sample
     
     def _retrieve_context(

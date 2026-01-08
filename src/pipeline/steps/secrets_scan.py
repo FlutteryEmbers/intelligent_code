@@ -36,6 +36,7 @@ class SecretsScanStep(BaseStep):
         clean_samples = []
         dropped_samples = []
         flagged_samples = []
+        modified_samples = 0
 
         def find_blacklist_hits(text: str) -> list[str]:
             if not text:
@@ -94,6 +95,7 @@ class SecretsScanStep(BaseStep):
                     sample["answer"] = sanitize_text(answer, findings)
                     sample["context"] = sanitize_blacklist(sample["context"])
                     sample["answer"] = sanitize_blacklist(sample["answer"])
+                    modified_samples += 1
                     clean_samples.append(sample)
                     action = "sanitize"
                 else:
@@ -112,9 +114,15 @@ class SecretsScanStep(BaseStep):
                 clean_samples.append(sample)
         
         # Write filtered samples
-        if len(clean_samples) < len(samples):
+        if len(clean_samples) < len(samples) or modified_samples:
             write_jsonl(self.paths["all_dedup_jsonl"], clean_samples)
-            self.logger.info(f"Filtered to {len(clean_samples)} samples (removed {len(samples) - len(clean_samples)})")
+            removed = len(samples) - len(clean_samples)
+            self.logger.info(
+                "Filtered to %s samples (removed %s, sanitized %s)",
+                len(clean_samples),
+                removed,
+                modified_samples,
+            )
         
         # Write report
         if flagged_samples:
