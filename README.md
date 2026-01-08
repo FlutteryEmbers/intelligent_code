@@ -6,9 +6,9 @@
   - 场景 1：`qa_rule`（基于业务流程/规则的问答对）
   - 场景 2：`arch_design`（基于仓库架构的设计方案）
 - **Evidence-first**：样本通过 `thought.evidence_refs` 回指 `data/raw/extracted/symbols.jsonl`，支持一致性校验与审计
-- **Auto RAG Mode（可选）**：方法画像 → embedding → 检索 → 生成问题与答案（质量与可控性更强）
+- **Auto RAG Mode（可选）**：方法画像 → embedding → 自动问题 → 回答（质量与可控性更强）
 - **Config-driven**：语言规则/分层识别通过 `configs/language/*.yaml` 扩展
-- **Offline Pipeline**：Parse → (Auto/QA/Design) → Validation → Merge → Dedup → Safety → Split → Export
+- **Offline Pipeline**：Parse → Method Understanding → Question/Answer → Design → Validation → Merge → Dedup → Safety → Split → Export
 
 ## Getting Started
 
@@ -73,16 +73,27 @@ export OLLAMA_BASE_URL=http://localhost:11434
 export OLLAMA_MODEL=qwen2.5:7b
 ```
 
-3) 选择生成模式（Auto 或标准）
+3) 选择生成模式（Auto QA / User QA）
 
 ```yaml
-auto:
-  embedding_model: "nomic-embed-text"
+core:
+  retrieval_top_k: 6
+  max_context_chars: 16000
+
+method_understanding:
+  enabled: true
   max_methods: 50
+
+question_answer:
   questions_per_method: 5
+  max_questions: 200
+  embedding_model: "nomic-embed-text"
+  user_questions_path: "configs/user_questions.yaml"
+  build_embeddings_in_user_mode: true
 
 design_questions:
   use_method_profiles: true
+  max_questions: 50
 ```
 
 ### Run
@@ -95,6 +106,16 @@ python3 main.py
 
 ```bash
 python3 main.py --skip-parse --skip-llm --skip-export
+```
+
+Auto QA 开关：
+
+```bash
+# 默认开启 Auto QA
+python3 main.py
+
+# 使用用户问题（关闭 Auto QA）
+python3 main.py --skip-question-answer
 ```
 
 ### Outputs（你应该看到）

@@ -1,4 +1,4 @@
-# Step 7 — SecretsScanStep Design
+# Step 8 — SecretsScanStep Design
 
 ## 章节与重点内容
 

@@ -30,8 +30,8 @@ flowchart TD
   A[CLI main.py args] --> B[Pipeline Orchestrator]
   B --> C[BaseStep.run Template Method]
   C --> D1[ParseStep]
-  C --> D2[QuestionAnswerStep (optional)]
-  C --> D3[QAGenerationStep (optional)]
+  C --> D2[MethodUnderstandingStep]
+  C --> D3[QuestionAnswerStep]
   C --> D4[DesignGenerationStep]
   C --> D5[ValidationStep (report-only)]
   C --> D6[MergeStep]
@@ -99,7 +99,7 @@ flowchart TD
 当前实现的“DB 等价物”为文件系统，关键工件包括：
 
 - Parse：`data/raw/extracted/symbols.jsonl`、`data/raw/repo_meta/repo_meta.json`
-- Generation：`data/intermediate/qa_raw.jsonl` / `auto_qa_raw.jsonl`、`data/intermediate/design_raw.jsonl`
+- Generation：`data/intermediate/auto_qa_raw.jsonl`、`data/intermediate/design_raw.jsonl`
 - Post-process：`data/intermediate/all_raw.jsonl`、`data/intermediate/all_dedup.jsonl`
 - Split：`data/final/{train,val,test}.jsonl` + `data/final/{qa,design}/*`
 - Export：`data/final/*_sft.jsonl` + `data/reports/dataset_stats.json`
@@ -119,8 +119,10 @@ flowchart TD
 ### Skip 策略
 
 - Parse 支持基于 commit cache 命中跳过（`repo_meta.repo_commit` 匹配当前 commit）
-- Auto/QA/Design 支持 `--skip-llm` 与 `--skip-qa/--skip-design`
-- Dedup 支持 `quality.enable_deduplication=false` 或缺少输入工件
+- MethodUnderstanding 支持 `method_understanding.enabled=false` 与 `--skip-llm`
+- QuestionAnswer 支持 `--skip-question-answer` / `--skip-qa` / `--skip-llm`
+- Design 支持 `--skip-design` / `--skip-llm`
+- Dedup 支持 `--skip-dedup` 或缺少输入工件
 - Export 支持 `--skip-export`
 
 ### Paths 映射策略

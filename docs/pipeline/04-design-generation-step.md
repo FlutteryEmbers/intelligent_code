@@ -1,4 +1,4 @@
-# Step 3 — DesignGenerationStep Design
+# Step 4 — DesignGenerationStep Design
 
 ## 章节与重点内容
 
@@ -49,7 +49,7 @@ DesignGenerator 在生成设计方案前，会从 symbols 中选择与设计问�
 
 ```mermaid
 flowchart TD
-  S[(symbols.jsonl)] -->|optional| R[DesignQuestionGenerator]
+  S[(symbols.jsonl)] -->|optional| R[AutoDesignQuestionGenerator]
   R --> RA[(design_questions_auto.jsonl)]
   S --> D[DesignGenerator]
   RA --> D

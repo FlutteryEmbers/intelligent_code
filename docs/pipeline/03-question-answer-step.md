@@ -1,11 +1,11 @@
-# Step 2 — QuestionAnswerStep Design (Method-Level RAG)
+# Step 3 — QuestionAnswerStep Design (Method-Level RAG)
 
 ## 章节与重点内容
 
-- Architecture Overview：四段式 Auto 链路（Profiles → Embeddings → Questions → Answers）
+- Architecture Overview：三段式 QA 链路（Embeddings → Questions → Answers）
 - Design Patterns：RAG Pipeline、Strategy（profile 规则来自 language profile）、Artifact boundary
-- Data Flow：`symbols.jsonl` → `method_profiles.jsonl` / `questions.jsonl` / `auto_qa_raw.jsonl`
-- Modular Detail：候选方法选择、embedding 构建、向量检索、证据引用约束
+- Data Flow：`method_profiles.jsonl` / `user_questions.yaml` → `questions.jsonl` → `auto_qa_raw.jsonl`
+- Modular Detail：embedding 构建、向量检索、证据引用约束
 - Trade-offs：成本/质量、路径隐式耦合、向量索引的简化实现
 
 ---
@@ -14,23 +14,24 @@
 
 ### 职责边界（Single Responsibility）
 
-QuestionAnswerStep 的职责是：在未设置 `--skip-question-answer` 时，执行“方法级理解 + RAG”链路，生成更高质量、更可解释的 QA 数据；同时可选地输出 method profiles 供自动设计问题生成增强上下文。
+QuestionAnswerStep 的职责是：在未设置 `--skip-question-answer` 时，基于已生成的 `method_profiles.jsonl` 执行 QA 生成链路，并输出 `auto_qa_raw.jsonl`。方法级理解由独立的 MethodUnderstandingStep 负责。
 
 ### 执行模式
 
 - **Auto QA 模式**：未设置 `--skip-question-answer` 且未设置 `--skip-llm/--skip-qa`
   - 产生 `auto_qa_raw.jsonl`（TrainingSample）
-- **Profiles-only 模式**：Auto QA 不需要，但 auto design questions 需要 method profiles
-  - 仅产生 `method_profiles.jsonl`
-- **Disabled/Skipped**：显式 `--skip-question-answer` 或其他 skip
+- **User QA 模式**：设置 `--skip-question-answer` 且未设置 `--skip-llm/--skip-qa`
+  - 从 `configs/user_questions.yaml` 读取问题并生成 `auto_qa_raw.jsonl`
+- **Disabled/Skipped**：显式 `--skip-qa` / `--skip-llm`
 
 ### 输入/输出（Artifacts）
 
 - 输入：
-  - `symbols.jsonl`
-  - 语言规则：language profile（用于候选选择与回答格式约束）
+  - `method_profiles.jsonl`（由 MethodUnderstandingStep 产出）
+  - `symbols.jsonl`（用于构造上下文与证据）
+  - 语言规则：language profile（用于回答格式约束）
+  - `configs/user_questions.yaml`（User QA 模式）
 - 输出（默认路径由配置键控制）：
-  - `data/intermediate/method_profiles.jsonl`
   - `data/intermediate/method_embeddings.jsonl`
   - `data/intermediate/questions.jsonl`
   - `data/intermediate/auto_qa_raw.jsonl`
@@ -44,10 +45,9 @@ QuestionAnswerStep 的职责是：在未设置 `--skip-question-answer` 时，�
 
 Question/Answer 模块把 QA 生成分解为：
 
-1. **理解（理解候选方法的业务语义）** → MethodProfile
-2. **索引（将 profiles 向量化）** → embeddings
-3. **提问（从 profile 生成多样化问题）** → questions
-4. **回答（检索 Top-K 方法作为上下文，生成带证据的回答）** → TrainingSample
+1. **索引（将 profiles 向量化）** → embeddings
+2. **提问（从 profile 生成多样化问题或加载用户问题）** → questions
+3. **回答（检索 Top-K 方法作为上下文，生成带证据的回答）** → TrainingSample
 
 该拆分把“选择什么问”和“如何答”解耦，使可控性、可观测性更强（每个阶段都有落盘工件可检查）。
 
@@ -65,12 +65,11 @@ Question/Answer 模块把 QA 生成分解为：
 
 ```mermaid
 flowchart TD
-  A[(symbols.jsonl)] --> B[AutoMethodUnderstander]
-  B --> P[(method_profiles.jsonl)]
-  P --> C[vector_index.build_embeddings]
-  C --> E[(method_embeddings.jsonl)]
+  P[(method_profiles.jsonl)] --> C[vector_index.build_embeddings]
   P --> D[AutoQuestionGenerator]
-  D --> Q[(questions.jsonl)]
+  U[(user_questions.yaml)] --> Q[(questions.jsonl)]
+  D --> Q
+  C --> E[(method_embeddings.jsonl)]
   Q --> F[AnswerGenerator]
   E --> F
   F --> O[(auto_qa_raw.jsonl)]
@@ -85,15 +84,7 @@ flowchart TD
 
 ## Modular Detail
 
-### A1：MethodProfile 生成（方法级理解）
-
-关键点：
-
-- 只选择 `symbol_type == method` 的符号作为候选。
-- 候选排序采用启发式打分（业务注解/文档/行数等）。
-- 输出 `MethodProfile`，包含 `business_rules/dependencies/evidence_refs` 等结构化字段，后续用于生成问题与回答。
-
-### A2：Embedding 构建与索引格式
+### A1：Embedding 构建与索引格式
 
 关键点：
 
@@ -101,14 +92,14 @@ flowchart TD
 - 使用 Ollama embeddings API 直接生成 embedding，并把向量写入 JSONL（每行一个 embedding entry）。
 - 该实现是“轻量索引”，无需引入向量数据库，便于本地快速验证。
 
-### A3：Question 生成与去重
+### A2：Question 生成与去重
 
 关键点：
 
 - 每个 profile 生成 `questions_per_method` 个问题。
 - 使用简单 hash 去重（避免重复问题污染训练集多样性）。
 
-### A4：Answer 生成（检索 Top-K 作为上下文）
+### A3：Answer 生成（检索 Top-K 作为上下文）
 
 关键点：
 
@@ -120,13 +111,13 @@ flowchart TD
 
 ## Coupling Points（与后续步骤的耦合）
 
-### 1) 与 QAGenerationStep 的“互斥耦合”
+### 1) 与 MethodUnderstandingStep 的输入耦合
 
-当未设置 `--skip-question-answer` 时，标准 QA step 默认跳过；因此 QuestionAnswerStep 的成功与否将直接影响 Merge 能否获得 QA 输入。
+QuestionAnswerStep 依赖 `method_profiles.jsonl`，当 MethodUnderstandingStep 被关闭或未产出 profiles 时，Auto QA 会失败。
 
 ### 2) 与 MergeStep 的“路径/命名耦合”
 
-MergeStep 会读取 `artifacts.auto_qa_raw_jsonl` 指定的文件名，并在 `paths["intermediate"]` 下定位；因此 Question/Answer 模块输出路径必须与该定位逻辑一致。
+MergeStep 会读取 `artifacts.auto_qa_raw_jsonl`（并兼容旧的 `qa_raw.jsonl`），因此 Question/Answer 模块输出路径必须与该配置保持一致。
 
 ### 3) 与 Split/Validation 的 schema 耦合
 

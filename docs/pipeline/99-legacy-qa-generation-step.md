@@ -1,4 +1,4 @@
-# Step 2 (Deprecated) — QAGenerationStep Design
+# Legacy (Deprecated) — QAGenerationStep Design
 
 ## 章节与重点内容
 

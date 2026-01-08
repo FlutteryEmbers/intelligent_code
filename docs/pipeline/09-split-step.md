@@ -1,4 +1,4 @@
-# Step 8 — SplitStep Design
+# Step 9 — SplitStep Design
 
 ## 章节与重点内容
 

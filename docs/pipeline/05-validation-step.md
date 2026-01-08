@@ -1,10 +1,10 @@
-# Step 4 — ValidationStep Design
+# Step 5 — ValidationStep Design
 
 ## 章节与重点内容
 
 - Architecture Overview：质量校验的定位（report-only gate）
 - Design Patterns：Schema Validation（Pydantic）、Evidence Verification（hash/定位校验）
-- Data Flow：`symbols.jsonl` + `{qa,design}_raw.jsonl` → quality reports + rejected
+- Data Flow：`symbols.jsonl` + `{auto_qa_raw,design}_raw.jsonl` → quality reports + rejected
 - Modular Detail：校验规则、错误分类与统计、输出报告结构
 - Trade-offs：不阻断后续 vs 数据集可训练性保证
 
@@ -22,7 +22,7 @@ ValidationStep 的唯一职责是：对已生成的样本做结构与证据一�
 
 - 输入：
   - `symbols.jsonl`
-  - `qa_raw.jsonl`（若存在）
+  - `auto_qa_raw.jsonl`（若存在，兼容 `qa_raw.jsonl`）
   - `design_raw.jsonl`（若存在）
 - 输出：
   - `data/reports/qa_quality.json`
@@ -58,7 +58,7 @@ ValidationStep 的唯一职责是：对已生成的样本做结构与证据一�
 ```mermaid
 flowchart LR
   S[(symbols.jsonl)] --> M[load_symbols_map]
-  Q[(qa_raw.jsonl)] --> V[validate_dataset]
+  Q[(auto_qa_raw.jsonl)] --> V[validate_dataset]
   D[(design_raw.jsonl)] --> V
   M --> V
   V --> R1[(qa_quality.json)]

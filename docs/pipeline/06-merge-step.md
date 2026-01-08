@@ -1,10 +1,10 @@
-# Step 5 — MergeStep Design
+# Step 6 — MergeStep Design
 
 ## 章节与重点内容
 
 - Architecture Overview：将 QA 与 Design 合并为统一数据流入口
 - Design Patterns：Adapter/Router（按模式选择 QA 输入）、Artifact aggregation
-- Data Flow：`qa_raw|auto_qa_raw` + `design_raw` → `all_raw.jsonl`
+- Data Flow：`auto_qa_raw`（兼容 `qa_raw`）+ `design_raw` → `all_raw.jsonl`
 - Modular Detail：Auto 模式下 QA 文件定位策略、缺失输入的处理
 - Trade-offs：简单合并 vs quality gating 缺失、模式开关造成跨步耦合
 
@@ -19,7 +19,7 @@ MergeStep 的唯一职责是：把 QA 与 Design 的 raw 样本聚合到一个�
 ### 输入/输出（Artifacts）
 
 - 输入：
-  - QA：`qa_raw.jsonl`（标准）或 `auto_qa_raw.jsonl`（Auto）
+  - QA：`auto_qa_raw.jsonl`（主路径，兼容 `qa_raw.jsonl`）
   - Design：`design_raw.jsonl`
 - 输出：
   - `data/intermediate/all_raw.jsonl`
@@ -28,14 +28,9 @@ MergeStep 的唯一职责是：把 QA 与 Design 的 raw 样本聚合到一个�
 
 ## Design Patterns
 
-### Router（按模式路由输入源）
+### Router（按存在性选择 QA 输入源）
 
-MergeStep 通过 `--skip-question-answer` 决定 QA 输入源：
-
-- Auto enabled：读 `auto.outputs.auto_qa_raw_jsonl`（以文件名形式拼到 `paths["intermediate"]`）
-- Auto disabled：读 `paths["qa_raw_jsonl"]`
-
-这是一种轻量的路由/适配，避免 pipeline 内出现“双 QA 输入”的复杂性。
+MergeStep 会优先读取 `artifacts.auto_qa_raw_jsonl`，同时兼容 `paths["qa_raw_jsonl"]`（旧路径或历史产物）。当两者都存在时，会全部合并。
 
 ---
 
@@ -58,9 +53,9 @@ flowchart LR
 - 若 QA 或 Design 文件不存在，MergeStep 记录 warning 并继续（最终可能只合并到单一类型样本或空）。
 - 该行为与 Orchestrator 的“失败不中断”策略一致，但可能导致后续步骤数据量过小。
 
-### Auto QA 文件名抽取逻辑
+### QA 输入缺失的容错
 
-Auto outputs 可能配置为完整路径，MergeStep 会做“取 basename”的兼容处理，然后再拼接到 intermediate 目录。
+若 QA 文件不存在，MergeStep 记录 warning 并继续，只合并 design 样本。
 
 ---
 

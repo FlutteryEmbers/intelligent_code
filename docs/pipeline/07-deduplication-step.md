@@ -1,4 +1,4 @@
-# Step 6 — DeduplicationStep Design
+# Step 7 — DeduplicationStep Design
 
 ## 章节与重点内容
 
