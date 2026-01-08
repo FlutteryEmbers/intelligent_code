@@ -53,6 +53,43 @@ def _pick_samples(rng: random.Random, samples: list[dict], count: int) -> tuple[
     return samples[:count], samples[count:]
 
 
+def _compute_distributions(samples: list[dict]) -> dict:
+    total = len(samples)
+    bucket_counts: dict[str, int] = defaultdict(int)
+    intent_counts: dict[str, int] = defaultdict(int)
+    module_counts: dict[str, int] = defaultdict(int)
+
+    for sample in samples:
+        coverage = sample.get("quality", {}).get("coverage", {})
+        bucket = coverage.get("bucket") or "high"
+        intent = coverage.get("intent") or "unknown"
+        module_span = coverage.get("module_span") or "unknown"
+
+        bucket_counts[bucket] += 1
+        intent_counts[intent] += 1
+        module_counts[module_span] += 1
+
+    def ratios(counts: dict[str, int]) -> dict[str, float]:
+        if total == 0:
+            return {}
+        return {key: round(value / total, 4) for key, value in counts.items()}
+
+    return {
+        "bucket_distribution": {
+            "counts": dict(bucket_counts),
+            "ratios": ratios(bucket_counts),
+        },
+        "intent_distribution": {
+            "counts": dict(intent_counts),
+            "ratios": ratios(intent_counts),
+        },
+        "module_span_distribution": {
+            "counts": dict(module_counts),
+            "ratios": ratios(module_counts),
+        },
+    }
+
+
 def _sample_by_targets(
     samples: list[dict],
     targets: dict[str, float],
@@ -129,6 +166,7 @@ def _sample_by_targets(
         "deficits": deficits,
         "borrowed": {k: dict(v) for k, v in borrowed.items()},
     }
+    report.update(_compute_distributions(final_samples))
     return final_samples, report
 
 
@@ -143,7 +181,14 @@ class CoverageSamplerStep(BaseStep):
     def display_name(self) -> str:
         return "Step 7: Coverage Sampling"
 
-    def _sample_file(self, path: Path, targets: dict[str, float], seed: int, mode: str) -> tuple[list[dict], dict]:
+    def _sample_file(
+        self,
+        path: Path,
+        targets: dict[str, float],
+        seed: int,
+        mode: str,
+        min_sample_size: int,
+    ) -> tuple[list[dict], dict]:
         if not path.exists():
             self.logger.info("Coverage sampling skipped, file not found: %s", path)
             return [], {"path": str(path), "skipped": True, "reason": "missing"}
@@ -153,8 +198,34 @@ class CoverageSamplerStep(BaseStep):
             self.logger.info("Coverage sampling skipped, empty file: %s", path)
             return [], {"path": str(path), "skipped": True, "reason": "empty"}
 
+        normalized_targets, used_default = _normalize_targets(targets)
+
         if mode == "upstream":
-            return samples, {"path": str(path), "skipped": True, "reason": "mode=upstream"}
+            report = {
+                "path": str(path),
+                "skipped": True,
+                "reason": "mode=upstream",
+                "total": len(samples),
+                "targets": normalized_targets,
+                "raw_targets": targets,
+                "used_default_targets": used_default,
+            }
+            report.update(_compute_distributions(samples))
+            return samples, report
+
+        if len(samples) < min_sample_size:
+            report = {
+                "path": str(path),
+                "skipped": True,
+                "reason": "below_min_sample_size",
+                "min_sample_size": min_sample_size,
+                "total": len(samples),
+                "targets": normalized_targets,
+                "raw_targets": targets,
+                "used_default_targets": used_default,
+            }
+            report.update(_compute_distributions(samples))
+            return samples, report
 
         sampled, report = _sample_by_targets(samples, targets, seed, self.logger, path.name)
         report["path"] = str(path)
@@ -193,12 +264,26 @@ class CoverageSamplerStep(BaseStep):
 
         qa_targets = qa_cov.get("targets", {})
         design_targets = design_cov.get("targets", {})
+        qa_min_samples = int(qa_cov.get("min_sample_size", 30))
+        design_min_samples = int(design_cov.get("min_sample_size", 30))
 
-        qa_samples, qa_report = self._sample_file(qa_clean_path, qa_targets, seed, qa_mode)
+        qa_samples, qa_report = self._sample_file(
+            qa_clean_path,
+            qa_targets,
+            seed,
+            qa_mode,
+            qa_min_samples,
+        )
         if qa_samples and qa_mode != "upstream":
             write_jsonl(qa_clean_path, qa_samples)
 
-        design_samples, design_report = self._sample_file(design_clean_path, design_targets, seed, design_mode)
+        design_samples, design_report = self._sample_file(
+            design_clean_path,
+            design_targets,
+            seed,
+            design_mode,
+            design_min_samples,
+        )
         if design_samples and design_mode != "upstream":
             write_jsonl(design_clean_path, design_samples)
 

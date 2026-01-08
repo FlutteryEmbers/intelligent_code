@@ -110,7 +110,12 @@ split:
   group_by: "package"
 
 safety:
-  mode: "drop"
+  mode: "keep"            # drop | keep | sanitize
+  blacklist_keywords:
+    - "作为人工智能"
+    - "无法访问"
+    - "不具备"
+    - "抱歉"
 
 output:
   raw_dir: "data/raw/extracted"
