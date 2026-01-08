@@ -30,7 +30,13 @@ def load_prompt_template(template_name: str) -> str:
     Returns:
         str: 模板内容
     """
-    template_path = Path(__file__).parent.parent.parent / "configs" / "prompts" / template_name
+    template_path = (
+        Path(__file__).parent.parent.parent
+        / "configs"
+        / "prompts"
+        / "design"
+        / template_name
+    )
     if not template_path.exists():
         raise FileNotFoundError(f"Prompt template not found: {template_path}")
     

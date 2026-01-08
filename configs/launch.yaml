@@ -47,11 +47,11 @@ design_questions:
     diversity_hint: true
 
 prompts:
-  method_understanding: "configs/prompts/auto_method_understanding.txt"
+  method_understanding: "configs/prompts/method_understanding/auto_method_understanding.txt"
   question_answer:
-    question_generation: "configs/prompts/auto_question_generation.txt"
-    answer_generation: "configs/prompts/auto_answer_generation.txt"
-  design_questions_generation: "configs/prompts/auto_design_question_generation.txt"
+    question_generation: "configs/prompts/question_answer/auto_question_generation.txt"
+    answer_generation: "configs/prompts/question_answer/auto_answer_generation.txt"
+  design_questions_generation: "configs/prompts/design/auto_design_question_generation.txt"
 
 artifacts:
   method_profiles_jsonl: "data/intermediate/method_profiles.jsonl"

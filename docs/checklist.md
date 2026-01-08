@@ -4,7 +4,7 @@
 
 ## 1. 目标对齐（Alignment）
 - 用户提问形态覆盖（模糊问/指代问/多轮追问）：部分满足。证据：`configs/user_inputs/user_questions.yaml` 支持用户自定义问题，`src/engine/auto_question_generator.py` 自动生成问题，但没有约束多轮或指代问题。
-- 回答预期（证据/结论/边界/可执行方案）：部分满足。证据：QA 输出结构由 `configs/prompts/auto_answer_generation.txt` 约束，设计方案结构由 `configs/prompts/design_user_prompt.txt` 约束；但校验未强制检查边界/假设是否显式出现（`src/engine/design_generator.py` 仅检查章节存在）。
+- 回答预期（证据/结论/边界/可执行方案）：部分满足。证据：QA 输出结构由 `configs/prompts/question_answer/auto_answer_generation.txt` 约束，设计方案结构由 `configs/prompts/design/design_user_prompt.txt` 约束；但校验未强制检查边界/假设是否显式出现（`src/engine/design_generator.py` 仅检查章节存在）。
 
 ## 2. 可验证正确（Verifiable Correctness）
 - QA 证据可追溯：满足。证据：`src/utils/schemas.py` 的 `EvidenceRef` 和 `TrainingSample` 定义包含 `file_path/start_line/end_line/source_hash/repo_commit`，`src/utils/validator.py` 校验 evidence_refs 与 symbols_map 一致。

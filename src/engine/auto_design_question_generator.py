@@ -57,7 +57,7 @@ class DesignQuestionGenerator:
         # 加载 prompt 模板
         prompt_path = self.config.get(
             'prompts.design_questions_generation',
-            'configs/prompts/auto_design_question_generation.txt'
+            'configs/prompts/design/auto_design_question_generation.txt'
         )
         self.prompt_template = load_prompt_template(prompt_path)
 

@@ -126,7 +126,7 @@ class AutoQuestionGenerator:
         # 加载 prompt 模板
         template_path = self.config.get(
             'prompts.question_answer.question_generation',
-            'configs/prompts/auto_question_generation.txt'
+            'configs/prompts/question_answer/auto_question_generation.txt'
         )
         self.prompt_template = load_prompt_template(template_path)
         
