@@ -34,7 +34,7 @@ pip install -r requirements.txt
 
 ### Core Configuration（最重要的几项）
 
-编辑 `configs/launch.yml`：
+编辑 `configs/launch.yaml`：
 
 1) 目标仓库与语言
 

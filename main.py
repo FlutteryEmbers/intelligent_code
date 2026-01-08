@@ -22,7 +22,7 @@ def main():
     parser.add_argument(
         "--config",
         type=str,
-        default="configs/launch.yml",
+        default="configs/launch.yaml",
         help="Path to configuration file"
     )
     parser.add_argument(

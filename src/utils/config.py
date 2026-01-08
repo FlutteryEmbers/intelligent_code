@@ -29,12 +29,12 @@ class Config:
         重新加载配置文件
         
         Args:
-            config_path: 配置文件路径，默认为 configs/launch.yml
+            config_path: 配置文件路径，默认为 configs/launch.yaml
         """
         if config_path is None:
             # 默认配置文件路径
             project_root = Path(__file__).parent.parent.parent
-            config_path = project_root / "configs" / "launch.yml"
+            config_path = project_root / "configs" / "launch.yaml"
         else:
             config_path = Path(config_path)
         

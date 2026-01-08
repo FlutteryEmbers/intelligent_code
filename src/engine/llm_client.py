@@ -337,7 +337,7 @@ if __name__ == "__main__":
     运行前请确保：
     1. Ollama 服务已启动：ollama serve
     2. 已拉取模型：ollama pull qwen2.5-coder-3b-instruct
-    3. 配置文件正确：configs/launch.yml
+    3. 配置文件正确：configs/launch.yaml
     """
     import sys
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
