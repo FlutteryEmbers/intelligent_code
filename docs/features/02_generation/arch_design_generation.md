@@ -47,6 +47,83 @@
 | `artifacts.design_questions_jsonl` | 设计问题输出 | auto 设计问题文件 | 默认即可 |
 | `artifacts.design_rejected_jsonl` | 设计拒绝记录 | 失败样本日志 | 默认即可 |
 
+## Prompt 说明（模板角色）
+
+### 模板：`configs/prompts/design/auto_design_question_generation.txt` / `coverage_design_question_generation.txt`
+
+#### 🌟 核心概念
+> 就像“设计题库模板”一样，保证问题结构清晰、覆盖目标明确。
+
+#### 📋 运作基石（元数据与规则）
+- **存放位置**：`configs/prompts/design/auto_design_question_generation.txt`（基础）/ `coverage_design_question_generation.txt`（带覆盖约束）
+- **工序位置**：DesignGenerationStep → DesignQuestionGenerator（Step 3a）
+- **变量注入**：`language`、`coverage_bucket/intent/question_type`、`constraint_strength/constraint_rules`、`scenario_constraints`、`context`、`evidence_pool`、`max_design_questions`、`min_evidence_refs`
+- **推理模式**：覆盖约束驱动的结构化出题
+- **核心准则**：
+  - 仅输出 JSON，必须包含 `design_questions` 列表
+  - 证据必须来自 `evidence_pool`
+  - 问题必须符合 bucket/intent/类型要求
+
+#### ⚙️ 仪表盘：我该如何控制它？
+
+| 配置参数 | 业务直观名称 | 调节它的效果 |
+| :--- | :--- | :--- |
+| `design_questions.prompts.question_generation` | 设计出题模板 | 控制问题结构 |
+| `design_questions.prompts.coverage_generation` | 覆盖出题模板 | 启用覆盖约束 |
+| `design_questions.coverage.*` | 覆盖与场景规则 | 控制 bucket/intent/场景注入 |
+
+#### 🛠️ 逻辑流向图 (Mermaid)
+
+```mermaid
+flowchart TD
+  A[symbols.jsonl] --> B[加载出题模板]
+  B --> C[注入覆盖变量]
+  C --> D[LLM 输出 design_questions]
+  D --> E[design_questions_auto.jsonl]
+```
+
+#### 🧩 解决的痛点
+- **以前的乱象**：设计问题来源单一、分布不可控。
+- **现在的秩序**：设计问题有模板、有证据池、有覆盖目标。
+
+---
+
+### 模板：`configs/prompts/design/design_system_prompt.txt` + `design_user_prompt.txt`
+
+#### 🌟 核心概念
+> 就像“设计方案写作规范”一样，保证输出结构统一、证据可审计。
+
+#### 📋 运作基石（元数据与规则）
+- **存放位置**：`configs/prompts/design/design_system_prompt.txt`、`configs/prompts/design/design_user_prompt.txt`
+- **工序位置**：DesignGenerationStep → DesignGenerator（Step 3b）
+- **变量注入**：`design_question_id/goal/constraints/acceptance_criteria/non_goals`、`context`、`architecture_constraints`、`counterexample_guidance`、`controller_symbol_id`、`service_evidence`、`repo_commit`
+- **推理模式**：证据锚定的结构化设计方案
+- **核心准则**：
+  - 仅输出 JSON（answer + thought）
+  - answer 必须包含 6 个章节
+  - evidence_refs 必须逐字复制提供的值
+
+#### ⚙️ 仪表盘：我该如何控制它？
+
+| 配置参数 | 业务直观名称 | 调节它的效果 |
+| :--- | :--- | :--- |
+| `design_questions.prompts.system_prompt` | 系统提示模板 | 固定答案结构 |
+| `design_questions.prompts.user_prompt` | 用户提示模板 | 注入问题与证据 |
+| `design_questions.constraints.*` | 反例/架构约束 | 强化审计性 |
+
+#### 🛠️ 逻辑流向图 (Mermaid)
+
+```mermaid
+flowchart TD
+  A[design_questions] --> B[加载系统/用户模板]
+  B --> C[注入证据与约束]
+  C --> D[LLM 输出 design_raw.jsonl]
+```
+
+#### 🧩 解决的痛点
+- **以前的乱象**：设计方案结构不一致、证据难追溯。
+- **现在的秩序**：结构统一、证据明确、可审计。
+
 ## 🛠️ 它是如何工作的（逻辑流向）
 
 ```mermaid

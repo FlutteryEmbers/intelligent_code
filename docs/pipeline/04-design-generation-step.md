@@ -70,6 +70,74 @@ flowchart TD
 
 ---
 
+## Prompt 说明（模板角色）
+
+### 设计出题模板（DesignQuestionGenerator）
+
+#### 🌟 核心概念
+> 就像“设计题库模板”，保证问题结构与覆盖目标一致。
+
+#### 📋 运作基石（元数据与规则）
+- **存放位置**：`configs/prompts/design/auto_design_question_generation.txt`、`coverage_design_question_generation.txt`
+- **工序位置**：DesignGenerationStep → Step 3a
+- **推理模式**：覆盖约束驱动的结构化出题
+- **核心准则**：JSON-only、`design_questions` 列表、证据来自 `evidence_pool`
+
+#### ⚙️ 仪表盘：我该如何控制它？
+
+| 配置参数 | 业务直观名称 | 调节它的效果 |
+| :--- | :--- | :--- |
+| `design_questions.prompts.question_generation` | 设计出题模板 | 控制问题结构 |
+| `design_questions.prompts.coverage_generation` | 覆盖出题模板 | 增加覆盖约束 |
+
+#### 🛠️ 逻辑流向图 (Mermaid)
+
+```mermaid
+flowchart TD
+  A[symbols.jsonl] --> B[加载出题模板]
+  B --> C[注入覆盖变量]
+  C --> D[LLM 输出 design_questions]
+```
+
+#### 🧩 解决的痛点
+- **以前的乱象**：设计问题难以标准化。
+- **现在的秩序**：模板化出题，覆盖目标可控。
+
+---
+
+### 设计回答模板（DesignGenerator）
+
+#### 🌟 核心概念
+> 就像“设计方案写作规范”，保证输出结构统一。
+
+#### 📋 运作基石（元数据与规则）
+- **存放位置**：`configs/prompts/design/design_system_prompt.txt`、`design_user_prompt.txt`
+- **工序位置**：DesignGenerationStep → Step 3b
+- **推理模式**：证据锚定的结构化设计方案
+- **核心准则**：JSON-only、answer 六段式、证据逐字复制
+
+#### ⚙️ 仪表盘：我该如何控制它？
+
+| 配置参数 | 业务直观名称 | 调节它的效果 |
+| :--- | :--- | :--- |
+| `design_questions.prompts.system_prompt` | 系统模板 | 固定结构 |
+| `design_questions.prompts.user_prompt` | 用户模板 | 注入问题与证据 |
+
+#### 🛠️ 逻辑流向图 (Mermaid)
+
+```mermaid
+flowchart TD
+  A[design_questions] --> B[加载系统/用户模板]
+  B --> C[注入证据与约束]
+  C --> D[LLM 输出 design_raw.jsonl]
+```
+
+#### 🧩 解决的痛点
+- **以前的乱象**：设计答案结构不一致。
+- **现在的秩序**：结构固定、易审计。
+
+---
+
 ## Coupling Points
 
 - ValidationStep：依赖证据引用与 schema 完整性。

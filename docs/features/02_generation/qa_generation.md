@@ -47,6 +47,91 @@
 | `artifacts.method_embeddings_jsonl` | 语义索引输出 | 检索索引文件 | 默认即可 |
 | `artifacts.auto_answer_rejected_jsonl` | QA 拒绝记录 | 输出失败样本 | 默认即可 |
 
+## Prompt 说明（模板角色）
+
+### 模板：`configs/prompts/question_answer/auto_question_generation.txt` / `coverage_question_generation.txt`
+
+#### 🌟 核心概念
+> 就像标准化“出题模板”一样，确保每一批问题都符合配额与业务语义。
+
+#### 📋 运作基石（元数据与规则）
+- **存放位置**：`configs/prompts/question_answer/auto_question_generation.txt`（基础）/ `coverage_question_generation.txt`（带覆盖约束）
+- **工序位置**：QuestionAnswerStep → AutoQuestionGenerator（问题生成）
+- **变量注入**：`method_profile`、`source_code`、`questions_per_method`、`coverage_bucket`、`coverage_intent`、`question_type`、`scenario_constraints`、`constraint_strength`、`constraint_rules`、`symbol_id/file_path/start_line/end_line/source_hash`、`repo_commit`
+- **推理模式**：约束驱动的结构化出题（配额 + 证据对齐）
+- **核心准则**：
+  - 必须输出严格 JSON 且数量固定
+  - `evidence_refs` 必须逐字复制输入
+  - 问题必须与 bucket/intent/question_type 对齐
+  - 禁止 Markdown/附加说明
+
+#### ⚙️ 仪表盘：我该如何控制它？
+
+| 配置参数 | 业务直观名称 | 调节它的效果 |
+| :--- | :--- | :--- |
+| `question_answer.prompts.question_generation` | 基础出题模板 | 控制问题结构 |
+| `question_answer.prompts.coverage_generation` | 覆盖出题模板 | 启用覆盖约束 |
+| `question_answer.coverage.*` | 覆盖与场景规则 | 决定 bucket/intent/场景注入 |
+
+#### 🛠️ 逻辑流向图 (Mermaid)
+
+```mermaid
+flowchart TD
+  A[MethodProfile] --> B[加载出题模板]
+  B --> C[注入覆盖与场景变量]
+  C --> D[LLM 生成问题 JSON]
+  D --> E[questions.jsonl]
+```
+
+#### 🧩 解决的痛点
+- **以前的乱象**：问题风格不一致、分布不可控。
+- **现在的秩序**：出题有模板、有配额、有证据约束。
+
+---
+
+### 模板：`configs/prompts/question_answer/auto_answer_generation.txt`
+
+#### 🌟 核心概念
+> 就像“标准答案模板”一样，回答必须带证据、结构一致、可审计。
+
+#### 📋 运作基石（元数据与规则）
+- **存放位置**：`configs/prompts/question_answer/auto_answer_generation.txt`
+- **工序位置**：QuestionAnswerStep → AnswerGenerator（回答生成）
+- **变量注入**：`question`、`context`、`available_evidence_refs`、`format_constraints`、`common_mistakes_examples`、`architecture_constraints`、`counterexample_guidance`
+- **推理模式**：证据锚定的结构化回答（observations/inferences/assumptions）
+- **核心准则**：
+  - 仅输出 JSON，禁止 Markdown
+  - `answer` 必须是字符串且包含 Rejected Alternatives
+  - `thought.evidence_refs` 必须来自可用证据池
+  - 结构化推理（observations/inferences/assumptions）
+
+#### ⚙️ 仪表盘：我该如何控制它？
+
+| 配置参数 | 业务直观名称 | 调节它的效果 |
+| :--- | :--- | :--- |
+| `question_answer.prompts.answer_generation` | 回答模板 | 决定答案结构 |
+| `question_answer.constraints.*` | 反例/架构约束 | 强化回答可审计性 |
+| `question_answer.retrieval.*` | 证据召回 | 控制可用证据池 |
+
+#### 🛠️ 逻辑流向图 (Mermaid)
+
+```mermaid
+flowchart TD
+  A[questions.jsonl] --> B[检索证据]
+  B --> C[加载回答模板]
+  C --> D[注入证据与约束]
+  D --> E[LLM 输出答案 JSON]
+  E --> F[auto_qa_raw.jsonl]
+```
+
+#### 🧩 解决的痛点
+- **以前的乱象**：回答缺证据、结构随意。
+- **现在的秩序**：回答结构统一、证据可追溯。
+
+备注：
+
+- `qa_system_prompt.txt` / `qa_user_prompt.txt` 当前未在代码中加载，属于历史模板。
+
 ## 🛠️ 它是如何工作的（逻辑流向）
 
 ```mermaid

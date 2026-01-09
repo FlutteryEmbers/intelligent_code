@@ -78,6 +78,42 @@ flowchart LR
 
 ---
 
+## Prompt 说明（模板角色）
+
+### 模板：`configs/prompts/method_understanding/auto_method_understanding.txt`
+
+#### 🌟 核心概念
+> 就像给方法做“统一说明书”，让后续生成有稳定语义输入。
+
+#### 📋 运作基石（元数据与规则）
+- **存放位置**：`configs/prompts/method_understanding/auto_method_understanding.txt`
+- **工序位置**：MethodUnderstandingStep
+- **变量注入**：`symbol_id`、`file_path`、`qualified_name`、`annotations`、`javadoc`、`source_code`、`start_line`、`end_line`、`source_hash`、`repo_commit`
+- **核心准则**：只输出严格 JSON、`evidence_refs` 必须逐字复制、字段固定不可缺失
+- **推理模式**：结构化信息抽取（按字段填充，避免自由发挥）
+
+#### ⚙️ 仪表盘：我该如何控制它？
+
+| 配置参数 | 业务直观名称 | 调节它的效果 |
+| :--- | :--- | :--- |
+| `method_understanding.prompts.generation` | 方法理解模板 | 决定输出结构 |
+| `core.max_context_chars` | 源码截断上限 | 限制上下文长度 |
+
+#### 🛠️ 逻辑流向图 (Mermaid)
+
+```mermaid
+flowchart TD
+  A[symbols.jsonl] --> B[加载模板]
+  B --> C[注入变量]
+  C --> D[LLM 输出 MethodProfile]
+```
+
+#### 🧩 解决的痛点
+- **以前的乱象**：方法语义靠人工解释，难以复用。
+- **现在的秩序**：结构化 MethodProfile 可统一消费。
+
+---
+
 ## Trade-offs
 
 ### 质量提升 vs 成本

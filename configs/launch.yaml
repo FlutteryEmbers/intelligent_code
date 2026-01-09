@@ -1,9 +1,9 @@
 repo:
-  path: "./repos/java/spring-ai"
+  path: "./repos/python/Mini-Chat-GPT"
   commit: ""
 
 language:
-  name: "java"
+  name: "python"
   profile_dir: "configs/language"
 
 llm:

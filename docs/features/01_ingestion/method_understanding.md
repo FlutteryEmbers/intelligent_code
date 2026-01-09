@@ -32,6 +32,45 @@
 | `artifacts.method_profiles_jsonl` | 方法说明书输出 | 结构化摘要输出路径 | 默认即可 |
 | `artifacts.auto_method_understanding_rejected_jsonl` | 失败记录 | 失败原因审计 | 默认即可 |
 
+## Prompt 说明（模板角色）
+
+### 模板：`configs/prompts/method_understanding/auto_method_understanding.txt`
+
+#### 🌟 核心概念
+> 就像给每个方法写“工作简历”一样，让后续问答与设计有统一的事实底稿。
+
+#### 📋 运作基石（元数据与规则）
+- **存放位置 (Loading Point)**：`configs/prompts/method_understanding/auto_method_understanding.txt`
+- **工序位置 (Step)**：MethodUnderstandingStep（方法理解阶段）
+- **变量注入**：`symbol_id`、`file_path`、`qualified_name`、`annotations`、`javadoc`、`source_code`、`start_line`、`end_line`、`source_hash`、`repo_commit`
+- **核心准则**：
+  - 必须输出严格 JSON（禁止 Markdown 与额外说明）
+  - `evidence_refs` 必须逐字复制输入值
+  - 摘要与规则条目要求简洁、可落地
+  - 输出字段固定，避免缺项
+- **推理模式**：结构化信息抽取（按字段填充，避免自由发挥）
+
+#### ⚙️ 仪表盘：我该如何控制它？
+
+| 配置参数 | 业务直观名称 | 调节它的效果 | 专家建议 |
+| :--- | :--- | :--- | :--- |
+| `method_understanding.prompts.generation` | 方法理解模板 | 决定“简历”结构与字段 | 保持默认 |
+| `core.max_context_chars` | 源码截断上限 | 过长源码会被截断 | 16000 |
+
+#### 🛠️ 逻辑流向图 (Mermaid)
+
+```mermaid
+flowchart TD
+  A[symbols.jsonl] --> B[加载模板]
+  B --> C[注入变量]
+  C --> D[LLM 生成 MethodProfile]
+  D --> E[method_profiles.jsonl]
+```
+
+#### 🧩 解决的痛点
+- **以前的乱象**：方法语义靠人工理解，信息不稳定。
+- **现在的秩序**：每个方法都有结构化“简历”，可直接复用。
+
 ## 🛠️ 它是如何工作的（逻辑流向）
 
 ```mermaid
