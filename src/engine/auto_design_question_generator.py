@@ -231,6 +231,13 @@ class DesignQuestionGenerator:
     ) -> list[dict]:
         collected: list[dict] = []
         seen_goals: set[str] = set()
+        
+        # Calculate actual needed batches based on max_design_questions and batch_size
+        import math
+        estimated_batches = min(
+            self.num_batches,
+            math.ceil(self.max_design_questions / max(self.batch_size, 1))
+        )
 
         for batch_idx in range(self.num_batches):
             remaining = self.max_design_questions - len(collected)
@@ -239,10 +246,11 @@ class DesignQuestionGenerator:
 
             current_batch_size = min(self.batch_size, remaining)
             logger.info(
-                "Batch %s/%s: Generating %s design questions",
+                "Batch %s/%s: Generating %s design questions (max_questions=%s)",
                 batch_idx + 1,
-                self.num_batches,
+                estimated_batches,
                 current_batch_size,
+                self.max_design_questions,
             )
 
             prompt = self._build_prompt(context, evidence_pool, current_batch_size)
