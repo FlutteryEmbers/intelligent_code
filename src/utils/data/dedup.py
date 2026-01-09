@@ -1,5 +1,5 @@
 """
-Deduplication utilities using simhash.
+Deduplication utilities using simhash and semantic similarity.
 Provides near-duplicate detection for training samples.
 """
 import hashlib
@@ -11,7 +11,7 @@ try:
 except ImportError:
     ollama = None
 
-from .io import read_jsonl, write_jsonl, write_json
+from src.utils.io.file_ops import read_jsonl, write_jsonl, write_json
 
 
 def simhash(text: str, bits: int = 64) -> int:
@@ -147,6 +147,7 @@ def dedup_jsonl_by_simhash(
         # Check for near-duplicates
         is_duplicate = False
         matched_idx = -1
+        distance = 0
         
         for kept_idx, kept_hash in zip(kept_indices, kept_hashes):
             distance = hamming_distance(sample_hash, kept_hash)
@@ -308,6 +309,21 @@ def dedup_jsonl_by_semantic(
     max_candidates: int = 2000,
     mapping_json: Path | str | None = None,
 ) -> dict[str, Any]:
+    """
+    Deduplicate JSONL file using semantic similarity.
+    
+    Args:
+        input_jsonl: Input JSONL file path
+        output_jsonl: Output JSONL file path (deduplicated)
+        embedding_model: Ollama model name for embeddings
+        threshold: Cosine similarity threshold (default: 0.92)
+        batch_size: Batch size for embedding (default: 64)
+        max_candidates: Max candidates to compare (default: 2000)
+        mapping_json: Optional output JSON file with deduplication mapping
+        
+    Returns:
+        Mapping dict with deduplication statistics
+    """
     input_jsonl = Path(input_jsonl)
     output_jsonl = Path(output_jsonl)
 

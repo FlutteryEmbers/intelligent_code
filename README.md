@@ -64,6 +64,82 @@ flowchart TD
   end
 ```
 
+## 📐 样本数量计算逻辑
+
+### QA 样本数量决定链
+
+```
+1. MethodUnderstanding
+   ├── 输入: symbols.jsonl 中的所有方法符号
+   └── 输出: method_profiles.jsonl
+       └── 数量限制: max_methods (默认 25)
+
+2. AutoQuestionGenerator
+   ├── 输入: method_profiles (最多 25 个)
+   ├── 每个 profile 生成问题数: questions_per_method (默认 3)
+   ├── 潜在问题数 = 25 × 3 = 75 个
+   └── 输出限制: max_questions (默认 15)
+       └── 实际输出: min(75, 15) = 15 个问题
+
+3. AnswerGenerator
+   ├── 输入: 15 个问题
+   └── 输出: 每个问题生成 1 个答案 → 15 个 QA 样本
+       └── 质量门禁后: 15 - rejected = 最终 QA 数
+```
+
+| 配置项 | 路径 | 默认值 | 作用 |
+|--------|------|--------|------|
+| `max_methods` | `method_understanding.max_methods` | 25 | 限制处理的方法数 |
+| `questions_per_method` | `question_answer.questions_per_method` | 3 | 每个方法生成多少问题 |
+| `max_questions` | `question_answer.max_questions` | 15 | QA 问题总数上限 |
+
+**公式**:
+```
+最终 QA 数 = min(max_methods × questions_per_method, max_questions) - rejected
+           = min(25 × 3, 15) - rejected
+           = 15 - rejected
+```
+
+### Design 样本数量决定链
+
+```
+1. DesignQuestionGenerator
+   ├── 输入: symbols.jsonl + method_profiles.jsonl (可选)
+   ├── 输出: design_questions_auto.jsonl
+   └── 数量限制: max_questions (默认 10)
+
+2. DesignGenerator
+   ├── 输入: 10 个设计问题
+   ├── 每个问题生成 1 个设计样本
+   └── 内部上限: max_samples (默认 50)
+       └── 实际受限于设计问题数，通常是 10
+
+3. 输出: 10 个 Design 样本
+   └── 质量门禁后: 10 - rejected = 最终 Design 数
+```
+
+| 配置项 | 路径 | 默认值 | 作用 |
+|--------|------|--------|------|
+| `max_questions` | `design_questions.max_questions` | 10 | 设计问题总数上限 |
+| `max_samples` | `core.max_items` | 50 | Design 样本内部上限 |
+| `use_method_profiles` | `design_questions.use_method_profiles` | true | 是否用 profiles 增强 |
+
+**公式**:
+```
+最终 Design 数 = min(design_questions_count, max_samples) - rejected
+              = min(10, 50) - rejected
+              = 10 - rejected
+```
+
+### 关键结论
+
+1. **QA 瓶颈在 `max_questions`** — 即使 `max_methods × questions_per_method` 很大，最终也只输出 `max_questions` 个问题
+2. **Design 瓶颈在 `design_questions.max_questions`** — `max_samples` 是内部保护，实际被设计问题数量限制
+3. **如果要增加输出数量**：
+   - QA: 提高 `question_answer.max_questions`
+   - Design: 提高 `design_questions.max_questions`
+4. **Rejected 样本不影响生成数量计算** — 它们是在生成后被质量门禁过滤的，而非预先减少生成目标
+
 ## 🧩 解决的痛点与带来的改变
 
 - **以前的乱象**：样本随机生成、证据不可追溯、质量难以说明。

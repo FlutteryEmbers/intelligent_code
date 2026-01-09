@@ -1,44 +1,34 @@
-"""
+﻿"""
 答案生成器
 
 基于问题和检索的上下文生成最终的 TrainingSample。
 """
 import json
-import random
 from pathlib import Path
 from typing import List
 
 import yaml
 
-from src.utils.schemas import QuestionSample, TrainingSample, CodeSymbol, EvidenceRef, ReasoningTrace
-from src.utils.config import Config
-from src.utils.logger import get_logger
-from src.utils.validator import normalize_path_separators
-from src.utils.language_profile import load_language_profile
-from src.utils import vector_index, write_json, load_prompt_template, load_yaml_file, load_yaml_list, read_jsonl, append_jsonl, clean_llm_json_output
-from src.utils.call_chain import expand_call_chain
+from src.utils.core.schemas import QuestionSample, TrainingSample, CodeSymbol, EvidenceRef, ReasoningTrace
+from src.utils.core.config import Config
+from src.utils.core.logger import get_logger
+from src.utils.data.validator import normalize_path_separators
+from src.utils.data.sampling import sample_negative_type
+from src.utils.generation.language_profile import load_language_profile
+from src.utils.generation.config_helpers import (
+    parse_coverage_config, parse_retrieval_config, parse_constraints_config,
+    parse_output_paths, create_seeded_rng, get_with_fallback,
+)
+from src.utils.io.file_ops import (
+    write_json, load_prompt_template, load_yaml_file, load_yaml_list,
+    read_jsonl, append_jsonl, clean_llm_json_output,
+)
+from src.utils.io.loaders import load_architecture_constraints
+from src.utils.retrieval import vector_index
+from src.utils.retrieval.call_chain import expand_call_chain
 from src.engine.llm_client import LLMClient
 
 logger = get_logger(__name__)
-
-
-def load_architecture_constraints(path_value: str | None) -> list[str]:
-    """加载架构约束"""
-    if not path_value:
-        return []
-    data = load_yaml_file(path_value)
-    if not data:
-        logger.warning("Architecture constraints not found: %s", path_value)
-        return []
-    
-    if isinstance(data, dict):
-        items = data.get("constraints", [])
-    else:
-        items = data
-    
-    if not isinstance(items, list):
-        return []
-    return [item for item in items if isinstance(item, str) and item.strip()]
 
 
 class AnswerGenerator:
@@ -55,36 +45,21 @@ class AnswerGenerator:
         logger.info(f"Loaded language profile: {self.language}")
         
         # 从配置读取参数
-        self.top_k_context = self.config.get(
-            'core.retrieval_top_k',
-            self.config.get('generation.retrieval_top_k', 6),
-        )
-        self.max_context_chars = self.config.get(
-            'core.max_context_chars',
-            self.config.get('generation.max_context_chars', 16000),
-        )
+        self.top_k_context = get_with_fallback(self.config, 'core.retrieval_top_k', 'generation.retrieval_top_k', 6)
+        self.max_context_chars = get_with_fallback(self.config, 'core.max_context_chars', 'generation.max_context_chars', 16000)
         self.batch_size = self.config.get('question_answer.batch_size', None)
         self.embedding_model = self.config.get('question_answer.embedding_model', 'nomic-embed-text')
-        self.coverage_config = self.config.get('question_answer.coverage', {}) or {}
-        self.negative_ratio = self.coverage_config.get('negative_ratio')
-        self.negative_types = self.coverage_config.get('negative_types', [])
-        if not isinstance(self.negative_types, list):
-            self.negative_types = []
-        self.negative_rng = random.Random(self.config.get('core.seed', 42))
-        self.retrieval_config = self.config.get('question_answer.retrieval', {}) or {}
-        self.retrieval_mode = self.retrieval_config.get('mode', 'hybrid')
-        self.retrieval_min_score = float(self.retrieval_config.get('min_score', 0.0))
-        self.retrieval_fallback_top_k = int(
-            self.retrieval_config.get('fallback_top_k', self.top_k_context)
-        )
-        call_chain_cfg = self.retrieval_config.get("call_chain", {}) or {}
-        self.call_chain_enabled = bool(call_chain_cfg.get("enabled", False))
-        self.call_chain_max_depth = int(call_chain_cfg.get("max_depth", 1))
-        self.call_chain_max_expansion = int(call_chain_cfg.get("max_expansion", 20))
+        
+        # 解析覆盖率配置
+        self.coverage_cfg = parse_coverage_config(self.config, 'question_answer')
+        self.negative_rng = create_seeded_rng(self.config)
+        
+        # 解析检索配置
+        self.retrieval_cfg = parse_retrieval_config(self.config, 'question_answer', self.top_k_context)
         self.retrieval_stats = {
-            "mode": self.retrieval_mode,
-            "min_score": self.retrieval_min_score,
-            "fallback_top_k": self.retrieval_fallback_top_k,
+            "mode": self.retrieval_cfg.mode,
+            "min_score": self.retrieval_cfg.min_score,
+            "fallback_top_k": self.retrieval_cfg.fallback_top_k,
             "total_questions": 0,
             "symbol_evidence_used": 0,
             "vector_used": 0,
@@ -97,11 +72,8 @@ class AnswerGenerator:
             "positive_samples": 0,
         }
 
-        constraints_cfg = self.config.get("question_answer.constraints", {}) or {}
-        self.enable_counterexample = bool(constraints_cfg.get("enable_counterexample", False))
-        self.enable_arch_constraints = bool(constraints_cfg.get("enable_arch_constraints", False))
-        constraints_path = self.config.get("core.architecture_constraints_path")
-        self.architecture_constraints = load_architecture_constraints(constraints_path)
+        # 解析约束配置
+        self.constraints_cfg = parse_constraints_config(self.config, 'question_answer')
         
         # 加载 prompt 模板
         template_path = self.config.get(
@@ -111,21 +83,17 @@ class AnswerGenerator:
         self.prompt_template = load_prompt_template(template_path)
         
         # 输出路径
-        self.output_jsonl = Path(self.config.get(
-            'artifacts.auto_qa_raw_jsonl',
-            'data/intermediate/auto_qa_raw.jsonl'
-        ))
-        self.rejected_jsonl = Path(self.config.get(
-            'artifacts.auto_answer_rejected_jsonl',
-            'data/intermediate/rejected/auto_answer_rejected.jsonl'
-        ))
+        self.output_paths = parse_output_paths(
+            self.config,
+            'artifacts.auto_qa_raw_jsonl', 'data/intermediate/auto_qa_raw.jsonl',
+            'artifacts.auto_answer_rejected_jsonl', 'data/intermediate/rejected/auto_answer_rejected.jsonl'
+        )
+        self.output_jsonl = self.output_paths.output_jsonl
+        self.rejected_jsonl = self.output_paths.rejected_jsonl
         self.embeddings_jsonl = Path(self.config.get(
             'artifacts.method_embeddings_jsonl',
             'data/intermediate/method_embeddings.jsonl'
         ))
-        
-        self.output_jsonl.parent.mkdir(parents=True, exist_ok=True)
-        self.rejected_jsonl.parent.mkdir(parents=True, exist_ok=True)
         
         # 统计
         self.stats = {
@@ -251,10 +219,10 @@ class AnswerGenerator:
         seed_symbols = []
         seen_symbol_ids = set()
 
-        use_symbol = self.retrieval_mode in ("symbol_only", "hybrid")
-        use_vector = self.retrieval_mode in ("vector_only", "hybrid")
+        use_symbol = self.retrieval_cfg.mode in ("symbol_only", "hybrid")
+        use_vector = self.retrieval_cfg.mode in ("vector_only", "hybrid")
 
-        if use_symbol and question.evidence_refs and self.retrieval_mode != "vector_only":
+        if use_symbol and question.evidence_refs and self.retrieval_cfg.mode != "vector_only":
             for ref in question.evidence_refs:
                 # 标准化路径以支持跨平台
                 normalized_symbol_id = normalize_path_separators(ref.symbol_id)
@@ -295,7 +263,7 @@ class AnswerGenerator:
                 query_text=question.question,
                 embeddings_jsonl=self.embeddings_jsonl,
                 embedding_model=self.embedding_model,
-                top_k=self.retrieval_fallback_top_k
+                top_k=self.retrieval_cfg.fallback_top_k
             )
 
             if not search_results:
@@ -303,16 +271,16 @@ class AnswerGenerator:
                 raise ValueError("No relevant methods found in vector search")
 
             filtered_results = search_results
-            if self.retrieval_min_score > 0:
+            if self.retrieval_cfg.min_score > 0:
                 filtered_results = [
                     (symbol_id, score)
                     for symbol_id, score in search_results
-                    if score >= self.retrieval_min_score
+                    if score >= self.retrieval_cfg.min_score
                 ]
                 if len(filtered_results) != len(search_results):
                     self.retrieval_stats["vector_filtered"] += 1
-                if not filtered_results and self.retrieval_mode == "hybrid":
-                    filtered_results = search_results[: self.retrieval_fallback_top_k]
+                if not filtered_results and self.retrieval_cfg.mode == "hybrid":
+                    filtered_results = search_results[: self.retrieval_cfg.fallback_top_k]
                     if filtered_results:
                         self.retrieval_stats["vector_fallback_used"] += 1
 
@@ -348,12 +316,12 @@ class AnswerGenerator:
                     seen_symbol_ids.add(symbol.symbol_id)
                     seed_symbols.append(symbol)
 
-        if self.call_chain_enabled and seed_symbols:
+        if self.retrieval_cfg.call_chain_enabled and seed_symbols:
             expanded = expand_call_chain(
                 seed_symbols,
                 symbols_map.values(),
-                max_depth=self.call_chain_max_depth,
-                max_expansion=self.call_chain_max_expansion,
+                max_depth=self.retrieval_cfg.call_chain_max_depth,
+                max_expansion=self.retrieval_cfg.call_chain_max_expansion,
             )
             added = 0
             for symbol in expanded:
@@ -376,7 +344,7 @@ class AnswerGenerator:
                 added += 1
             self.retrieval_stats["call_chain_expanded"] += added
         
-        if not context_parts and self.retrieval_mode == "symbol_only":
+        if not context_parts and self.retrieval_cfg.mode == "symbol_only":
             self.retrieval_stats["symbol_only_failures"] += 1
             raise ValueError("Symbol-only retrieval requires evidence_refs on questions")
 
@@ -533,14 +501,14 @@ class AnswerGenerator:
         return "\n".join(parts)
 
     def _format_architecture_constraints(self) -> str:
-        if not self.enable_arch_constraints:
+        if not self.constraints_cfg.enable_arch_constraints:
             return "None"
-        if not self.architecture_constraints:
+        if not self.constraints_cfg.architecture_constraints:
             return "None"
-        return "\n".join(f"- {item}" for item in self.architecture_constraints)
+        return "\n".join(f"- {item}" for item in self.constraints_cfg.architecture_constraints)
 
     def _format_counterexample_guidance(self) -> str:
-        if not self.enable_counterexample:
+        if not self.constraints_cfg.enable_counterexample:
             return "None"
         return (
             "Include a 'Rejected Alternatives' section with at least 1 alternative, "
@@ -554,15 +522,11 @@ class AnswerGenerator:
         write_json(report_path, self.retrieval_stats)
 
     def _sample_negative_type(self) -> str | None:
-        if not self.negative_types:
-            return None
-        if not isinstance(self.negative_ratio, (int, float)):
-            return None
-        if self.negative_ratio <= 0:
-            return None
-        if self.negative_rng.random() >= float(self.negative_ratio):
-            return None
-        return self.negative_rng.choice(self.negative_types)
+        return sample_negative_type(
+            self.coverage_cfg.negative_ratio,
+            self.coverage_cfg.negative_types,
+            self.negative_rng
+        )
 
     def _inject_negative_rules(self, prompt: str, negative_type: str | None) -> str:
         rules = self._build_negative_rules(negative_type)
@@ -646,7 +610,7 @@ class AnswerGenerator:
         logger.info("Answer Generation Summary")
         logger.info("=" * 60)
         logger.info(f"Total Questions: {self.stats['total_questions']}")
-        logger.info(f"Success: {self.stats['success']}")
-        logger.info(f"Failed: {self.stats['failed']}")
+        logger.info(f"Generated QA Samples: {self.stats['success']}/{self.stats['total_questions']}")
+        logger.info(f"Rejected: {self.stats['failed']}")
         logger.info(f"Output: {self.output_jsonl}")
-        logger.info(f"Rejected: {self.rejected_jsonl}")
+        logger.info(f"Rejected File: {self.rejected_jsonl}")

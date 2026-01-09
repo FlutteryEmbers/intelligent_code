@@ -1,7 +1,8 @@
 """
 Step 6: Deduplication
 """
-from src.utils import dedup_jsonl_by_simhash, dedup_jsonl_by_semantic, read_json, write_json
+from src.utils.data.dedup import dedup_jsonl_by_simhash, dedup_jsonl_by_semantic
+from src.utils.io.file_ops import read_json, write_json
 from src.pipeline.base_step import BaseStep
 
 

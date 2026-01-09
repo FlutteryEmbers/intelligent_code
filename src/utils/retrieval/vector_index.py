@@ -13,7 +13,7 @@ try:
 except ImportError:
     raise ImportError("ollama package not found. Please install: pip install ollama")
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -214,7 +214,7 @@ def search(
 # ==================== 自测代码 ====================
 if __name__ == '__main__':
     import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
     
     # 测试余弦相似度
     vec1 = [1.0, 0.0, 0.0]

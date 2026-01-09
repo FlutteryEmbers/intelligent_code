@@ -3,7 +3,7 @@ Step 5: Merge Samples
 """
 from pathlib import Path
 
-from src.utils import read_jsonl, write_jsonl
+from src.utils.io.file_ops import read_jsonl, write_jsonl
 from src.pipeline.base_step import BaseStep
 
 

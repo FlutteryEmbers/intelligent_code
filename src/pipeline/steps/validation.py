@@ -3,7 +3,7 @@ Step 4: Validation
 """
 from pathlib import Path
 
-from src.utils import load_symbols_map, validate_dataset
+from src.utils.data.validator import load_symbols_map, validate_dataset
 from src.pipeline.base_step import BaseStep
 
 

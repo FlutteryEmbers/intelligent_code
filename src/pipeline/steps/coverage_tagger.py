@@ -1,4 +1,4 @@
-"""
+﻿"""
 Coverage tagging step.
 """
 from __future__ import annotations
@@ -7,110 +7,17 @@ from collections import defaultdict
 from pathlib import Path
 
 from src.pipeline.base_step import BaseStep
-from src.utils import read_jsonl, write_jsonl
-from src.utils.validator import normalize_path_separators
-
-
-INTENT_KEYWORDS = {
-    "config": ["config", "yaml", "properties", "flag", "env", "配置", "开关"],
-    "error": ["error", "exception", "fail", "timeout", "retry", "code", "错误", "异常", "失败", "超时", "重试", "错误码"],
-    "deploy": ["deploy", "rollout", "release", "migration", "部署", "发布", "上线", "迁移"],
-    "impact": ["impact", "change", "break", "影响", "变更"],
-    "perf": ["latency", "throughput", "performance", "perf", "性能", "吞吐", "延迟"],
-    "consistency": ["consistency", "transaction", "一致性", "事务"],
-    "auth": ["auth", "authorize", "permission", "权限", "鉴权", "认证"],
-    "flow": ["flow", "workflow", "流程", "链路", "路径"],
-    "how_to": ["how to", "如何", "怎样", "如何做", "如何使用"],
-    "compatibility": ["compatibility", "legacy", "兼容", "历史"],
-    "edge": ["edge", "corner", "边界", "极端"],
-}
-
-HARD_KEYWORDS = [
-    "legacy",
-    "compatibility",
-    "invariant",
-    "gotcha",
-    "pitfall",
-    "反直觉",
-    "隐含",
-    "历史",
-    "兼容",
-    "坑",
-    "陷阱",
-]
-
-
-def _infer_intent(text: str) -> str:
-    lowered = text.lower()
-    for intent, keywords in INTENT_KEYWORDS.items():
-        for kw in keywords:
-            if kw in lowered:
-                return intent
-    return "how_to"
-
-
-def _infer_module_span(evidence_refs: list[dict]) -> str:
-    if not evidence_refs:
-        return "single"
-    prefixes = set()
-    for ref in evidence_refs:
-        path = ref.get("file_path") or ""
-        if not path:
-            continue
-        normalized = normalize_path_separators(path)
-        prefix = normalized.split("/")[0] if normalized else ""
-        if prefix:
-            prefixes.add(prefix)
-    return "multi" if len(prefixes) > 1 else "single"
-
-
-def _infer_bucket(intent: str, module_span: str, text: str) -> str:
-    lowered = text.lower()
-    if intent in ("compatibility", "edge") or any(kw in lowered for kw in HARD_KEYWORDS):
-        return "hard"
-    if module_span == "multi" or intent in ("perf", "consistency"):
-        return "mid"
-    return "high"
-
-
-def _apply_evidence_bucket(
-    bucket: str,
-    evidence_count: int,
-    evidence_cfg: dict,
-) -> str:
-    mode = evidence_cfg.get("mode", "off")
-    if mode not in ("assist", "strict"):
-        return bucket
-
-    try:
-        mid_min = int(evidence_cfg.get("mid_min", 0))
-    except (TypeError, ValueError):
-        mid_min = 0
-    try:
-        hard_min = int(evidence_cfg.get("hard_min", 0))
-    except (TypeError, ValueError):
-        hard_min = 0
-
-    if mode == "strict":
-        if hard_min and evidence_count >= hard_min:
-            return "hard"
-        if mid_min and evidence_count >= mid_min:
-            return "mid"
-        return "high"
-
-    candidate = bucket
-    if hard_min and evidence_count >= hard_min:
-        candidate = "hard"
-    elif mid_min and evidence_count >= mid_min:
-        candidate = "mid"
-
-    rank = {"high": 0, "mid": 1, "hard": 2}
-    base_rank = rank.get(bucket, 0)
-    cand_rank = rank.get(candidate, base_rank)
-    return candidate if cand_rank > base_rank else bucket
+from src.utils.io.file_ops import read_jsonl, write_jsonl
+from src.utils.data.coverage import (
+    infer_intent,
+    infer_module_span,
+    infer_bucket,
+    apply_evidence_bucket,
+)
 
 
 def _apply_coverage(sample: dict, default_source: str, evidence_cfg: dict) -> dict:
+    """Apply coverage tags to a sample."""
     quality = sample.get("quality") or {}
     coverage = quality.get("coverage") or {}
 
@@ -124,19 +31,19 @@ def _apply_coverage(sample: dict, default_source: str, evidence_cfg: dict) -> di
 
     if "intent" not in coverage:
         text = f"{sample.get('instruction', '')} {sample.get('answer', '')}"
-        coverage["intent"] = _infer_intent(text)
+        coverage["intent"] = infer_intent(text)
 
     if "module_span" not in coverage:
-        coverage["module_span"] = _infer_module_span(evidence_refs)
+        coverage["module_span"] = infer_module_span(evidence_refs)
 
     if "bucket" not in coverage:
         text = f"{sample.get('instruction', '')} {sample.get('answer', '')}"
-        bucket = _infer_bucket(
+        bucket = infer_bucket(
             coverage.get("intent", "how_to"),
             coverage.get("module_span", "single"),
             text,
         )
-        coverage["bucket"] = _apply_evidence_bucket(bucket, evidence_count, evidence_cfg)
+        coverage["bucket"] = apply_evidence_bucket(bucket, evidence_count, evidence_cfg)
 
     coverage.setdefault("source", default_source)
     coverage.setdefault("scenario", scenario)

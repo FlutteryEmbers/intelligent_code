@@ -1,4 +1,4 @@
-"""
+﻿"""
 Auto 模块 - 方法级理解生成器
 
 为候选方法生成深度理解的 MethodProfile。
@@ -8,11 +8,13 @@ import time
 from pathlib import Path
 from typing import Generator
 
-from src.utils.schemas import CodeSymbol, MethodProfile, EvidenceRef, sha256_text
-from src.utils.config import Config
-from src.utils.logger import get_logger
-from src.utils.language_profile import load_language_profile
-from src.utils import load_prompt_template, read_jsonl, append_jsonl, clean_llm_json_output
+from src.utils.core.schemas import CodeSymbol, MethodProfile, EvidenceRef, sha256_text
+from src.utils.core.config import Config
+from src.utils.core.logger import get_logger
+from src.utils.generation.language_profile import load_language_profile
+from src.utils.generation.config_helpers import get_with_fallback
+from src.utils.io.file_ops import load_prompt_template, read_jsonl, append_jsonl, clean_llm_json_output
+from src.utils.io.loaders import load_symbols_jsonl
 from src.engine.llm_client import LLMClient
 
 logger = get_logger(__name__)
@@ -30,14 +32,12 @@ class AutoMethodUnderstander:
         self.profile = load_language_profile(config=self.config)
         logger.info(f"Loaded language profile: {self.profile.language}")
         
-        # 从配置读取参数
-        self.max_methods = self.config.get(
-            'method_understanding.max_methods',
-            self.config.get('auto.max_methods', 50),
+        # 从配置读取参数 using shared helpers
+        self.max_methods = get_with_fallback(
+            self.config, 'method_understanding.max_methods', 'auto.max_methods', 50
         )
-        self.max_context_chars = self.config.get(
-            'core.max_context_chars',
-            self.config.get('generation.max_context_chars', 16000),
+        self.max_context_chars = get_with_fallback(
+            self.config, 'core.max_context_chars', 'generation.max_context_chars', 16000
         )
 
         batching_cfg = self.config.get('method_understanding.batching', {})
@@ -110,9 +110,8 @@ class AutoMethodUnderstander:
         """
         logger.info(f"Loading symbols from {symbols_path}")
         
-        # 读取所有符号
-        symbol_dicts = read_jsonl(symbols_path)
-        symbols = [CodeSymbol(**d) for d in symbol_dicts]
+        # 读取所有符号 using shared utility
+        symbols = load_symbols_jsonl(symbols_path)
         
         logger.info(f"Loaded {len(symbols)} symbols")
         

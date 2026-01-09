@@ -33,7 +33,8 @@ class Config:
         """
         if config_path is None:
             # 默认配置文件路径
-            project_root = Path(__file__).parent.parent.parent
+            # core/config.py -> core -> utils -> src -> project_root
+            project_root = Path(__file__).parent.parent.parent.parent
             config_path = project_root / "configs" / "launch.yaml"
         else:
             config_path = Path(config_path)

@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Optional
 import yaml
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -132,6 +132,113 @@ class LanguageProfile:
     def __contains__(self, key: str) -> bool:
         """Support 'in' operator"""
         return key in self.data
+    
+    # Layer identification methods
+    def is_controller(self, symbol) -> bool:
+        """Check if symbol is a controller using profile rules
+        
+        Args:
+            symbol: CodeSymbol object with annotations, name, qualified_name, file_path
+            
+        Returns:
+            bool: True if symbol matches controller layer rules
+        """
+        layer_rules = self.get_design_layer('controller')
+        return self._matches_layer_rules(symbol, layer_rules)
+    
+    def is_service(self, symbol) -> bool:
+        """Check if symbol is a service using profile rules
+        
+        Args:
+            symbol: CodeSymbol object
+            
+        Returns:
+            bool: True if symbol matches service layer rules
+        """
+        layer_rules = self.get_design_layer('service')
+        return self._matches_layer_rules(symbol, layer_rules)
+    
+    def is_repository(self, symbol) -> bool:
+        """Check if symbol is a repository using profile rules
+        
+        Args:
+            symbol: CodeSymbol object
+            
+        Returns:
+            bool: True if symbol matches repository layer rules
+        """
+        layer_rules = self.get_design_layer('repository')
+        return self._matches_layer_rules(symbol, layer_rules)
+    
+    def get_layer(self, symbol) -> str | None:
+        """Get the layer type for a symbol
+        
+        Args:
+            symbol: CodeSymbol object
+            
+        Returns:
+            str | None: 'controller', 'service', 'repository', or None
+        """
+        if self.is_controller(symbol):
+            return 'controller'
+        if self.is_service(symbol):
+            return 'service'
+        if self.is_repository(symbol):
+            return 'repository'
+        return None
+    
+    def filter_by_layer(self, symbols: list, layer: str) -> list:
+        """Filter symbols by layer type
+        
+        Args:
+            symbols: List of CodeSymbol objects
+            layer: Layer type ('controller', 'service', 'repository')
+            
+        Returns:
+            list: Symbols matching the specified layer
+        """
+        layer_check = {
+            'controller': self.is_controller,
+            'service': self.is_service,
+            'repository': self.is_repository,
+        }.get(layer)
+        
+        if not layer_check:
+            return []
+        return [s for s in symbols if layer_check(s)]
+    
+    def _matches_layer_rules(self, symbol, layer_rules: dict) -> bool:
+        """Generic layer matching based on profile rules
+        
+        Args:
+            symbol: CodeSymbol object
+            layer_rules: Dict with annotations, decorators, name_keywords, path_keywords
+            
+        Returns:
+            bool: True if symbol matches any rule
+        """
+        # Check annotations/decorators (both in symbol.annotations)
+        symbol_annotations = {ann.name for ann in symbol.annotations}
+        profile_annotations = set(layer_rules.get('annotations', []))
+        profile_decorators = set(layer_rules.get('decorators', []))
+        
+        if symbol_annotations & (profile_annotations | profile_decorators):
+            return True
+        
+        # Check name keywords
+        name_keywords = layer_rules.get('name_keywords', [])
+        name_lower = symbol.name.lower()
+        qualified_lower = symbol.qualified_name.lower()
+        if any(kw in name_lower or kw in qualified_lower for kw in name_keywords):
+            return True
+        
+        # Check path keywords
+        path_keywords = layer_rules.get('path_keywords', [])
+        path_lower = symbol.file_path.lower()
+        if any(kw in path_lower for kw in path_keywords):
+            return True
+        
+        return False
 
 
 def load_language_profile(
@@ -158,11 +265,11 @@ def load_language_profile(
     """
     # Import here to avoid circular dependency
     if config is None:
-        from src.utils.config import Config
+        from src.utils.core.config import Config
         config = Config()
     
     # Check if config is Config object or dict
-    from src.utils.config import Config as ConfigClass
+    from src.utils.core.config import Config as ConfigClass
     
     # Determine language name
     if language_name is None:

@@ -1,10 +1,9 @@
-"""
+﻿"""
 场景 2：架构设计方案生成器 - 基于设计问题生成设计方案
 
 从代码仓库中检索相关上下文，为给定设计问题生成架构设计方案。
 """
 import json
-import random
 import time
 from pathlib import Path
 from typing import Generator
@@ -12,35 +11,25 @@ from collections import Counter
 
 import yaml
 
-from src.utils.schemas import CodeSymbol, TrainingSample, ReasoningTrace, EvidenceRef, sha256_text
-from src.utils import write_json, load_prompt_template, load_yaml_file, load_yaml_list, read_jsonl, append_jsonl, clean_llm_json_output
-from src.utils.call_chain import expand_call_chain
-from src.utils.validator import normalize_path_separators
-from src.utils.config import Config
-from src.utils.logger import get_logger
-from src.utils.language_profile import load_language_profile
+from src.utils.core.schemas import CodeSymbol, TrainingSample, ReasoningTrace, EvidenceRef, sha256_text
+from src.utils.core.config import Config
+from src.utils.core.logger import get_logger
+from src.utils.data.validator import normalize_path_separators
+from src.utils.data.sampling import sample_negative_type
+from src.utils.generation.language_profile import load_language_profile
+from src.utils.generation.config_helpers import (
+    parse_coverage_config, parse_retrieval_config, parse_constraints_config,
+    parse_output_paths, create_seeded_rng, get_with_fallback,
+)
+from src.utils.io.file_ops import (
+    write_json, load_prompt_template, load_yaml_file, load_yaml_list,
+    read_jsonl, append_jsonl, clean_llm_json_output,
+)
+from src.utils.io.loaders import load_symbols_jsonl, load_architecture_constraints
+from src.utils.retrieval.call_chain import expand_call_chain
 from src.engine.llm_client import LLMClient
 
 logger = get_logger(__name__)
-
-
-def load_architecture_constraints(path_value: str | None) -> list[str]:
-    """加载架构约束"""
-    if not path_value:
-        return []
-    data = load_yaml_file(path_value)
-    if not data:
-        logger.warning("Architecture constraints not found: %s", path_value)
-        return []
-    
-    if isinstance(data, dict):
-        items = data.get("constraints", [])
-    else:
-        items = data
-    
-    if not isinstance(items, list):
-        return []
-    return [item for item in items if isinstance(item, str) and item.strip()]
 
 
 def load_design_questions_config(config_path: str | Path | None = None) -> list['DesignQuestion']:
@@ -161,36 +150,19 @@ class DesignGenerator:
         self.user_prompt_template = load_prompt_template(user_prompt_path)
         
         # 从配置读取参数
-        self.top_k_context = self.config.get(
-            'core.retrieval_top_k',
-            self.config.get('generation.retrieval_top_k', 6),
-        )
-        self.max_context_chars = self.config.get(
-            'core.max_context_chars',
-            self.config.get('generation.max_context_chars', 16000),
-        )
-        self.max_samples = self.config.get(
-            'core.max_items',
-            self.config.get('generation.max_items', 50),
-        )
-        self.coverage_config = self.config.get('design_questions.coverage', {}) or {}
-        self.negative_ratio = self.coverage_config.get('negative_ratio')
-        self.negative_types = self.coverage_config.get('negative_types', [])
-        if not isinstance(self.negative_types, list):
-            self.negative_types = []
-        self.negative_rng = random.Random(self.config.get('core.seed', 42))
-        self.retrieval_config = self.config.get('design_questions.retrieval', {}) or {}
-        self.retrieval_mode = self.retrieval_config.get('mode', 'hybrid')
-        self.retrieval_fallback_top_k = int(
-            self.retrieval_config.get('fallback_top_k', self.top_k_context)
-        )
-        call_chain_cfg = self.retrieval_config.get("call_chain", {}) or {}
-        self.call_chain_enabled = bool(call_chain_cfg.get("enabled", False))
-        self.call_chain_max_depth = int(call_chain_cfg.get("max_depth", 1))
-        self.call_chain_max_expansion = int(call_chain_cfg.get("max_expansion", 20))
+        self.top_k_context = get_with_fallback(self.config, 'core.retrieval_top_k', 'generation.retrieval_top_k', 6)
+        self.max_context_chars = get_with_fallback(self.config, 'core.max_context_chars', 'generation.max_context_chars', 16000)
+        self.max_samples = get_with_fallback(self.config, 'core.max_items', 'generation.max_items', 50)
+        
+        # 解析覆盖率配置
+        self.coverage_cfg = parse_coverage_config(self.config, 'design_questions')
+        self.negative_rng = create_seeded_rng(self.config)
+        
+        # 解析检索配置
+        self.retrieval_cfg = parse_retrieval_config(self.config, 'design_questions', self.top_k_context)
         self.retrieval_stats = {
-            "mode": self.retrieval_mode,
-            "fallback_top_k": self.retrieval_fallback_top_k,
+            "mode": self.retrieval_cfg.mode,
+            "fallback_top_k": self.retrieval_cfg.fallback_top_k,
             "total_questions": 0,
             "candidates_empty": 0,
             "scored_non_empty": 0,
@@ -200,11 +172,8 @@ class DesignGenerator:
             "positive_samples": 0,
         }
 
-        constraints_cfg = self.config.get("design_questions.constraints", {}) or {}
-        self.enable_counterexample = bool(constraints_cfg.get("enable_counterexample", False))
-        self.enable_arch_constraints = bool(constraints_cfg.get("enable_arch_constraints", False))
-        constraints_path = self.config.get("core.architecture_constraints_path")
-        self.architecture_constraints = load_architecture_constraints(constraints_path)
+        # 解析约束配置
+        self.constraints_cfg = parse_constraints_config(self.config, 'design_questions')
         
         # 输出路径
         self.output_dir = Path(self.config.get('output.intermediate_dir', 'data/intermediate'))
@@ -252,8 +221,8 @@ class DesignGenerator:
         start_time = time.time()
         logger.info(f"Starting design generation from {symbols_path}")
         
-        # 加载符号
-        symbols = self._load_symbols(symbols_path)
+        # 加载符号 using shared utility
+        symbols = load_symbols_jsonl(symbols_path)
         
         if not symbols:
             logger.warning("No symbols loaded")
@@ -312,37 +281,14 @@ class DesignGenerator:
         self._save_samples(samples)
         
         elapsed = time.time() - start_time
+        total_q = self.stats['total_design_questions']
         logger.info(f"Design generation completed in {elapsed:.1f}s:")
-        logger.info(f"  - Total design questions: {self.stats['total_design_questions']}")
-        logger.info(f"  - Generated samples: {self.stats['generated_samples']}")
+        logger.info(f"  - Total design questions: {total_q}")
+        logger.info(f"  - Generated samples: {self.stats['generated_samples']}/{total_q}")
         logger.info(f"  - Rejected samples: {self.stats['rejected_samples']}")
         
         self._write_retrieval_report()
         return samples
-    
-    def _load_symbols(self, symbols_path: Path | str) -> list[CodeSymbol]:
-        """加载符号文件"""
-        symbols_path = Path(symbols_path)
-        
-        if not symbols_path.exists():
-            raise FileNotFoundError(f"Symbols file not found: {symbols_path}")
-        
-        symbols = []
-        with open(symbols_path, 'r', encoding='utf-8') as f:
-            for line_num, line in enumerate(f, 1):
-                line = line.strip()
-                if not line:
-                    continue
-                
-                try:
-                    data = json.loads(line)
-                    symbol = CodeSymbol(**data)
-                    symbols.append(symbol)
-                except Exception as e:
-                    logger.warning(f"Failed to parse symbol at line {line_num}: {e}")
-        
-        logger.info(f"Loaded {len(symbols)} symbols from {symbols_path}")
-        return symbols
     
     def _save_design_questions(self, design_questions: list[DesignQuestion]):
         """保存设计问题到 JSONL"""
@@ -498,7 +444,7 @@ class DesignGenerator:
         # 提取设计问题关键词
         req_keywords = self._extract_keywords(design_question.goal)
         
-        if self.retrieval_mode != "symbol_only":
+        if self.retrieval_cfg.mode != "symbol_only":
             for symbol in candidates:
                 score = self._calculate_relevance_score(symbol, req_keywords)
                 if score > 0:
@@ -511,21 +457,21 @@ class DesignGenerator:
             self.retrieval_stats["scored_non_empty"] += 1
             top_symbols = [s for s, _ in scored_candidates[:self.top_k_context]]
         else:
-            if self.retrieval_mode == "symbol_only" or self.retrieval_mode == "hybrid":
+            if self.retrieval_cfg.mode == "symbol_only" or self.retrieval_cfg.mode == "hybrid":
                 self.retrieval_stats["fallback_used"] += 1
-                top_symbols = candidates[: self.retrieval_fallback_top_k]
+                top_symbols = candidates[:self.retrieval_cfg.fallback_top_k]
             else:
                 top_symbols = []
         
         # 确保包含不同层级
         top_symbols = self._balance_layers(top_symbols, candidates)
 
-        if self.call_chain_enabled and top_symbols:
+        if self.retrieval_cfg.call_chain_enabled and top_symbols:
             expanded = expand_call_chain(
                 top_symbols,
                 symbols,
-                max_depth=self.call_chain_max_depth,
-                max_expansion=self.call_chain_max_expansion,
+                max_depth=self.retrieval_cfg.call_chain_max_depth,
+                max_expansion=self.retrieval_cfg.call_chain_max_expansion,
             )
             added = 0
             existing = {symbol.symbol_id for symbol in top_symbols}
@@ -535,7 +481,7 @@ class DesignGenerator:
                 top_symbols.append(symbol)
                 existing.add(symbol.symbol_id)
                 added += 1
-                if added >= self.call_chain_max_expansion:
+                if added >= self.retrieval_cfg.call_chain_max_expansion:
                     break
             self.retrieval_stats["call_chain_expanded"] += added
 
@@ -549,10 +495,10 @@ class DesignGenerator:
             if symbol.symbol_type != 'method':
                 continue
             
-            # Check if symbol belongs to any design layer
-            if (self._is_controller(symbol) or 
-                self._is_service(symbol) or 
-                self._is_repository(symbol)):
+            # Check if symbol belongs to any design layer using profile methods
+            if (self.profile.is_controller(symbol) or 
+                self.profile.is_service(symbol) or 
+                self.profile.is_repository(symbol)):
                 candidates.append(symbol)
         
         return candidates
@@ -572,14 +518,14 @@ class DesignGenerator:
         return keywords
 
     def _format_architecture_constraints(self) -> str:
-        if not self.enable_arch_constraints:
+        if not self.constraints_cfg.enable_arch_constraints:
             return "None"
-        if not self.architecture_constraints:
+        if not self.constraints_cfg.architecture_constraints:
             return "None"
-        return "\n".join(f"- {item}" for item in self.architecture_constraints)
+        return "\n".join(f"- {item}" for item in self.constraints_cfg.architecture_constraints)
 
     def _format_counterexample_guidance(self) -> str:
-        if not self.enable_counterexample:
+        if not self.constraints_cfg.enable_counterexample:
             return "None"
         return (
             "Include a 'Rejected Alternatives' section with at least 1 alternative, "
@@ -599,11 +545,11 @@ class DesignGenerator:
                 score += 1
         
         # Layer-based scoring
-        if self._is_controller(symbol):
+        if self.profile.is_controller(symbol):
             score += 3  # Controllers are entry points
-        elif self._is_service(symbol):
+        elif self.profile.is_service(symbol):
             score += 2  # Services are core logic
-        elif self._is_repository(symbol):
+        elif self.profile.is_repository(symbol):
             score += 1  # Repositories are data access
         
         # Documentation bonus
@@ -622,68 +568,28 @@ class DesignGenerator:
         layers = {'controller': 0, 'service': 0, 'repository': 0}
         
         for symbol in selected:
-            if self._is_controller(symbol):
+            if self.profile.is_controller(symbol):
                 layers['controller'] += 1
-            elif self._is_service(symbol):
+            elif self.profile.is_service(symbol):
                 layers['service'] += 1
-            elif self._is_repository(symbol):
+            elif self.profile.is_repository(symbol):
                 layers['repository'] += 1
         
         # 如果缺少 Controller，尝试补充
         if layers['controller'] == 0:
             for candidate in all_candidates:
-                if self._is_controller(candidate) and candidate not in selected:
+                if self.profile.is_controller(candidate) and candidate not in selected:
                     selected.insert(0, candidate)
                     break
         
         # 如果缺少 Service，尝试补充
         if layers['service'] == 0:
             for candidate in all_candidates:
-                if self._is_service(candidate) and candidate not in selected:
+                if self.profile.is_service(candidate) and candidate not in selected:
                     selected.append(candidate)
                     break
         
         return selected
-    
-    def _is_controller(self, symbol: CodeSymbol) -> bool:
-        """Check if symbol is a controller using language profile rules"""
-        layer_rules = self.profile.get_design_layer('controller')
-        return self._matches_layer_rules(symbol, layer_rules)
-    
-    def _is_service(self, symbol: CodeSymbol) -> bool:
-        """Check if symbol is a service using language profile rules"""
-        layer_rules = self.profile.get_design_layer('service')
-        return self._matches_layer_rules(symbol, layer_rules)
-    
-    def _is_repository(self, symbol: CodeSymbol) -> bool:
-        """Check if symbol is a repository using language profile rules"""
-        layer_rules = self.profile.get_design_layer('repository')
-        return self._matches_layer_rules(symbol, layer_rules)
-    
-    def _matches_layer_rules(self, symbol: CodeSymbol, layer_rules: dict) -> bool:
-        """Generic layer matching based on profile rules"""
-        # Check annotations/decorators (both in symbol.annotations)
-        symbol_annotations = {ann.name for ann in symbol.annotations}
-        profile_annotations = set(layer_rules.get('annotations', []))
-        profile_decorators = set(layer_rules.get('decorators', []))
-        
-        if symbol_annotations & (profile_annotations | profile_decorators):
-            return True
-        
-        # Check name keywords
-        name_keywords = layer_rules.get('name_keywords', [])
-        name_lower = symbol.name.lower()
-        qualified_lower = symbol.qualified_name.lower()
-        if any(kw in name_lower or kw in qualified_lower for kw in name_keywords):
-            return True
-        
-        # Check path keywords
-        path_keywords = layer_rules.get('path_keywords', [])
-        path_lower = symbol.file_path.lower()
-        if any(kw in path_lower for kw in path_keywords):
-            return True
-        
-        return False
     
     def _build_context(
         self,
@@ -693,10 +599,10 @@ class DesignGenerator:
         """构造上下文字符串"""
         parts = []
         
-        # 按层级分组
-        controllers = [s for s in symbols if self._is_controller(s)]
-        services = [s for s in symbols if self._is_service(s)]
-        repositories = [s for s in symbols if self._is_repository(s)]
+        # 按层级分组 using profile methods
+        controllers = [s for s in symbols if self.profile.is_controller(s)]
+        services = [s for s in symbols if self.profile.is_service(s)]
+        repositories = [s for s in symbols if self.profile.is_repository(s)]
         
         # Controller 层
         if controllers:
@@ -755,8 +661,8 @@ class DesignGenerator:
     ) -> str:
         """构造 user prompt"""
         # 选择关键符号用于示例
-        controller_symbol = next((s for s in symbols if self._is_controller(s)), symbols[0])
-        service_symbol = next((s for s in symbols if self._is_service(s)), symbols[0] if len(symbols) > 0 else None)
+        controller_symbol = next((s for s in symbols if self.profile.is_controller(s)), symbols[0])
+        service_symbol = next((s for s in symbols if self.profile.is_service(s)), symbols[0] if len(symbols) > 0 else None)
         
         # 准备约束条件、验收标准和非目标的格式化文本
         constraints_text = '\n'.join([f'- {c}' for c in design_question.constraints])
@@ -819,15 +725,12 @@ Service 核心逻辑：
         return prompt
 
     def _sample_negative_type(self) -> str | None:
-        if not self.negative_types:
-            return None
-        if not isinstance(self.negative_ratio, (int, float)):
-            return None
-        if self.negative_ratio <= 0:
-            return None
-        if self.negative_rng.random() >= float(self.negative_ratio):
-            return None
-        return self.negative_rng.choice(self.negative_types)
+        """Sample a negative type using shared utility"""
+        return sample_negative_type(
+            self.coverage_cfg.negative_ratio,
+            self.coverage_cfg.negative_types,
+            self.negative_rng
+        )
 
     def _inject_negative_rules(self, prompt: str, negative_type: str | None) -> str:
         rules = self._build_negative_rules(negative_type)
@@ -1015,11 +918,12 @@ Service 核心逻辑：
     
     def print_summary(self):
         """打印生成摘要"""
+        total_q = self.stats['total_design_questions']
         print("\n" + "=" * 70)
         print(" 架构设计方案生成摘要")
         print("=" * 70)
-        print(f"总设计问题数: {self.stats['total_design_questions']}")
-        print(f"成功生成: {self.stats['generated_samples']}")
+        print(f"总设计问题数: {total_q}")
+        print(f"成功生成: {self.stats['generated_samples']}/{total_q}")
         print(f"生成失败: {self.stats['rejected_samples']}")
         
         if self.stats['validation_errors']:

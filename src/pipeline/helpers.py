@@ -4,7 +4,8 @@ Helper functions for pipeline operations.
 import subprocess
 from pathlib import Path
 
-from src.utils import get_logger, read_json
+from src.utils.core.logger import get_logger
+from src.utils.io.file_ops import read_json
 
 logger = get_logger(__name__)
 

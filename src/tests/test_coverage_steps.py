@@ -10,7 +10,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from src.pipeline.steps.coverage_sampler import CoverageSamplerStep
 from src.pipeline.steps.coverage_tagger import CoverageTaggerStep
-from src.utils import read_json, read_jsonl, write_jsonl
+from src.utils.io.file_ops import read_json, read_jsonl, write_jsonl
 
 
 class _Args:

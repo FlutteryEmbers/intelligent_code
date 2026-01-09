@@ -1,4 +1,4 @@
-"""
+﻿"""
 Automatic Design Question Generator - 自动生成架构设计问题
 
 从代码仓库结构和符号中自动生成架构设计问题，用于 DesignGenerator。
@@ -6,16 +6,24 @@ Automatic Design Question Generator - 自动生成架构设计问题
 """
 import json
 import time
-import random
 from pathlib import Path
 from typing import Generator
 
-from src.utils.schemas import CodeSymbol
-from src.utils.config import Config
-from src.utils.logger import get_logger
-from src.utils.validator import normalize_path_separators
-from src.utils.language_profile import load_language_profile
-from src.utils import load_prompt_template, load_yaml_list, read_jsonl, append_jsonl, clean_llm_json_output
+from src.utils.core.schemas import CodeSymbol
+from src.utils.core.config import Config
+from src.utils.core.logger import get_logger
+from src.utils.data.validator import normalize_path_separators
+from src.utils.data.sampling import (
+    weighted_choice, sample_coverage_target, sample_question_type, build_scenario_constraints,
+)
+from src.utils.generation.language_profile import load_language_profile
+from src.utils.generation.config_helpers import (
+    parse_coverage_config, create_seeded_rng, get_with_fallback, resolve_prompt_path,
+)
+from src.utils.io.file_ops import (
+    load_prompt_template, load_yaml_list, read_jsonl, append_jsonl, clean_llm_json_output,
+)
+from src.utils.io.loaders import load_symbols_jsonl
 from src.engine.llm_client import LLMClient
 
 logger = get_logger(__name__)
@@ -40,47 +48,36 @@ class DesignQuestionGenerator:
         # Load language profile for layer rules
         self.language_profile = load_language_profile(self.config)
 
-        # 加载 prompt 模板
+        # 加载 prompt 模板 using shared utility
         coverage_prompt = self.config.get('design_questions.prompts.coverage_generation')
         base_prompt = self.config.get(
             'design_questions.prompts.question_generation',
             'configs/prompts/design/auto_design_question_generation.txt',
         )
-        prompt_path = self._resolve_prompt_path(coverage_prompt, base_prompt)
+        prompt_path = resolve_prompt_path(coverage_prompt, base_prompt)
         self.prompt_template = load_prompt_template(prompt_path)
 
-        # 从配置读取参数
-        self.max_design_questions = self.config.get(
-            'design_questions.max_questions',
-            self.config.get('core.max_items', self.config.get('generation.max_items', 50)),
+        # 从配置读取参数 using shared helpers
+        self.max_design_questions = get_with_fallback(
+            self.config, 'design_questions.max_questions', 'core.max_items', 50
         )
-        self.top_k_symbols = self.config.get(
-            'core.retrieval_top_k',
-            self.config.get('generation.retrieval_top_k', 6),
+        self.top_k_symbols = get_with_fallback(
+            self.config, 'core.retrieval_top_k', 'generation.retrieval_top_k', 6
         )
         self.min_evidence_refs = self.config.get('design_questions.min_evidence_refs', 1)
-        self.max_context_chars = self.config.get(
-            'core.max_context_chars',
-            self.config.get('generation.max_context_chars', 16000),
+        self.max_context_chars = get_with_fallback(
+            self.config, 'core.max_context_chars', 'generation.max_context_chars', 16000
         )
-        self.seed = self.config.get(
-            'core.seed',
-            self.config.get('generation.seed', 42),
-        )
-        self.coverage_config = self.config.get('design_questions.coverage', {}) or {}
-        self.coverage_mode = self.coverage_config.get('mode', 'hybrid')
-        self.constraint_strength = self.coverage_config.get('constraint_strength', 'hybrid')
-        self.coverage_rng = random.Random(self.seed)
-        self.diversity_config = self.coverage_config.get('diversity', {}) or {}
-        self.diversity_mode = self.diversity_config.get('mode', 'off')
-        self.question_type_targets = self.diversity_config.get('question_type_targets', {}) or {}
-        self.scenario_config = self.coverage_config.get('scenario_injection', {}) or {}
-        self.scenario_mode = self.scenario_config.get('mode', 'off')
-        self.fuzzy_ratio = float(self.scenario_config.get('fuzzy_ratio', 0) or 0)
+        
+        # 解析覆盖率配置 using shared config parser
+        self.coverage_cfg = parse_coverage_config(self.config, 'design_questions')
+        self.coverage_rng = create_seeded_rng(self.config)
+        
+        # Load scenario templates
         self.scenario_templates = load_yaml_list(
-            self.scenario_config.get('templates_path'),
+            self.coverage_cfg.templates_path,
             key='templates'
-        ) if self.scenario_config.get('templates_path') else []
+        ) if self.coverage_cfg.templates_path else []
 
         # Method profiles 配置（可选增强）
         self.use_method_profiles = self.config.get('design_questions.use_method_profiles', False)
@@ -132,14 +129,6 @@ class DesignQuestionGenerator:
             self.batch_size,
         )
 
-    def _resolve_prompt_path(self, preferred: str | None, fallback: str) -> str:
-        if preferred:
-            preferred_path = Path(preferred)
-            if preferred_path.exists():
-                return str(preferred_path)
-            logger.warning("Coverage prompt not found, fallback to base prompt: %s", preferred_path)
-        return fallback
-
     def generate_from_repo(
         self,
         symbols_path: str | Path = 'data/raw/extracted/symbols.jsonl',
@@ -158,7 +147,8 @@ class DesignQuestionGenerator:
         start_time = time.time()
         logger.info(f"Starting design question generation from {symbols_path}")
 
-        symbols = self._load_symbols(symbols_path)
+        # Load symbols using shared utility
+        symbols = load_symbols_jsonl(symbols_path)
         self.stats['total_symbols'] = len(symbols)
 
         if not symbols:
@@ -283,153 +273,60 @@ class DesignQuestionGenerator:
 
         return collected
 
-    def _load_symbols(self, symbols_path: Path | str) -> list[CodeSymbol]:
-        symbols_path = Path(symbols_path)
-        if not symbols_path.exists():
-            raise FileNotFoundError(f"Symbols file not found: {symbols_path}")
-
-        symbols = []
-        with open(symbols_path, 'r', encoding='utf-8') as f:
-            for line_num, line in enumerate(f, 1):
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    data = json.loads(line)
-                    symbol = CodeSymbol(**data)
-                    symbols.append(symbol)
-                except Exception as e:
-                    logger.warning(f"Failed to parse symbol at line {line_num}: {e}")
-
-        logger.info(f"Loaded {len(symbols)} symbols from {symbols_path}")
-        return symbols
-
     def _filter_candidates(self, symbols: list[CodeSymbol]) -> list[CodeSymbol]:
-        """Filter candidate symbols using language profile rules"""
+        """Filter candidate symbols using language profile layer methods"""
         candidates = []
-        
-        # Collect all layer rules
-        design_layers = self.language_profile.get('design', {}).get('layers', {})
-        all_annotations = set()
-        all_decorators = set()
-        all_keywords = []
-        
-        for layer_name in ['controller', 'service', 'repository']:
-            layer_rules = design_layers.get(layer_name, {})
-            all_annotations.update(layer_rules.get('annotations', []))
-            all_decorators.update(layer_rules.get('decorators', []))
-            all_keywords.extend(layer_rules.get('name_keywords', []))
-            all_keywords.extend(layer_rules.get('path_keywords', []))
         
         for symbol in symbols:
             if symbol.symbol_type != 'method':
                 continue
 
-            annotations = {ann.name for ann in symbol.annotations}
-            # Check both annotations (Java) and decorators (Python)
-            if annotations & (all_annotations | all_decorators):
-                candidates.append(symbol)
-                continue
-
-            # Check keywords in path and qualified name
-            path_lower = symbol.file_path.lower()
-            qualified_lower = symbol.qualified_name.lower()
-            if any(kw in path_lower or kw in qualified_lower for kw in all_keywords):
+            # Use profile's layer identification methods
+            if (self.language_profile.is_controller(symbol) or 
+                self.language_profile.is_service(symbol) or 
+                self.language_profile.is_repository(symbol)):
                 candidates.append(symbol)
 
         return candidates
 
     def _select_top_k_symbols(self, candidates: list[CodeSymbol]) -> list[CodeSymbol]:
-        controllers = [s for s in candidates if self._is_controller(s)]
-        services = [s for s in candidates if self._is_service(s)]
-        repositories = [s for s in candidates if self._is_repository(s)]
+        """Select top k symbols with balanced layer representation"""
+        import random as rnd
+        
+        controllers = [s for s in candidates if self.language_profile.is_controller(s)]
+        services = [s for s in candidates if self.language_profile.is_service(s)]
+        repositories = [s for s in candidates if self.language_profile.is_repository(s)]
 
-        random.seed(self.seed)
+        seed = self.config.get('core.seed', self.config.get('generation.seed', 42))
+        rnd.seed(seed)
         k = min(self.top_k_symbols, len(candidates))
 
         selected = []
         controller_quota = min(len(controllers), max(k // 3, 1))
-        selected.extend(random.sample(controllers, controller_quota) if len(controllers) >= controller_quota else controllers)
+        selected.extend(rnd.sample(controllers, controller_quota) if len(controllers) >= controller_quota else controllers)
 
         service_quota = min(len(services), max(k // 3, 1))
-        selected.extend(random.sample(services, service_quota) if len(services) >= service_quota else services)
+        selected.extend(rnd.sample(services, service_quota) if len(services) >= service_quota else services)
 
         remaining = k - len(selected)
         if remaining > 0 and repositories:
             repo_quota = min(len(repositories), remaining)
-            selected.extend(random.sample(repositories, repo_quota) if len(repositories) >= repo_quota else repositories)
+            selected.extend(rnd.sample(repositories, repo_quota) if len(repositories) >= repo_quota else repositories)
 
         if len(selected) < k:
             remaining_candidates = [s for s in candidates if s not in selected]
             if remaining_candidates:
                 supplement = min(len(remaining_candidates), k - len(selected))
-                selected.extend(random.sample(remaining_candidates, supplement))
+                selected.extend(rnd.sample(remaining_candidates, supplement))
 
         return selected[:k]
-
-    def _is_controller(self, symbol: CodeSymbol) -> bool:
-        """Check if symbol is a controller using language profile rules"""
-        layer_rules = self.language_profile.get('design', {}).get('layers', {}).get('controller', {})
-        
-        # Check annotations (Java) or decorators (Python)
-        annotations = {ann.name for ann in symbol.annotations}
-        if annotations & set(layer_rules.get('annotations', [])):
-            return True
-        if annotations & set(layer_rules.get('decorators', [])):
-            return True
-        
-        # Check name and path keywords
-        path_lower = symbol.file_path.lower()
-        name_lower = symbol.qualified_name.lower()
-        name_keywords = layer_rules.get('name_keywords', [])
-        path_keywords = layer_rules.get('path_keywords', [])
-        
-        return any(kw in name_lower for kw in name_keywords) or any(kw in path_lower for kw in path_keywords)
-
-    def _is_service(self, symbol: CodeSymbol) -> bool:
-        """Check if symbol is a service using language profile rules"""
-        layer_rules = self.language_profile.get('design', {}).get('layers', {}).get('service', {})
-        
-        # Check annotations (Java) or decorators (Python)
-        annotations = {ann.name for ann in symbol.annotations}
-        if annotations & set(layer_rules.get('annotations', [])):
-            return True
-        if annotations & set(layer_rules.get('decorators', [])):
-            return True
-        
-        # Check name and path keywords
-        path_lower = symbol.file_path.lower()
-        name_lower = symbol.qualified_name.lower()
-        name_keywords = layer_rules.get('name_keywords', [])
-        path_keywords = layer_rules.get('path_keywords', [])
-        
-        return any(kw in name_lower for kw in name_keywords) or any(kw in path_lower for kw in path_keywords)
-
-    def _is_repository(self, symbol: CodeSymbol) -> bool:
-        """Check if symbol is a repository using language profile rules"""
-        layer_rules = self.language_profile.get('design', {}).get('layers', {}).get('repository', {})
-        
-        # Check annotations (Java) or decorators (Python)
-        annotations = {ann.name for ann in symbol.annotations}
-        if annotations & set(layer_rules.get('annotations', [])):
-            return True
-        if annotations & set(layer_rules.get('decorators', [])):
-            return True
-        
-        # Check name and path keywords
-        path_lower = symbol.file_path.lower()
-        name_lower = symbol.qualified_name.lower()
-        name_keywords = layer_rules.get('name_keywords', [])
-        path_keywords = layer_rules.get('path_keywords', [])
-        
-        return any(kw in name_lower for kw in name_keywords) or any(kw in path_lower for kw in path_keywords)
 
     def _build_context(self, symbols: list[CodeSymbol]) -> str:
         """Build context string with language-specific code blocks"""
         parts = []
-        controllers = [s for s in symbols if self._is_controller(s)]
-        services = [s for s in symbols if self._is_service(s)]
-        repositories = [s for s in symbols if self._is_repository(s)]
+        controllers = [s for s in symbols if self.language_profile.is_controller(s)]
+        services = [s for s in symbols if self.language_profile.is_service(s)]
+        repositories = [s for s in symbols if self.language_profile.is_repository(s)]
         
         # Get language name for code blocks
         language_name = self.language_profile.get('language', 'java')
@@ -518,77 +415,35 @@ class DesignQuestionGenerator:
             result = result[:self.profiles_max_chars] + "\n\n... (profiles truncated)"
         return result
 
-    def _weighted_choice(self, weights: dict[str, float], default: str) -> str:
-        if not isinstance(weights, dict):
-            return default
-        total = sum(float(value) for value in weights.values())
-        if total <= 0:
-            return default
-        threshold = self.coverage_rng.random() * total
-        cumulative = 0.0
-        for key, value in weights.items():
-            cumulative += float(value)
-            if threshold <= cumulative:
-                return key
-        return default
+    def _sample_coverage_target_local(self) -> tuple[str, str]:
+        """Sample coverage target using shared utility"""
+        return sample_coverage_target(self.coverage_cfg, self.coverage_rng)
 
-    def _sample_coverage_target(self) -> tuple[str, str]:
-        if self.coverage_mode not in ("upstream", "hybrid"):
-            return "high", "design"
-        bucket = self._weighted_choice(
-            self.coverage_config.get("targets", {}),
-            "high",
+    def _sample_question_type_local(self) -> str:
+        """Sample question type using shared utility"""
+        return sample_question_type(self.coverage_cfg, self.coverage_rng)
+
+    def _build_scenario_constraints_local(self) -> str:
+        """Build scenario constraints using shared utility"""
+        return build_scenario_constraints(
+            self.coverage_cfg, self.scenario_templates, self.coverage_rng
         )
-        intent = self._weighted_choice(
-            self.coverage_config.get("intent_targets", {}),
-            "design",
-        )
-        return bucket, intent
-
-    def _sample_question_type(self) -> str:
-        if self.diversity_mode != "quota":
-            return "architecture"
-        return self._weighted_choice(self.question_type_targets, "architecture")
-
-    def _build_scenario_constraints(self) -> str:
-        if self.scenario_mode != "ratio":
-            return ""
-        if not self.scenario_templates or self.fuzzy_ratio <= 0:
-            return ""
-        if self.coverage_rng.random() >= self.fuzzy_ratio:
-            return ""
-        return self.coverage_rng.choice(self.scenario_templates)
 
     def _resolve_constraint_strength(self, bucket: str) -> str:
-        strength = self.constraint_strength
-        if strength == "hybrid":
-            return "strong" if bucket in ("mid", "hard") else "weak"
-        if strength in ("strong", "weak"):
-            return strength
-        return "weak"
+        """Resolve constraint strength based on bucket and config"""
+        from src.utils.data.sampling import resolve_constraint_strength
+        return resolve_constraint_strength(self.coverage_cfg.constraint_strength, bucket)
 
     def _build_constraint_rules(self, bucket: str) -> tuple[str, str]:
-        strength = self._resolve_constraint_strength(bucket)
-        if strength == "strong":
-            rules = (
-                "Strong constraints:\n"
-                "- Include trade-offs, constraints, or implicit requirements.\n"
-                "- Highlight risks, boundary conditions, or backward compatibility.\n"
-                "- Keep the question specific to the evidence pool and design context."
-            )
-        else:
-            rules = (
-                "Weak constraints:\n"
-                "- Keep the question concise and focused on a single goal.\n"
-                "- Use natural wording but stay grounded in the evidence pool."
-            )
-        return strength, rules
+        """Build constraint rules using shared utility"""
+        from src.utils.data.sampling import build_constraint_rules
+        return build_constraint_rules(self.coverage_cfg.constraint_strength, bucket)
 
     def _build_prompt(self, context: str, evidence_pool: str, max_design_questions: int) -> str:
         language_name = self.language_profile.get('language', 'java')
-        coverage_bucket, coverage_intent = self._sample_coverage_target()
-        question_type = self._sample_question_type()
-        scenario_constraints = self._build_scenario_constraints()
+        coverage_bucket, coverage_intent = self._sample_coverage_target_local()
+        question_type = self._sample_question_type_local()
+        scenario_constraints = self._build_scenario_constraints_local()
         constraint_strength, constraint_rules = self._build_constraint_rules(coverage_bucket)
         return self.prompt_template.format(
             language=language_name.capitalize(),
@@ -827,12 +682,14 @@ class DesignQuestionGenerator:
             logger.error(f"Failed to log rejected entry: {e}")
 
     def print_summary(self):
+        max_cap = self.max_design_questions
         print("\n" + "=" * 70)
         print(" 自动设计问题生成摘要")
         print("=" * 70)
         print(f"总符号数: {self.stats['total_symbols']}")
         print(f"过滤候选: {self.stats['filtered_symbols']}")
-        print(f"成功生成: {self.stats['generated_design_questions']}")
+        print(f"最大问题数限制: {max_cap}")
+        print(f"成功生成: {self.stats['generated_design_questions']}/{max_cap}")
         print(f"生成失败: {self.stats['rejected_design_questions']}")
         print(f"\n输出文件:")
         print(f"  - 设计问题文件: {self.output_jsonl}")

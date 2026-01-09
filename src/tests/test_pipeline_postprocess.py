@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import sys
 from pathlib import Path
@@ -12,8 +12,8 @@ if str(REPO_ROOT) not in sys.path:
 from src.pipeline.steps.deduplication import DeduplicationStep
 from src.pipeline.steps.merge import MergeStep
 from src.pipeline.steps.split import SplitStep
-from src.utils import read_jsonl, write_jsonl
-from src.utils.schemas import sha256_text
+from src.utils.io.file_ops import read_jsonl, write_jsonl
+from src.utils.core.schemas import sha256_text
 
 
 class _Args:

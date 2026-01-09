@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 from collections import defaultdict
 
-from .schemas import CodeSymbol
+from src.utils.core.schemas import CodeSymbol
 
 
 def extract_package_from_qualified_name(qualified_name: str) -> str:
@@ -86,6 +86,9 @@ def get_sample_group_key(
     Returns:
         Group key string
     """
+    # Normalize path separators for cross-platform compatibility
+    from .validator import normalize_path_separators
+    
     # Get first evidence ref
     thought = sample.get("thought", {})
     evidence_refs = thought.get("evidence_refs", [])
@@ -98,11 +101,14 @@ def get_sample_group_key(
     first_ref = evidence_refs[0]
     symbol_id = first_ref.get("symbol_id", "")
     
-    if not symbol_id or symbol_id not in symbols_map:
+    # Normalize symbol_id
+    normalized_symbol_id = normalize_path_separators(symbol_id) if symbol_id else ""
+    
+    if not normalized_symbol_id or normalized_symbol_id not in symbols_map:
         return "_UNKNOWN_SYMBOL_"
     
     # Get symbol
-    symbol = symbols_map[symbol_id]
+    symbol = symbols_map[normalized_symbol_id]
     
     # Extract group key based on strategy
     if group_by == "package":
@@ -143,6 +149,7 @@ def group_split_samples(
         test_ratio: Ratio for test set (default: 0.1)
         seed: Random seed for reproducibility
         group_by: Grouping strategy - "package" or "path"
+        min_groups_for_grouping: Minimum groups for group-based split
         
     Returns:
         Tuple of (train_samples, val_samples, test_samples)

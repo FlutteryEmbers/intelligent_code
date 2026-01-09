@@ -1,11 +1,12 @@
-"""
+﻿"""
 Step 1: Parse Repository
 """
 from pathlib import Path
 
 from src.parser.java_parser import JavaParser
 from src.parser.python_parser import PythonParser
-from src.utils import write_json, write_jsonl, detect_license
+from src.utils.io.file_ops import write_json, write_jsonl
+from src.utils.safety.scanner import detect_license
 from src.pipeline.base_step import BaseStep
 from src.pipeline.helpers import should_skip_parse
 
@@ -37,7 +38,7 @@ class ParseStep(BaseStep):
         
         # Select parser based on language.name
         # Handle both dict and Config object
-        from src.utils.config import Config as ConfigClass
+        from src.utils.core.config import Config as ConfigClass
         if isinstance(self.config, ConfigClass):
             # Config object - use bracket notation for nested access
             language_name = self.config["language"]["name"].lower()

@@ -1,8 +1,8 @@
 """
 Step 7: Secrets Scanning
 """
-import re
-from src.utils import read_jsonl, write_jsonl, scan_secrets, sanitize_text
+from src.utils.io.file_ops import read_jsonl, write_jsonl
+from src.utils.safety.scanner import scan_secrets, sanitize_text, find_blacklist_hits, sanitize_blacklist
 from src.pipeline.base_step import BaseStep
 
 
@@ -38,29 +38,6 @@ class SecretsScanStep(BaseStep):
         flagged_samples = []
         modified_samples = 0
 
-        def find_blacklist_hits(text: str) -> list[str]:
-            if not text:
-                return []
-            lowered = text.lower()
-            hits = []
-            for keyword in blacklist_keywords:
-                if not isinstance(keyword, str) or not keyword:
-                    continue
-                if keyword.lower() in lowered:
-                    hits.append(keyword)
-            return hits
-
-        def sanitize_blacklist(text: str) -> str:
-            if not text:
-                return text
-            sanitized = text
-            for keyword in blacklist_keywords:
-                if not isinstance(keyword, str) or not keyword:
-                    continue
-                pattern = re.compile(re.escape(keyword), re.IGNORECASE)
-                sanitized = pattern.sub("[REDACTED]", sanitized)
-            return sanitized
-
         for idx, sample in enumerate(samples):
             # Scan context and answer
             context = sample.get("context", "")
@@ -68,7 +45,7 @@ class SecretsScanStep(BaseStep):
             scan_text = context + "\n" + answer
             
             findings = scan_secrets(scan_text)
-            blacklist_hits = find_blacklist_hits(scan_text)
+            blacklist_hits = find_blacklist_hits(scan_text, blacklist_keywords)
             
             if findings or blacklist_hits:
                 if findings:
@@ -93,8 +70,8 @@ class SecretsScanStep(BaseStep):
                 elif safety_mode == "sanitize":
                     sample["context"] = sanitize_text(context, findings)
                     sample["answer"] = sanitize_text(answer, findings)
-                    sample["context"] = sanitize_blacklist(sample["context"])
-                    sample["answer"] = sanitize_blacklist(sample["answer"])
+                    sample["context"] = sanitize_blacklist(sample["context"], blacklist_keywords)
+                    sample["answer"] = sanitize_blacklist(sample["answer"], blacklist_keywords)
                     modified_samples += 1
                     clean_samples.append(sample)
                     action = "sanitize"

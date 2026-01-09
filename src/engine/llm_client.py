@@ -1,4 +1,4 @@
-"""
+﻿"""
 LLM 客户端 - 本地 LLM 调用封装（支持 Ollama）
 """
 import json
@@ -12,9 +12,9 @@ from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import ValidationError
 
-from src.utils.schemas import TrainingSample
-from src.utils.config import config
-from src.utils.logger import get_logger
+from src.utils.core.schemas import TrainingSample
+from src.utils.core.config import config
+from src.utils.core.logger import get_logger
 
 
 logger = get_logger(__name__)
@@ -342,7 +342,7 @@ if __name__ == "__main__":
     import sys
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
     
-    from src.utils.config import config
+    from src.utils.core.config import config
     
     print("=" * 60)
     print("LLMClient 自测")

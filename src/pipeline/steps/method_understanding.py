@@ -1,9 +1,9 @@
-"""
+﻿"""
 Step A1: Method Understanding
 """
 from src.engine.auto_method_understander import AutoMethodUnderstander
 from src.pipeline.base_step import BaseStep
-from src.utils.config import Config
+from src.utils.core.config import Config
 
 
 class MethodUnderstandingStep(BaseStep):

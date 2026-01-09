@@ -311,3 +311,51 @@ def sanitize_text(text: str, findings: list[dict]) -> str:
         result = result[:finding["start"]] + placeholder + result[finding["end"]:]
     
     return result
+
+
+def find_blacklist_hits(text: str, blacklist_keywords: list[str]) -> list[str]:
+    """
+    Find blacklist keyword hits in text.
+    
+    Args:
+        text: Text to scan
+        blacklist_keywords: List of keywords to check
+        
+    Returns:
+        List of matched keywords
+    """
+    if not text or not blacklist_keywords:
+        return []
+    
+    lowered = text.lower()
+    hits = []
+    for keyword in blacklist_keywords:
+        if not isinstance(keyword, str) or not keyword:
+            continue
+        if keyword.lower() in lowered:
+            hits.append(keyword)
+    return hits
+
+
+def sanitize_blacklist(text: str, blacklist_keywords: list[str], placeholder: str = "[REDACTED]") -> str:
+    """
+    Sanitize text by replacing blacklist keywords with placeholder.
+    
+    Args:
+        text: Original text
+        blacklist_keywords: List of keywords to replace
+        placeholder: Replacement text (default: "[REDACTED]")
+        
+    Returns:
+        Sanitized text with keywords replaced
+    """
+    if not text or not blacklist_keywords:
+        return text
+    
+    sanitized = text
+    for keyword in blacklist_keywords:
+        if not isinstance(keyword, str) or not keyword:
+            continue
+        pattern = re.compile(re.escape(keyword), re.IGNORECASE)
+        sanitized = pattern.sub(placeholder, sanitized)
+    return sanitized

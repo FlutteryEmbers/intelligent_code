@@ -6,20 +6,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.pipeline.base_step import BaseStep
-from src.utils import read_jsonl, write_json
-
-
-def _compute_distribution(samples: list[dict]) -> dict:
-    counts: dict[str, int] = {}
-    for sample in samples:
-        coverage = sample.get("quality", {}).get("coverage", {})
-        q_type = coverage.get("question_type") or "unknown"
-        counts[q_type] = counts.get(q_type, 0) + 1
-    total = sum(counts.values())
-    ratios = {}
-    if total > 0:
-        ratios = {key: round(value / total, 4) for key, value in counts.items()}
-    return {"counts": counts, "ratios": ratios, "total": total}
+from src.utils.io.file_ops import read_jsonl, write_json
+from src.utils.data.coverage import compute_distribution
 
 
 def _compare_targets(targets: dict, actual: dict, max_delta: float) -> list[str]:
@@ -87,8 +75,8 @@ class QuestionTypeReportStep(BaseStep):
         qa_samples = read_jsonl(qa_clean_path) if qa_clean_path.exists() else []
         design_samples = read_jsonl(design_clean_path) if design_clean_path.exists() else []
 
-        qa_dist = _compute_distribution(qa_samples)
-        design_dist = _compute_distribution(design_samples)
+        qa_dist = compute_distribution(qa_samples, "quality.coverage.question_type")
+        design_dist = compute_distribution(design_samples, "quality.coverage.question_type")
 
         qa_max_delta = float(qa_reg.get("max_delta", 0.1))
         design_max_delta = float(design_reg.get("max_delta", 0.1))

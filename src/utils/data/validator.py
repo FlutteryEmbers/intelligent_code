@@ -2,14 +2,13 @@
 Dataset quality validation utilities.
 Provides sample validation and dataset quality gates.
 """
-import json
 import re
 from pathlib import Path
 from typing import Any
 from collections import Counter
 
-from .schemas import CodeSymbol, TrainingSample, EvidenceRef
-from .io import read_jsonl, write_json, append_jsonl
+from src.utils.core.schemas import CodeSymbol, TrainingSample
+from src.utils.io.file_ops import read_jsonl, write_json, append_jsonl
 
 
 def normalize_path_separators(path: str) -> str:
@@ -433,6 +432,8 @@ def validate_dataset(
         symbols_map: symbol_id -> CodeSymbol mapping
         report_path: Path to output JSON report
         rejected_path: Path to output rejected samples JSONL
+        clean_path: Path to output clean samples JSONL
+        config: Optional configuration dict
     """
     input_jsonl = Path(input_jsonl)
     report_path = Path(report_path)

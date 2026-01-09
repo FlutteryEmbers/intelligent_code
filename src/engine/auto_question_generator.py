@@ -1,21 +1,25 @@
-"""
+﻿"""
 Auto 模块 - 问题生成器
 
 基于 MethodProfile 自动生成多样化的业务问题。
 """
 import json
 import hashlib
-import random
 from pathlib import Path
 from typing import List
 
 import yaml
 
-from src.utils.schemas import MethodProfile, QuestionSample, CodeSymbol, EvidenceRef
-from src.utils.config import Config
-from src.utils.logger import get_logger
-from src.utils.validator import normalize_path_separators
-from src.utils import load_prompt_template, load_yaml_list, read_jsonl, append_jsonl, clean_llm_json_output
+from src.utils.core.schemas import MethodProfile, QuestionSample, CodeSymbol, EvidenceRef
+from src.utils.core.config import Config
+from src.utils.core.logger import get_logger
+from src.utils.data.validator import normalize_path_separators
+from src.utils.data.sampling import (
+    sample_coverage_target, sample_question_type, build_scenario_constraints, build_constraint_rules,
+)
+from src.utils.io.file_ops import load_prompt_template, load_yaml_list, append_jsonl, clean_llm_json_output
+from src.utils.io.loaders import load_profiles_jsonl
+from src.utils.generation.config_helpers import parse_coverage_config, create_seeded_rng, resolve_prompt_path
 from src.engine.llm_client import LLMClient
 
 logger = get_logger(__name__)
@@ -114,20 +118,14 @@ class AutoQuestionGenerator:
         self.questions_per_method = self.config.get('question_answer.questions_per_method', 5)
         self.max_questions = self.config.get('question_answer.max_questions', None)
         self.batch_size = self.config.get('question_answer.batch_size', None)
-        self.coverage_config = self.config.get('question_answer.coverage', {}) or {}
-        self.coverage_mode = self.coverage_config.get('mode', 'hybrid')
-        self.constraint_strength = self.coverage_config.get('constraint_strength', 'hybrid')
-        self.coverage_rng = random.Random(self.config.get('core.seed', 42))
-        self.diversity_config = self.coverage_config.get('diversity', {}) or {}
-        self.diversity_mode = self.diversity_config.get('mode', 'off')
-        self.question_type_targets = self.diversity_config.get('question_type_targets', {}) or {}
-        self.scenario_config = self.coverage_config.get('scenario_injection', {}) or {}
-        self.scenario_mode = self.scenario_config.get('mode', 'off')
-        self.fuzzy_ratio = float(self.scenario_config.get('fuzzy_ratio', 0) or 0)
+        
+        # 解析覆盖率配置
+        self.coverage_cfg = parse_coverage_config(self.config, 'question_answer')
+        self.coverage_rng = create_seeded_rng(self.config)
         self.scenario_templates = load_yaml_list(
-            self.scenario_config.get('templates_path'),
+            self.coverage_cfg.templates_path,
             key='templates'
-        ) if self.scenario_config.get('templates_path') else []
+        ) if self.coverage_cfg.templates_path else []
         
         # 加载 prompt 模板
         coverage_prompt = self.config.get('question_answer.prompts.coverage_generation')
@@ -135,7 +133,7 @@ class AutoQuestionGenerator:
             'question_answer.prompts.question_generation',
             'configs/prompts/question_answer/auto_question_generation.txt'
         )
-        template_path = self._resolve_prompt_path(coverage_prompt, base_prompt)
+        template_path = resolve_prompt_path(coverage_prompt, base_prompt)
         self.prompt_template = load_prompt_template(template_path)
         
         # 输出路径
@@ -152,14 +150,6 @@ class AutoQuestionGenerator:
             'duplicates_removed': 0,
         }
 
-    def _resolve_prompt_path(self, preferred: str | None, fallback: str) -> str:
-        if preferred:
-            preferred_path = Path(preferred)
-            if preferred_path.exists():
-                return str(preferred_path)
-            logger.warning("Coverage prompt not found, fallback to base prompt: %s", preferred_path)
-        return fallback
-    
     def generate_from_profiles(
         self,
         profiles_jsonl: Path,
@@ -178,19 +168,8 @@ class AutoQuestionGenerator:
         """
         logger.info(f"Loading profiles from {profiles_jsonl}")
         
-        # 读取所有 profiles
-        profile_dicts = read_jsonl(profiles_jsonl)
-        profiles = []
-        for profile_dict in profile_dicts:
-            # 转换 evidence_refs
-            evidence_refs = []
-            for ref in profile_dict.get('evidence_refs', []):
-                evidence_refs.append(EvidenceRef(**ref))
-            profile_dict['evidence_refs'] = evidence_refs
-            
-            profiles.append(MethodProfile(**profile_dict))
-        
-        logger.info(f"Loaded {len(profiles)} profiles")
+        # 读取所有 profiles（使用共享工具）
+        profiles = load_profiles_jsonl(profiles_jsonl)
         self.stats['total_profiles'] = len(profiles)
         
         # 为每个 profile 生成问题
@@ -257,74 +236,27 @@ class AutoQuestionGenerator:
             if self.max_questions is not None and self.stats['total_questions'] >= self.max_questions:
                     break
         
-        logger.info(f"Question generation completed: {self.stats['total_questions']} questions, {self.stats['duplicates_removed']} duplicates removed")
+        potential = self.stats['total_profiles'] * self.questions_per_method
+        max_cap = self.max_questions or potential
+        logger.info(
+            f"Question generation completed: {self.stats['total_questions']}/{max_cap} questions "
+            f"(potential: {potential} from {self.stats['total_profiles']} profiles × {self.questions_per_method}/profile, "
+            f"duplicates removed: {self.stats['duplicates_removed']})"
+        )
         return all_questions
 
-    def _weighted_choice(self, weights: dict[str, float], default: str) -> str:
-        if not isinstance(weights, dict):
-            return default
-        total = sum(float(value) for value in weights.values())
-        if total <= 0:
-            return default
-        threshold = self.coverage_rng.random() * total
-        cumulative = 0.0
-        for key, value in weights.items():
-            cumulative += float(value)
-            if threshold <= cumulative:
-                return key
-        return default
-
+    # 采样方法（使用共享工具）
     def _sample_coverage_target(self) -> tuple[str, str]:
-        if self.coverage_mode not in ("upstream", "hybrid"):
-            return "high", "how_to"
-        bucket = self._weighted_choice(
-            self.coverage_config.get("targets", {}),
-            "high",
-        )
-        intent = self._weighted_choice(
-            self.coverage_config.get("intent_targets", {}),
-            "how_to",
-        )
-        return bucket, intent
+        return sample_coverage_target(self.coverage_cfg, self.coverage_rng)
 
     def _sample_question_type(self) -> str:
-        if self.diversity_mode != "quota":
-            return "how_to"
-        return self._weighted_choice(self.question_type_targets, "how_to")
+        return sample_question_type(self.coverage_cfg, self.coverage_rng)
 
     def _build_scenario_constraints(self) -> str:
-        if self.scenario_mode != "ratio":
-            return ""
-        if not self.scenario_templates or self.fuzzy_ratio <= 0:
-            return ""
-        if self.coverage_rng.random() >= self.fuzzy_ratio:
-            return ""
-        return self.coverage_rng.choice(self.scenario_templates)
-
-    def _resolve_constraint_strength(self, bucket: str) -> str:
-        strength = self.constraint_strength
-        if strength == "hybrid":
-            return "strong" if bucket in ("mid", "hard") else "weak"
-        if strength in ("strong", "weak"):
-            return strength
-        return "weak"
+        return build_scenario_constraints(self.coverage_cfg, self.scenario_templates, self.coverage_rng)
 
     def _build_constraint_rules(self, bucket: str) -> tuple[str, str]:
-        strength = self._resolve_constraint_strength(bucket)
-        if strength == "strong":
-            rules = (
-                "【强约束】\n"
-                "- 必须体现冲突/权衡/隐含约束/历史兼容/边界条件中的至少一类。\n"
-                "- 问题需指向方法的具体行为或风险，不要停留在泛泛概念。\n"
-                "- 至少包含一个明确的限制条件或失败场景。"
-            )
-        else:
-            rules = (
-                "【弱约束】\n"
-                "- 问题表达清晰、自然，聚焦单一目标或单一流程节点。\n"
-                "- 保持与代码上下文相关，但允许更通用的业务表述。"
-            )
-        return strength, rules
+        return build_constraint_rules(self.coverage_cfg.constraint_strength, bucket)
     
     def _generate_questions(
         self,
@@ -438,10 +370,15 @@ class AutoQuestionGenerator:
     
     def print_summary(self):
         """打印统计摘要"""
+        potential = self.stats['total_profiles'] * self.questions_per_method
+        max_cap = self.max_questions or potential
         logger.info("=" * 60)
         logger.info("Question Generation Summary")
         logger.info("=" * 60)
         logger.info(f"Total Profiles: {self.stats['total_profiles']}")
-        logger.info(f"Total Questions: {self.stats['total_questions']}")
+        logger.info(f"Questions per Profile: {self.questions_per_method}")
+        logger.info(f"Potential Questions: {potential}")
+        logger.info(f"Max Questions Cap: {max_cap}")
+        logger.info(f"Generated Questions: {self.stats['total_questions']}/{max_cap}")
         logger.info(f"Duplicates Removed: {self.stats['duplicates_removed']}")
         logger.info(f"Output: {self.output_jsonl}")

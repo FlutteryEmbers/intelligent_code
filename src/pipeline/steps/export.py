@@ -1,7 +1,8 @@
 """
 Step 9: Export to SFT Format
 """
-from src.utils import read_jsonl, export_sft_jsonl, export_statistics
+from src.utils.io.file_ops import read_jsonl
+from src.utils.io.exporters import export_sft_jsonl, export_statistics
 from src.pipeline.base_step import BaseStep
 
 

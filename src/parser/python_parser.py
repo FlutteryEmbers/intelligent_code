@@ -1,11 +1,11 @@
-"""Python Parser - Extract symbols from Python code (placeholder for tree-sitter implementation)"""
+﻿"""Python Parser - Extract symbols from Python code (placeholder for tree-sitter implementation)"""
 from pathlib import Path
 from typing import List
 import ast
 import re
 
-from src.utils.schemas import CodeSymbol, Annotation
-from src.utils.logger import get_logger
+from src.utils.core.schemas import CodeSymbol, Annotation
+from src.utils.core.logger import get_logger
 from src.parser.base import BaseParser
 
 logger = get_logger(__name__)
@@ -108,7 +108,7 @@ class PythonParser(BaseParser):
             node.lineno
         )
         
-        from src.utils.schemas import sha256_text
+        from src.utils.core.schemas import sha256_text
         
         return CodeSymbol(
             symbol_id=symbol_id,
@@ -172,7 +172,7 @@ class PythonParser(BaseParser):
             node.lineno
         )
         
-        from src.utils.schemas import sha256_text
+        from src.utils.core.schemas import sha256_text
         
         return CodeSymbol(
             symbol_id=symbol_id,

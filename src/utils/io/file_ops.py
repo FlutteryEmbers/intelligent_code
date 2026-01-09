@@ -1,6 +1,7 @@
 """
-I/O utilities for JSON and JSONL file operations.
-Provides functions with automatic parent directory creation.
+基础文件读写操作
+
+提供 JSON、JSONL、YAML 文件的读写功能，自动创建父目录。
 """
 import json
 from pathlib import Path
@@ -96,13 +97,11 @@ def write_jsonl(path: Path | str, rows: Iterable[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     
     if HAS_ORJSON:
-        # Use orjson for faster serialization
         with open(path, 'wb') as f:
             for row in rows:
                 f.write(orjson.dumps(row))
                 f.write(b'\n')
     else:
-        # Fallback to standard json
         with open(path, 'w', encoding='utf-8') as f:
             for row in rows:
                 f.write(json.dumps(row, ensure_ascii=False))
@@ -121,12 +120,10 @@ def append_jsonl(path: Path | str, row: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     
     if HAS_ORJSON:
-        # Use orjson for faster serialization
         with open(path, 'ab') as f:
             f.write(orjson.dumps(row))
             f.write(b'\n')
     else:
-        # Fallback to standard json
         with open(path, 'a', encoding='utf-8') as f:
             f.write(json.dumps(row, ensure_ascii=False))
             f.write('\n')
@@ -149,7 +146,7 @@ def load_prompt_template(template_path: str | Path) -> str:
     
     # Try relative path resolution if not absolute
     if not path.is_absolute():
-        project_root = Path(__file__).parent.parent.parent
+        project_root = Path(__file__).parent.parent.parent.parent
         candidate = project_root / path
         if candidate.exists():
             path = candidate

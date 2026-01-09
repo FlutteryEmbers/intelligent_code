@@ -1,4 +1,4 @@
-"""
+﻿"""
 Step 3: Design Generation (Auto Design Questions + Design Samples)
 """
 from src.engine.auto_design_question_generator import DesignQuestionGenerator
@@ -8,7 +8,7 @@ from src.engine.design_generator import (
     load_design_questions_config,
 )
 from src.pipeline.base_step import BaseStep
-from src.utils.config import Config
+from src.utils.core.config import Config
 
 
 class DesignGenerationStep(BaseStep):
@@ -59,7 +59,10 @@ class DesignGenerationStep(BaseStep):
                     for question_dict in design_question_dicts
                 ]
                 
-                self.logger.info(f"Generated {len(custom_design_questions)} auto design questions")
+                max_q = question_gen.max_design_questions
+                self.logger.info(
+                    f"Generated {len(custom_design_questions)}/{max_q} auto design questions"
+                )
                 if custom_design_questions:
                     self.logger.info(f"First design question ID: {custom_design_questions[0].id}")
                 else:
@@ -97,7 +100,10 @@ class DesignGenerationStep(BaseStep):
                 design_questions=user_design_questions,
             )
         
-        self.logger.info(f"Generated {len(design_samples)} design samples")
+        self.logger.info(
+            f"Generated {len(design_samples)}/{design_gen.stats['total_design_questions']} design samples "
+            f"(rejected: {design_gen.stats['rejected_samples']})"
+        )
         
         return {
             "status": "success",

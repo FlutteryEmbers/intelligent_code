@@ -7,7 +7,7 @@ import re
 from collections import defaultdict
 from typing import Iterable
 
-from src.utils.schemas import CodeSymbol
+from src.utils.core.schemas import CodeSymbol
 
 _CALL_NAME_RE = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 _STOPWORDS = {
@@ -38,6 +38,17 @@ def expand_call_chain(
     max_depth: int = 1,
     max_expansion: int = 20,
 ) -> list[CodeSymbol]:
+    """Expand call chain from seed symbols.
+    
+    Args:
+        seeds: Starting symbols
+        symbols: All available symbols to search
+        max_depth: Maximum depth of call chain expansion
+        max_expansion: Maximum number of symbols to return
+        
+    Returns:
+        List of expanded CodeSymbol objects
+    """
     if max_depth <= 0 or max_expansion <= 0:
         return []
     index = _build_name_index(symbols)

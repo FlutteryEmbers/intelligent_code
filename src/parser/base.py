@@ -1,11 +1,11 @@
-"""
+﻿"""
 Parser 抽象基类 - 定义代码解析器的统一接口
 """
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Generator
 
-from src.utils.schemas import CodeSymbol, ParsingReport
+from src.utils.core.schemas import CodeSymbol, ParsingReport
 
 
 class BaseParser(ABC):
@@ -22,8 +22,8 @@ class BaseParser(ABC):
             config: 解析器配置字典（通常是整个pipeline config）
                    解析配置会从language profile中自动加载
         """
-        from src.utils.language_profile import load_language_profile
-        from src.utils.config import Config as ConfigClass
+        from src.utils.generation.language_profile import load_language_profile
+        from src.utils.core.config import Config as ConfigClass
         
         self.config = config or {}
         

@@ -5,7 +5,7 @@ Provides export to Qwen2.5 and other model fine-tuning formats.
 from pathlib import Path
 from typing import Any
 
-from .io import write_jsonl
+from .file_ops import write_jsonl, write_json
 
 
 def export_sft_jsonl(
@@ -43,7 +43,7 @@ def export_sft_jsonl(
     
     # Get system prompt from language profile if not provided
     if system_prompt is None:
-        from src.utils.language_profile import load_language_profile
+        from src.utils.generation.language_profile import load_language_profile
         profile = load_language_profile()
         system_prompt = profile.get_system_prompt('default')
         if not system_prompt:
@@ -183,7 +183,7 @@ def export_with_reasoning_trace(
     out_path = Path(out_path)
     
     if system_prompt is None:
-        from src.utils.language_profile import load_language_profile
+        from src.utils.generation.language_profile import load_language_profile
         profile = load_language_profile()
         system_prompt = profile.get_system_prompt('reasoning')
         if not system_prompt:
@@ -283,8 +283,6 @@ def export_statistics(
     Returns:
         Statistics dict
     """
-    from .io import write_json
-    
     if not samples:
         stats = {"total": 0, "error": "No samples"}
         write_json(out_path, stats)

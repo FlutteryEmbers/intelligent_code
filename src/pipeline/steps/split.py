@@ -1,7 +1,9 @@
 """
 Step 8: Split Dataset
 """
-from src.utils import read_jsonl, write_jsonl, load_symbols_map, group_split_samples
+from src.utils.io.file_ops import read_jsonl, write_jsonl
+from src.utils.data.validator import load_symbols_map
+from src.utils.data.splitter import group_split_samples
 from src.pipeline.base_step import BaseStep
 
 

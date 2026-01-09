@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import sys
@@ -9,9 +9,9 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.pipeline.steps.secrets_scan import SecretsScanStep
-from src.utils import read_jsonl, write_jsonl
-from src.utils.schemas import sha256_text
-from src.utils.validator import load_symbols_map, validate_dataset
+from src.utils.io.file_ops import read_jsonl, write_jsonl
+from src.utils.core.schemas import sha256_text
+from src.utils.data.validator import load_symbols_map, validate_dataset
 
 
 class _Args:

@@ -8,93 +8,25 @@ from collections import defaultdict
 from pathlib import Path
 
 from src.pipeline.base_step import BaseStep
-from src.utils import read_jsonl, write_jsonl, write_json
-
-
-BUCKETS = ("high", "mid", "hard")
-DEFAULT_TARGETS = {"high": 0.8, "mid": 0.15, "hard": 0.05}
-FALLBACK_CHAIN = {
-    "hard": ("mid", "high"),
-    "mid": ("high",),
-    "high": (),
-}
-
-
-def _normalize_targets(targets: dict | None) -> tuple[dict[str, float], bool]:
-    if not isinstance(targets, dict):
-        return DEFAULT_TARGETS.copy(), True
-    total = sum(float(value) for value in targets.values())
-    if total <= 0:
-        return DEFAULT_TARGETS.copy(), True
-    normalized = {bucket: float(targets.get(bucket, 0.0)) / total for bucket in BUCKETS}
-    return normalized, False
-
-
-def _desired_counts(total: int, targets: dict[str, float]) -> dict[str, int]:
-    counts = {bucket: int(round(total * targets.get(bucket, 0.0))) for bucket in BUCKETS}
-    delta = total - sum(counts.values())
-    if delta != 0:
-        ordered = sorted(targets.items(), key=lambda item: item[1], reverse=True)
-        idx = 0
-        step = 1 if delta > 0 else -1
-        for _ in range(abs(delta)):
-            bucket = ordered[idx % len(ordered)][0]
-            counts[bucket] = max(0, counts[bucket] + step)
-            idx += 1
-    return counts
+from src.utils.io.file_ops import read_jsonl, write_jsonl, write_json
+from src.utils.data.coverage import (
+    BUCKETS,
+    DEFAULT_TARGETS,
+    FALLBACK_CHAIN,
+    normalize_targets,
+    desired_counts,
+    compute_multi_distributions,
+)
 
 
 def _pick_samples(rng: random.Random, samples: list[dict], count: int) -> tuple[list[dict], list[dict]]:
+    """Pick samples from list and return (selected, remaining)."""
     if count <= 0:
         return [], samples
     if count >= len(samples):
         return samples, []
     rng.shuffle(samples)
     return samples[:count], samples[count:]
-
-
-def _compute_distributions(samples: list[dict]) -> dict:
-    total = len(samples)
-    bucket_counts: dict[str, int] = defaultdict(int)
-    intent_counts: dict[str, int] = defaultdict(int)
-    module_counts: dict[str, int] = defaultdict(int)
-    polarity_counts: dict[str, int] = defaultdict(int)
-
-    for sample in samples:
-        coverage = sample.get("quality", {}).get("coverage", {})
-        bucket = coverage.get("bucket") or "high"
-        intent = coverage.get("intent") or "unknown"
-        module_span = coverage.get("module_span") or "unknown"
-        polarity = coverage.get("polarity") or "positive"
-
-        bucket_counts[bucket] += 1
-        intent_counts[intent] += 1
-        module_counts[module_span] += 1
-        polarity_counts[polarity] += 1
-
-    def ratios(counts: dict[str, int]) -> dict[str, float]:
-        if total == 0:
-            return {}
-        return {key: round(value / total, 4) for key, value in counts.items()}
-
-    return {
-        "bucket_distribution": {
-            "counts": dict(bucket_counts),
-            "ratios": ratios(bucket_counts),
-        },
-        "intent_distribution": {
-            "counts": dict(intent_counts),
-            "ratios": ratios(intent_counts),
-        },
-        "module_span_distribution": {
-            "counts": dict(module_counts),
-            "ratios": ratios(module_counts),
-        },
-        "polarity_distribution": {
-            "counts": dict(polarity_counts),
-            "ratios": ratios(polarity_counts),
-        },
-    }
 
 
 def _sample_by_targets(
@@ -105,9 +37,10 @@ def _sample_by_targets(
     scope: str | None = None,
     negative_ratio: float | None = None,
 ) -> tuple[list[dict], dict]:
+    """Sample by coverage targets with optional negative ratio."""
     rng = random.Random(seed)
     total = len(samples)
-    normalized_targets, used_default = _normalize_targets(targets)
+    normalized_targets, used_default = normalize_targets(targets)
     if used_default and logger:
         scope_hint = f" ({scope})" if scope else ""
         logger.warning(
@@ -115,7 +48,7 @@ def _sample_by_targets(
             "Check config path and coverage.targets.",
             scope_hint,
         )
-    desired = _desired_counts(total, normalized_targets)
+    desired = desired_counts(total, normalized_targets)
 
     grouped: dict[str, list[dict]] = defaultdict(list)
     for sample in samples:
@@ -204,7 +137,7 @@ def _sample_by_targets(
         "negative_ratio": negative_ratio,
         "negative_deficits": polarity_deficits,
     }
-    report.update(_compute_distributions(final_samples))
+    report.update(compute_multi_distributions(final_samples))
     return final_samples, report
 
 
@@ -237,7 +170,7 @@ class CoverageSamplerStep(BaseStep):
             self.logger.info("Coverage sampling skipped, empty file: %s", path)
             return [], {"path": str(path), "skipped": True, "reason": "empty"}
 
-        normalized_targets, used_default = _normalize_targets(targets)
+        normalized_targets, used_default = normalize_targets(targets)
 
         if mode == "upstream":
             report = {
@@ -249,7 +182,7 @@ class CoverageSamplerStep(BaseStep):
                 "raw_targets": targets,
                 "used_default_targets": used_default,
             }
-            report.update(_compute_distributions(samples))
+            report.update(compute_multi_distributions(samples))
             return samples, report
 
         if len(samples) < min_sample_size:
@@ -263,7 +196,7 @@ class CoverageSamplerStep(BaseStep):
                 "raw_targets": targets,
                 "used_default_targets": used_default,
             }
-            report.update(_compute_distributions(samples))
+            report.update(compute_multi_distributions(samples))
             return samples, report
 
         sampled, report = _sample_by_targets(

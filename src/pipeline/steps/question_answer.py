@@ -1,11 +1,12 @@
-"""
+﻿"""
 Question/Answer Module: Method-Level RAG Pipeline
 """
 from pathlib import Path
 
 from src.engine.auto_question_generator import AutoQuestionGenerator, load_user_questions_config
 from src.engine.answer_generator import AnswerGenerator
-from src.utils import load_symbols_map, vector_index
+from src.utils.data.validator import load_symbols_map
+from src.utils.retrieval import vector_index
 from src.pipeline.base_step import BaseStep
 
 
@@ -70,7 +71,7 @@ class QuestionAnswerStep(BaseStep):
     
     def execute(self) -> dict:
         """Execute auto module."""
-        from src.utils.config import Config
+        from src.utils.core.config import Config
         config_instance = Config()
         config_instance.reload(self.args.config)
         
@@ -109,14 +110,19 @@ class QuestionAnswerStep(BaseStep):
                 
                 # Step A3: Generate Questions
                 questions_per_method = qa_config.get("questions_per_method", 5)
-                self.logger.info(f"Step A3: Generating questions ({questions_per_method} per method)")
+                max_questions = qa_config.get("max_questions")
+                self.logger.info(f"Step A3: Generating questions ({questions_per_method} per method, max: {max_questions or 'unlimited'})")
                 question_gen = AutoQuestionGenerator(config_instance)
                 questions = question_gen.generate_from_profiles(
                     profiles_jsonl=method_profiles_jsonl,
                     symbols_map=symbols_map,
                     repo_commit=self.repo_commit
                 )
-                self.logger.info(f"Generated {len(questions)} questions")
+                potential = question_gen.stats['total_profiles'] * questions_per_method
+                self.logger.info(
+                    f"Generated {len(questions)}/{max_questions or potential} questions "
+                    f"(potential: {potential} from {question_gen.stats['total_profiles']} profiles)"
+                )
             else:
                 if self.build_embeddings_in_user_mode:
                     if not method_profiles_jsonl.exists():
@@ -180,7 +186,8 @@ class QuestionAnswerStep(BaseStep):
                 symbols_map=symbols_map,
                 repo_commit=self.repo_commit
             )
-            self.logger.info(f"Generated {len(qa_samples)} auto QA samples")
+            total_q = answer_gen.stats['total_questions']
+            self.logger.info(f"Generated {len(qa_samples)}/{total_q} QA samples (rejected: {answer_gen.stats['failed']})")
             
             return {
                 "status": "success",

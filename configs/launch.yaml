@@ -34,7 +34,7 @@ method_understanding:
 
 question_answer:
   questions_per_method: 3
-  max_questions: 5
+  max_questions: 15
   batch_size: 3
   embedding_model: "nomic-embed-text"
   user_questions_path: "configs/user_inputs/user_questions.yaml"
