@@ -1,16 +1,83 @@
 # Intelligent Training Data Generation System
 
-## What You Get
+面向业务与工程团队的离线训练集生成流水线，强调“证据可追溯、质量可控、分布可解释”。
 
-- **Two Scenarios**
-  - 场景 1：`qa_rule`（基于业务流程/规则的问答对）
-  - 场景 2：`arch_design`（基于仓库架构的设计方案）
-- **Evidence-first**：样本通过 `thought.evidence_refs` 回指 `data/raw/extracted/symbols.jsonl`，支持一致性校验与审计
-- **Auto RAG Mode（可选）**：方法画像 → embedding → 自动问题 → 回答（质量与可控性更强）
-- **Config-driven**：语言规则/分层识别通过 `configs/language/*.yaml` 扩展
-- **Offline Pipeline**：Parse → Method Understanding → Question/Answer → Design → Validation → Coverage Tagging → Coverage Sampling → Question Type Report → Merge → Dedup → Safety → Split → Export
+## 🌟 核心概念：像“有质检的内容工厂”一样
+> 就像生产线先有质检再出货，系统先抽取代码证据，再生成样本，并用质量与分布规则把关。
 
-## Getting Started
+## 📋 运作基石（必要元数据）
+
+- **涉及领地 (Code Context)**：
+  - Pipeline 编排：`src/pipeline/orchestrator.py`, `src/pipeline/base_step.py`
+  - 解析与证据：`src/pipeline/steps/parse.py`, `src/parser/*`
+  - 方法理解：`src/pipeline/steps/method_understanding.py`, `src/engine/auto_method_understander.py`
+  - 问答生成：`src/pipeline/steps/question_answer.py`, `src/engine/auto_question_generator.py`, `src/engine/answer_generator.py`
+  - 设计生成：`src/pipeline/steps/design_generation.py`, `src/engine/auto_design_question_generator.py`, `src/engine/design_generator.py`
+  - 质量与分布：`src/pipeline/steps/validation.py`, `coverage_tagger.py`, `coverage_sampler.py`, `question_type_report.py`
+  - 后处理与导出：`merge.py`, `deduplication.py`, `secrets_scan.py`, `split.py`, `export.py`
+
+- **执行准则 (Business Rules)**：
+  - 每条样本必须带证据引用 `evidence_refs`，并与代码符号一致。
+  - 质量校验会产出 clean 分支，合并时优先使用 clean。
+  - 分布控制按 80/15/5 目标抽样，并输出分布报表与回归告警。
+  - 推理记录结构化输出（observations/inferences/assumptions），用于质量审计。
+
+- **参考证据**：
+  - `data/raw/extracted/symbols.jsonl` 与 `repo_commit` 用于一致性校验。
+
+## ⚙️ 仪表盘：我该如何控制它？
+
+| 配置参数 | 业务名称 | 调节它的效果 | 专家建议 |
+| :--- | :--- | :--- | :--- |
+| `repo.path` | 代码仓路径 | 指定解析对象 | 指向目标仓库 |
+| `language.name` | 语言类型 | 选择解析器 | java / python |
+| `llm.model` | 生成模型 | 控制生成质量与成本 | `qwen2.5:7b` |
+| `method_understanding.enabled` | 方法理解开关 | 是否产出方法画像 | demo 开启 |
+| `question_answer.max_questions` | QA 问题上限 | 控制问答规模 | 25 |
+| `design_questions.max_questions` | 设计问题上限 | 控制设计样本规模 | 30 |
+| `quality.gate_mode` | 质量门禁 | gate / report | demo 可 report |
+| `question_answer.coverage.targets` | QA 难度分布 | 高/中/难比例 | 0.8/0.15/0.05 |
+| `safety.mode` | 敏感信息处理 | drop / sanitize / keep | demo 可 keep |
+| `dedup.semantic.enabled` | 语义去重开关 | 是否开启语义去重 | demo 可关闭 |
+
+## 🛠️ 它是如何工作的（逻辑流向）
+
+```mermaid
+flowchart TD
+  A[解析代码] --> B[方法理解]
+  B --> C[问答生成]
+  B --> D[设计生成]
+  C --> E[质量校验]
+  D --> E
+  E --> F[分布打标/抽样]
+  F --> G[类型报表]
+  G --> H[合并]
+  H --> I[去重]
+  I --> J[安全清洗]
+  J --> K[切分]
+  K --> L[训练格式导出]
+
+  subgraph 业务规则
+    E --> E1[证据一致性 + 结构化推理]
+    F --> F1[80/15/5 分布目标]
+    H --> H1[clean 优先 / gate 模式]
+  end
+```
+
+## 🧩 解决的痛点与带来的改变
+
+- **以前的乱象**：样本随机生成、证据不可追溯、质量难以说明。
+- **现在的秩序**：证据有锚定、质量有门禁、分布有报表与回归提示。
+
+## 💡 开发者笔记
+
+- Pipeline 默认串行执行，单步失败不会阻断后续步骤（便于 demo 跑通）。
+- 关键输出：`data/reports/*`（质量与分布报表）、`data/final/*`（训练数据）。
+- 详细功能说明请见：
+  - `docs/features/README.md`
+  - `docs/pipeline/README.md`
+
+## 快速开始（保留项）
 
 ### Prerequisites
 
@@ -32,34 +99,7 @@ source venv/bin/activate  # Linux/Mac
 pip install -r requirements.txt
 ```
 
-### Core Configuration（最重要的几项）
-
-编辑 `configs/launch.yaml`：
-
-1) 目标仓库与语言
-
-```yaml
-repo:
-  path: "./repos/java/spring-ai"  # 改成你的仓库路径
-  commit: ""                      # 可留空（自动从 git 取 HEAD）
-
-language:
-  name: "java"                    # java | python
-  profile_dir: "configs/language"
-```
-
-2) 本地 LLM（Ollama）
-
-```yaml
-llm:
-  base_url: "http://localhost:11434/v1"
-  model: "qwen2.5:7b"
-  temperature: 0.2
-  max_tokens: 10000
-  timeout: 120
-```
-
-可选环境变量覆盖：
+### 环境变量（可选）
 
 ```bash
 # Windows
@@ -71,30 +111,6 @@ set OLLAMA_MODEL=qwen2.5:7b
 export REPO_PATH=/path/to/repo
 export OLLAMA_BASE_URL=http://localhost:11434
 export OLLAMA_MODEL=qwen2.5:7b
-```
-
-3) 选择生成模式（Auto QA / User QA）
-
-```yaml
-core:
-  retrieval_top_k: 6
-  max_context_chars: 16000
-
-method_understanding:
-  enabled: true
-  max_methods: 10
-
-question_answer:
-  questions_per_method: 5
-  max_questions: 25
-  embedding_model: "nomic-embed-text"
-  user_questions_path: "configs/user_inputs/user_questions.yaml"
-  build_embeddings_in_user_mode: true
-
-design_questions:
-  use_method_profiles: true
-  max_questions: 30
-  user_questions_path: "configs/user_inputs/design_questions.yaml"
 ```
 
 ### Run
@@ -123,17 +139,5 @@ python3 main.py --skip-question-answer
 
 - Parse：`data/raw/extracted/symbols.jsonl`、`data/raw/repo_meta/repo_meta.json`
 - Intermediate：`data/intermediate/*.jsonl`
-- Final SFT：`data/final/{train,val,test}_sft.jsonl`（以及 `data/final/qa/*`、`data/final/design/*`）
+- Final：`data/final/{train,val,test}_sft.jsonl`（以及 `data/final/qa/*`、`data/final/design/*`）
 - Reports：`data/reports/pipeline_summary.json`、`data/reports/dataset_stats.json`、`data/reports/coverage_report.json`、`data/reports/question_type_report.json`
-
-## Deep Dive（Design Docs）
-
-基于 `src/pipeline` 的 step 拆分设计文档：
-
-- 索引：`docs/pipeline/README.md`
-- 编排与 Step API：`docs/pipeline/00-orchestrator-and-step-api.md`
-- 各步骤：`docs/pipeline/01-parse-step.md` → `docs/pipeline/13-export-step.md`
-
-Feature 说明文档（面向业务视角）：
-
-- 索引：`docs/features/README.md`
