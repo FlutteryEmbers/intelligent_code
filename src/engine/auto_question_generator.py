@@ -15,38 +15,10 @@ from src.utils.schemas import MethodProfile, QuestionSample, CodeSymbol, Evidenc
 from src.utils.config import Config
 from src.utils.logger import get_logger
 from src.utils.validator import normalize_path_separators
+from src.utils import load_prompt_template, load_yaml_list, read_jsonl, append_jsonl, clean_llm_json_output
 from src.engine.llm_client import LLMClient
 
 logger = get_logger(__name__)
-
-
-def load_prompt_template(template_path: str) -> str:
-    """加载 prompt 模板文件"""
-    path = Path(template_path)
-    if not path.exists():
-        raise FileNotFoundError(f"Prompt template not found: {path}")
-    
-    with open(path, 'r', encoding='utf-8') as f:
-        return f.read()
-
-
-def load_scenario_templates(template_path: str | None) -> list[str]:
-    if not template_path:
-        return []
-    path = Path(template_path)
-    if not path.exists():
-        logger.warning("Scenario templates not found: %s", path)
-        return []
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            data = yaml.safe_load(f) or {}
-    except Exception as e:
-        logger.warning("Failed to load scenario templates: %s", e)
-        return []
-    templates = data.get("templates") if isinstance(data, dict) else data
-    if not isinstance(templates, list):
-        return []
-    return [t for t in templates if isinstance(t, str) and t.strip()]
 
 
 def simple_hash(text: str) -> str:
@@ -152,9 +124,10 @@ class AutoQuestionGenerator:
         self.scenario_config = self.coverage_config.get('scenario_injection', {}) or {}
         self.scenario_mode = self.scenario_config.get('mode', 'off')
         self.fuzzy_ratio = float(self.scenario_config.get('fuzzy_ratio', 0) or 0)
-        self.scenario_templates = load_scenario_templates(
-            self.scenario_config.get('templates_path')
-        )
+        self.scenario_templates = load_yaml_list(
+            self.scenario_config.get('templates_path'),
+            key='templates'
+        ) if self.scenario_config.get('templates_path') else []
         
         # 加载 prompt 模板
         coverage_prompt = self.config.get('question_answer.prompts.coverage_generation')
@@ -206,18 +179,16 @@ class AutoQuestionGenerator:
         logger.info(f"Loading profiles from {profiles_jsonl}")
         
         # 读取所有 profiles
+        profile_dicts = read_jsonl(profiles_jsonl)
         profiles = []
-        with open(profiles_jsonl, 'r', encoding='utf-8') as f:
-            for line in f:
-                if line.strip():
-                    profile_dict = json.loads(line)
-                    # 转换 evidence_refs
-                    evidence_refs = []
-                    for ref in profile_dict.get('evidence_refs', []):
-                        evidence_refs.append(EvidenceRef(**ref))
-                    profile_dict['evidence_refs'] = evidence_refs
-                    
-                    profiles.append(MethodProfile(**profile_dict))
+        for profile_dict in profile_dicts:
+            # 转换 evidence_refs
+            evidence_refs = []
+            for ref in profile_dict.get('evidence_refs', []):
+                evidence_refs.append(EvidenceRef(**ref))
+            profile_dict['evidence_refs'] = evidence_refs
+            
+            profiles.append(MethodProfile(**profile_dict))
         
         logger.info(f"Loaded {len(profiles)} profiles")
         self.stats['total_profiles'] = len(profiles)
@@ -226,60 +197,64 @@ class AutoQuestionGenerator:
         all_questions = []
         question_hashes = set()  # 用于去重
         
-        with open(self.output_jsonl, 'w', encoding='utf-8') as f:
-            batch_size = self.batch_size or len(profiles) or 1
-            for batch_start in range(0, len(profiles), batch_size):
-                batch = profiles[batch_start:batch_start + batch_size]
-                logger.info(
-                    "Question batch %s-%s/%s",
-                    batch_start + 1,
-                    batch_start + len(batch),
-                    len(profiles),
-                )
-                for i, profile in enumerate(batch, batch_start + 1):
-                    if self.max_questions is not None and self.stats['total_questions'] >= self.max_questions:
-                        logger.info(
-                            "Reached max_questions=%s, stopping question generation",
-                            self.max_questions,
-                        )
-                        break
-                    logger.info(f"Generating questions for {i}/{len(profiles)}: {profile.qualified_name}")
+        # 清空输出文件
+        if self.output_jsonl.exists():
+            self.output_jsonl.unlink()
+        
+        batch_size = self.batch_size or len(profiles) or 1
+        for batch_start in range(0, len(profiles), batch_size):
+            batch = profiles[batch_start:batch_start + batch_size]
+            logger.info(
+                "Question batch %s-%s/%s",
+                batch_start + 1,
+                batch_start + len(batch),
+                len(profiles),
+            )
+            for i, profile in enumerate(batch, batch_start + 1):
+                if self.max_questions is not None and self.stats['total_questions'] >= self.max_questions:
+                    logger.info(
+                        "Reached max_questions=%s, stopping question generation",
+                        self.max_questions,
+                    )
+                    break
+                logger.info(f"Generating questions for {i}/{len(profiles)}: {profile.qualified_name}")
+                
+                try:
+                    # 获取源码（标准化路径以支持跨平台）
+                    normalized_symbol_id = normalize_path_separators(profile.symbol_id)
+                    symbol = symbols_map.get(normalized_symbol_id)
+                    if not symbol:
+                        logger.warning(f"Symbol not found for {profile.symbol_id}")
+                        continue
                     
-                    try:
-                        # 获取源码（标准化路径以支持跨平台）
-                        normalized_symbol_id = normalize_path_separators(profile.symbol_id)
-                        symbol = symbols_map.get(normalized_symbol_id)
-                        if not symbol:
-                            logger.warning(f"Symbol not found for {profile.symbol_id}")
-                            continue
-                        
-                        # 生成问题
-                        questions = self._generate_questions(profile, symbol)
-                        
-                        # 去重
-                        for q in questions:
-                            if self.max_questions is not None and self.stats['total_questions'] >= self.max_questions:
-                                break
-                            q_hash = simple_hash(q.question)
-                            if q_hash not in question_hashes:
-                                question_hashes.add(q_hash)
-                                all_questions.append(q)
-                                
-                                # 写入文件
-                                f.write(q.model_dump_json() + '\n')
-                                f.flush()
-                                
-                                self.stats['total_questions'] += 1
-                            else:
-                                self.stats['duplicates_removed'] += 1
-                        
+                    # 生成问题
+                    questions = self._generate_questions(profile, symbol)
+                    
+                    # 去重
+                    for q in questions:
                         if self.max_questions is not None and self.stats['total_questions'] >= self.max_questions:
                             break
-                                
-                    except Exception as e:
-                        logger.error(f"Failed to generate questions for {profile.symbol_id}: {e}")
-                        continue
-                if self.max_questions is not None and self.stats['total_questions'] >= self.max_questions:
+                        q_hash = simple_hash(q.question)
+                        if q_hash not in question_hashes:
+                            question_hashes.add(q_hash)
+                            all_questions.append(q)
+                            
+                            # 写入文件
+                            question_dict = json.loads(q.model_dump_json())
+                            append_jsonl(self.output_jsonl, question_dict)
+                            
+                            self.stats['total_questions'] += 1
+                        else:
+                            self.stats['duplicates_removed'] += 1
+                    
+                    if self.max_questions is not None and self.stats['total_questions'] >= self.max_questions:
+                        break
+                
+                except Exception as e:
+                    logger.error(f"Failed to generate questions for {profile.symbol_id}: {e}")
+                    continue
+                
+            if self.max_questions is not None and self.stats['total_questions'] >= self.max_questions:
                     break
         
         logger.info(f"Question generation completed: {self.stats['total_questions']} questions, {self.stats['duplicates_removed']} duplicates removed")
@@ -423,7 +398,7 @@ class AutoQuestionGenerator:
             raw_output = response.content.strip()
             
             # 清理输出
-            cleaned_output = self._clean_json_output(raw_output)
+            cleaned_output = clean_llm_json_output(raw_output)
             
             # 解析为字典
             result = json.loads(cleaned_output)
@@ -431,7 +406,14 @@ class AutoQuestionGenerator:
             # 提取 questions 数组
             questions_data = result.get('questions', [])
             if len(questions_data) != self.questions_per_method:
-                logger.warning(f"Expected {self.questions_per_method} questions, got {len(questions_data)}")
+                logger.warning(
+                    "Expected %s questions, got %s (symbol=%s)",
+                    self.questions_per_method,
+                    len(questions_data),
+                    symbol.symbol_id,
+                )
+            if not questions_data:
+                logger.warning("No questions returned by LLM for %s", symbol.symbol_id)
             
             # 转换为 QuestionSample
             questions = []
@@ -451,32 +433,8 @@ class AutoQuestionGenerator:
             return questions
             
         except Exception as e:
-            logger.error(f"LLM call failed: {e}")
+            logger.error("LLM call failed for %s: %s", symbol.symbol_id, e)
             return []
-    
-    def _clean_json_output(self, output: str) -> str:
-        """清理 LLM 输出，提取纯 JSON"""
-        output = output.strip()
-        
-        # 移除 Markdown 代码块标记
-        if output.startswith("```json"):
-            output = output[7:]
-        elif output.startswith("```"):
-            output = output[3:]
-        
-        if output.endswith("```"):
-            output = output[:-3]
-        
-        output = output.strip()
-        
-        # 查找第一个 { 和最后一个 }
-        start_idx = output.find("{")
-        end_idx = output.rfind("}")
-        
-        if start_idx != -1 and end_idx != -1:
-            output = output[start_idx:end_idx+1]
-        
-        return output
     
     def print_summary(self):
         """打印统计摘要"""

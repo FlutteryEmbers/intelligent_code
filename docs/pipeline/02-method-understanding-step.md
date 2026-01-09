@@ -64,6 +64,12 @@ flowchart LR
 - 只选择 `symbol_type == method`。
 - 排序依据 language profile 中的规则（注解/命名/路径等）。
 
+### 批处理与追加模式
+
+- `method_understanding.batching.enabled=true` 时，单次仅处理 `batch_size` 个候选方法。
+- `output_mode=append` 会在原有 `method_profiles.jsonl` 末尾追加结果。
+- `resume=true` 时会读取已有 `symbol_id`，跳过已处理方法（仅在 append 时生效）。
+
 ### Profile 结构要点
 
 - `summary`、`business_rules`、`dependencies`

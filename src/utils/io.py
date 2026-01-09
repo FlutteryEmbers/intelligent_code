@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from typing import Any, Iterable
 
+import yaml
+
 # Try to import orjson for better performance
 try:
     import orjson
@@ -128,3 +130,112 @@ def append_jsonl(path: Path | str, row: dict) -> None:
         with open(path, 'a', encoding='utf-8') as f:
             f.write(json.dumps(row, ensure_ascii=False))
             f.write('\n')
+
+
+def load_prompt_template(template_path: str | Path) -> str:
+    """
+    Load prompt template file with automatic relative path resolution.
+    
+    Args:
+        template_path: Path to template file (absolute or relative to project root)
+        
+    Returns:
+        Template content as string
+        
+    Raises:
+        FileNotFoundError: If template file not found
+    """
+    path = Path(template_path)
+    
+    # Try relative path resolution if not absolute
+    if not path.is_absolute():
+        project_root = Path(__file__).parent.parent.parent
+        candidate = project_root / path
+        if candidate.exists():
+            path = candidate
+    
+    if not path.exists():
+        raise FileNotFoundError(f"Prompt template not found: {path}")
+    
+    with open(path, 'r', encoding='utf-8') as f:
+        return f.read()
+
+
+def load_yaml_file(yaml_path: str | Path) -> dict:
+    """
+    Load YAML file and return as dict.
+    
+    Args:
+        yaml_path: Path to YAML file
+        
+    Returns:
+        Parsed dict or empty dict if file doesn't exist or parse fails
+    """
+    path = Path(yaml_path)
+    if not path.exists():
+        return {}
+    
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return yaml.safe_load(f) or {}
+    except Exception as e:
+        print(f"Error loading YAML {path}: {e}")
+        return {}
+
+
+def load_yaml_list(yaml_path: str | Path, key: str | None = None) -> list:
+    """
+    Load list from YAML file.
+    
+    Args:
+        yaml_path: Path to YAML file
+        key: Optional key to extract list from (if None, expects top-level list)
+        
+    Returns:
+        List or empty list if file doesn't exist or parse fails
+    """
+    data = load_yaml_file(yaml_path)
+    
+    if key:
+        items = data.get(key, [])
+    else:
+        items = data if isinstance(data, list) else []
+    
+    if not isinstance(items, list):
+        return []
+    
+    return [item for item in items if item]
+
+
+def clean_llm_json_output(output: str) -> str:
+    """
+    Clean LLM output to extract pure JSON.
+    Removes markdown code blocks, extra text, etc.
+    
+    Args:
+        output: Raw LLM output string
+        
+    Returns:
+        Cleaned JSON string
+    """
+    output = output.strip()
+    
+    # Remove markdown code blocks
+    if output.startswith("```json"):
+        output = output[7:]
+    elif output.startswith("```"):
+        output = output[3:]
+    
+    if output.endswith("```"):
+        output = output[:-3]
+    
+    output = output.strip()
+    
+    # Extract JSON object (find first { and last })
+    start_idx = output.find("{")
+    end_idx = output.rfind("}")
+    
+    if start_idx != -1 and end_idx != -1:
+        output = output[start_idx:end_idx+1]
+    
+    return output

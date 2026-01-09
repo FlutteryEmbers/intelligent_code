@@ -13,7 +13,7 @@ from collections import Counter
 import yaml
 
 from src.utils.schemas import CodeSymbol, TrainingSample, ReasoningTrace, EvidenceRef, sha256_text
-from src.utils import write_json
+from src.utils import write_json, load_prompt_template, load_yaml_file, load_yaml_list, read_jsonl, append_jsonl, clean_llm_json_output
 from src.utils.call_chain import expand_call_chain
 from src.utils.validator import normalize_path_separators
 from src.utils.config import Config
@@ -24,40 +24,20 @@ from src.engine.llm_client import LLMClient
 logger = get_logger(__name__)
 
 
-def load_prompt_template(template_path: str | Path) -> str:
-    """加载prompt模板文件
-    
-    Args:
-        template_path: 模板文件路径
-        
-    Returns:
-        str: 模板内容
-    """
-    template_path = Path(template_path)
-    if not template_path.exists():
-        raise FileNotFoundError(f"Prompt template not found: {template_path}")
-    
-    with open(template_path, 'r', encoding='utf-8') as f:
-        return f.read()
-
-
 def load_architecture_constraints(path_value: str | None) -> list[str]:
+    """加载架构约束"""
     if not path_value:
         return []
-    path = Path(path_value)
-    if not path.exists():
-        logger.warning("Architecture constraints not found: %s", path)
+    data = load_yaml_file(path_value)
+    if not data:
+        logger.warning("Architecture constraints not found: %s", path_value)
         return []
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
-    except Exception as exc:
-        logger.warning("Failed to load architecture constraints: %s", exc)
-        return []
+    
     if isinstance(data, dict):
         items = data.get("constraints", [])
     else:
         items = data
+    
     if not isinstance(items, list):
         return []
     return [item for item in items if isinstance(item, str) and item.strip()]
@@ -366,9 +346,12 @@ class DesignGenerator:
     
     def _save_design_questions(self, design_questions: list[DesignQuestion]):
         """保存设计问题到 JSONL"""
-        with open(self.design_questions_path, 'w', encoding='utf-8') as f:
-            for question in design_questions:
-                f.write(json.dumps(question.to_dict(), ensure_ascii=False) + '\n')
+        # 清空文件
+        if self.design_questions_path.exists():
+            self.design_questions_path.unlink()
+        
+        for question in design_questions:
+            append_jsonl(self.design_questions_path, question.to_dict())
         
         logger.info(f"Saved {len(design_questions)} design questions to {self.design_questions_path}")
     

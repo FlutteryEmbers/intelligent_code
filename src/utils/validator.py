@@ -56,6 +56,20 @@ def load_symbols_map(symbols_jsonl: Path | str) -> dict[str, CodeSymbol]:
     return symbols_map
 
 
+def load_symbols_list(symbols_jsonl: Path | str) -> list[CodeSymbol]:
+    """
+    Load symbols from JSONL as a list.
+    
+    Args:
+        symbols_jsonl: Path to symbols.jsonl file
+        
+    Returns:
+        List of CodeSymbol objects
+    """
+    symbols_map = load_symbols_map(symbols_jsonl)
+    return list(symbols_map.values())
+
+
 def _quality_issue(code: str, message: str) -> dict[str, str]:
     return {"code": code, "message": message}
 

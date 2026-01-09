@@ -12,19 +12,10 @@ from src.utils.schemas import CodeSymbol, MethodProfile, EvidenceRef, sha256_tex
 from src.utils.config import Config
 from src.utils.logger import get_logger
 from src.utils.language_profile import load_language_profile
+from src.utils import load_prompt_template, read_jsonl, append_jsonl, clean_llm_json_output
 from src.engine.llm_client import LLMClient
 
 logger = get_logger(__name__)
-
-
-def load_prompt_template(template_path: str) -> str:
-    """加载 prompt 模板文件"""
-    path = Path(template_path)
-    if not path.exists():
-        raise FileNotFoundError(f"Prompt template not found: {path}")
-    
-    with open(path, 'r', encoding='utf-8') as f:
-        return f.read()
 
 
 class AutoMethodUnderstander:
@@ -48,6 +39,21 @@ class AutoMethodUnderstander:
             'core.max_context_chars',
             self.config.get('generation.max_context_chars', 16000),
         )
+
+        batching_cfg = self.config.get('method_understanding.batching', {})
+        self.batching_enabled = bool(batching_cfg.get('enabled', False))
+        batch_size = batching_cfg.get('batch_size', None)
+        self.batch_size = int(batch_size) if batch_size else None
+        if self.batch_size is not None and self.batch_size <= 0:
+            self.batch_size = None
+        self.output_mode = batching_cfg.get('output_mode', 'overwrite')
+        if self.output_mode not in ('overwrite', 'append'):
+            logger.warning(
+                "Unknown output_mode '%s' for method_understanding; falling back to overwrite",
+                self.output_mode,
+            )
+            self.output_mode = 'overwrite'
+        self.resume = bool(batching_cfg.get('resume', False))
         
         # 加载 prompt 模板
         template_path = self.config.get(
@@ -75,6 +81,18 @@ class AutoMethodUnderstander:
             'success': 0,
             'failed': 0,
         }
+
+    def _load_processed_ids(self) -> set[str]:
+        """加载已处理的 symbol_id 集合"""
+        if not self.output_jsonl.exists():
+            return set()
+        
+        processed = set()
+        profiles = read_jsonl(self.output_jsonl)
+        for profile in profiles:
+            if symbol_id := profile.get('symbol_id'):
+                processed.add(symbol_id)
+        return processed
     
     def generate_from_symbols(
         self,
@@ -93,53 +111,97 @@ class AutoMethodUnderstander:
         logger.info(f"Loading symbols from {symbols_path}")
         
         # 读取所有符号
-        symbols = []
-        with open(symbols_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                if line.strip():
-                    symbol_dict = json.loads(line)
-                    symbols.append(CodeSymbol(**symbol_dict))
+        symbol_dicts = read_jsonl(symbols_path)
+        symbols = [CodeSymbol(**d) for d in symbol_dicts]
         
         logger.info(f"Loaded {len(symbols)} symbols")
         
         # 选择候选方法
         candidates = self._select_candidates(symbols)
         logger.info(f"Selected {len(candidates)} candidate methods")
-        
+
+        processed_ids: set[str] = set()
+        if self.resume:
+            if self.output_mode != 'append':
+                logger.warning(
+                    "resume enabled with output_mode=%s; resume will be ignored",
+                    self.output_mode,
+                )
+                self.resume = False
+            else:
+                processed_ids = self._load_processed_ids()
+                if processed_ids:
+                    logger.info("Loaded %s processed method profiles for resume", len(processed_ids))
+
+        if processed_ids:
+            before = len(candidates)
+            candidates = [c for c in candidates if c.symbol_id not in processed_ids]
+            skipped = before - len(candidates)
+            if skipped:
+                logger.info("Skipped %s already processed methods", skipped)
+
         # 生成 profiles
         profiles = []
-        with open(self.output_jsonl, 'w', encoding='utf-8') as f_out, \
-             open(self.rejected_jsonl, 'w', encoding='utf-8') as f_rej:
-            
-            for i, symbol in enumerate(candidates, 1):
-                logger.info(f"Processing {i}/{len(candidates)}: {symbol.qualified_name}")
-                
-                try:
-                    profile = self._generate_profile(symbol, repo_commit)
-                    
-                    # 写入成功的 profile
-                    f_out.write(profile.model_dump_json() + '\n')
-                    f_out.flush()
-                    
-                    profiles.append(profile)
-                    self.stats['success'] += 1
-                    
-                except Exception as e:
-                    logger.error(f"Failed to generate profile for {symbol.symbol_id}: {e}")
-                    
-                    # 写入失败记录
-                    rejected_entry = {
-                        'symbol_id': symbol.symbol_id,
-                        'qualified_name': symbol.qualified_name,
-                        'error': str(e),
-                        'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S')
-                    }
-                    f_rej.write(json.dumps(rejected_entry, ensure_ascii=False) + '\n')
-                    f_rej.flush()
-                    
-                    self.stats['failed'] += 1
-                
-                self.stats['total_processed'] += 1
+        
+        # 如果是 overwrite 模式，先清空文件
+        if self.output_mode == 'overwrite':
+            if self.output_jsonl.exists():
+                self.output_jsonl.unlink()
+            if self.rejected_jsonl.exists():
+                self.rejected_jsonl.unlink()
+        
+        total = len(candidates)
+        if self.batching_enabled and self.batch_size:
+            logger.info(
+                "Batching enabled: total=%s, batch_size=%s",
+                total,
+                self.batch_size,
+            )
+            batch_ranges = range(0, total, self.batch_size)
+        else:
+            batch_ranges = [0]
+
+        for batch_start in batch_ranges:
+            if self.batching_enabled and self.batch_size:
+                batch_end = min(batch_start + self.batch_size, total)
+                batch = candidates[batch_start:batch_end]
+                logger.info(
+                    "Processing batch %s-%s/%s",
+                    batch_start + 1,
+                    batch_end,
+                    total,
+                )
+            else:
+                batch = candidates
+
+            for i, symbol in enumerate(batch, batch_start + 1):
+                    logger.info(f"Processing {i}/{total}: {symbol.qualified_name}")
+
+                    try:
+                        profile = self._generate_profile(symbol, repo_commit)
+
+                        # 写入成功的 profile
+                        profile_dict = json.loads(profile.model_dump_json())
+                        append_jsonl(self.output_jsonl, profile_dict)
+
+                        profiles.append(profile)
+                        self.stats['success'] += 1
+
+                    except Exception as e:
+                        logger.error(f"Failed to generate profile for {symbol.symbol_id}: {e}")
+
+                        # 写入失败记录
+                        rejected_entry = {
+                            'symbol_id': symbol.symbol_id,
+                            'qualified_name': symbol.qualified_name,
+                            'error': str(e),
+                            'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S')
+                        }
+                        append_jsonl(self.rejected_jsonl, rejected_entry)
+
+                        self.stats['failed'] += 1
+
+                    self.stats['total_processed'] += 1
         
         logger.info(f"Profile generation completed: {self.stats['success']} success, {self.stats['failed']} failed")
         return profiles
@@ -236,7 +298,7 @@ class AutoMethodUnderstander:
             raw_output = response.content.strip()
             
             # 清理输出
-            cleaned_output = self._clean_json_output(raw_output)
+            cleaned_output = clean_llm_json_output(raw_output)
             
             # 解析为字典
             profile_dict = json.loads(cleaned_output)
@@ -255,30 +317,6 @@ class AutoMethodUnderstander:
         except Exception as e:
             logger.error(f"LLM call failed: {e}")
             raise
-    
-    def _clean_json_output(self, output: str) -> str:
-        """清理 LLM 输出，提取纯 JSON"""
-        output = output.strip()
-        
-        # 移除 Markdown 代码块标记
-        if output.startswith("```json"):
-            output = output[7:]
-        elif output.startswith("```"):
-            output = output[3:]
-        
-        if output.endswith("```"):
-            output = output[:-3]
-        
-        output = output.strip()
-        
-        # 查找第一个 { 和最后一个 }
-        start_idx = output.find("{")
-        end_idx = output.rfind("}")
-        
-        if start_idx != -1 and end_idx != -1:
-            output = output[start_idx:end_idx+1]
-        
-        return output
     
     def print_summary(self):
         """打印统计摘要"""

@@ -9,7 +9,7 @@ language:
 llm:
   provider: "ollama"
   base_url: "http://localhost:11434/v1"
-  model: "qwen2.5:7b"
+  model: "qwen2.5:3b"
   temperature: 0.2
   max_tokens: 10000
   timeout_sec: 180
@@ -17,20 +17,25 @@ llm:
 core:
   seed: 42
   retrieval_top_k: 6
-  max_context_chars: 16000
+  max_context_chars: 14000
   max_items: 50
   architecture_constraints_path: "configs/user_inputs/architecture_constraints.yaml"
 
 method_understanding:
   enabled: true
-  max_methods: 300
+  max_methods: 25
   prompts:
     generation: "configs/prompts/method_understanding/auto_method_understanding.txt"
+  batching:
+    enabled: true
+    batch_size: 50
+    output_mode: "overwrite"
+    resume: false
 
 question_answer:
   questions_per_method: 3
-  max_questions: 1000
-  batch_size: 5
+  max_questions: 5
+  batch_size: 3
   embedding_model: "nomic-embed-text"
   user_questions_path: "configs/user_inputs/user_questions.yaml"
   build_embeddings_in_user_mode: true
@@ -102,7 +107,7 @@ design_questions:
   profiles_top_k: 20
   profiles_max_chars: 6000
   require_layer_coverage: false
-  max_questions: 500
+  max_questions: 10
   batching:
     enabled: true
     batch_size: 3

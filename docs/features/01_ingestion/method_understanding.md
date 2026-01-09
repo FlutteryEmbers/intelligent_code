@@ -17,6 +17,7 @@
   - 候选方法按“业务标记、文档、合适长度”加权评分，取前 N 个。
   - 源码过长会截断，保证上下文长度可控。
   - 输出包含 `evidence_refs`，后续回答可直接引用。
+  - 启用批处理时仅处理 `batch_size` 上限；可选追加写入与跳过已处理方法。
 
 - **参考证据**：
   - 方法来源于 `symbols.jsonl`，并附带 `repo_commit`、文件路径与行号信息。
@@ -29,6 +30,10 @@
 | `method_understanding.max_methods` | 方法候选上限 | 控制抽取多少个方法 | 小仓库 10~30 |
 | `method_understanding.prompts.generation` | 生成模板 | 控制“说明书”的结构 | 保持默认 |
 | `core.max_context_chars` | 源码上限 | 截断过长方法 | 16000 |
+| `method_understanding.batching.enabled` | 批处理开关 | 单次运行只处理一小批 | demo 视机器开启 |
+| `method_understanding.batching.batch_size` | 单次处理上限 | 缩短每次运行时间 | 50 |
+| `method_understanding.batching.output_mode` | 输出模式 | overwrite 或 append | overwrite |
+| `method_understanding.batching.resume` | 追加跳过 | append 时跳过已处理 | false |
 | `artifacts.method_profiles_jsonl` | 方法说明书输出 | 结构化摘要输出路径 | 默认即可 |
 | `artifacts.auto_method_understanding_rejected_jsonl` | 失败记录 | 失败原因审计 | 默认即可 |
 
@@ -77,13 +82,15 @@ flowchart TD
 flowchart TD
   A[symbols.jsonl] --> B[筛选 method 符号]
   B --> C[评分排序取前 N 个]
-  C --> D[生成“方法说明书”】【MethodProfile】]
-  D --> E[method_profiles.jsonl]
-  D --> F[rejected 失败记录]
+  C --> D[可选：批处理限制 batch_size]
+  D --> E[生成“方法说明书”】【MethodProfile】]
+  E --> F[可选：append + resume 跳过已处理]
+  E --> G[method_profiles.jsonl]
+  E --> H[rejected 失败记录]
 
   subgraph 业务规则
     C --> C1[业务标记/文档/长度加分]
-    D --> D1[源码过长自动截断]
+    E --> E1[源码过长自动截断]
   end
 ```
 

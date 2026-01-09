@@ -15,25 +15,10 @@ from src.utils.config import Config
 from src.utils.logger import get_logger
 from src.utils.validator import normalize_path_separators
 from src.utils.language_profile import load_language_profile
+from src.utils import load_prompt_template, load_yaml_list, read_jsonl, append_jsonl, clean_llm_json_output
 from src.engine.llm_client import LLMClient
-from src.engine.auto_question_generator import load_scenario_templates
 
 logger = get_logger(__name__)
-
-
-def load_prompt_template(template_path: str | Path) -> str:
-    """加载 prompt 模板文件"""
-    path = Path(template_path)
-    if not path.is_absolute():
-        project_root = Path(__file__).parent.parent.parent
-        candidate = project_root / path
-        if candidate.exists():
-            path = candidate
-    if not path.exists():
-        raise FileNotFoundError(f"Prompt template not found: {path}")
-
-    with open(path, 'r', encoding='utf-8') as f:
-        return f.read()
 
 
 class DesignQuestionGenerator:
@@ -92,9 +77,10 @@ class DesignQuestionGenerator:
         self.scenario_config = self.coverage_config.get('scenario_injection', {}) or {}
         self.scenario_mode = self.scenario_config.get('mode', 'off')
         self.fuzzy_ratio = float(self.scenario_config.get('fuzzy_ratio', 0) or 0)
-        self.scenario_templates = load_scenario_templates(
-            self.scenario_config.get('templates_path')
-        )
+        self.scenario_templates = load_yaml_list(
+            self.scenario_config.get('templates_path'),
+            key='templates'
+        ) if self.scenario_config.get('templates_path') else []
 
         # Method profiles 配置（可选增强）
         self.use_method_profiles = self.config.get('design_questions.use_method_profiles', False)

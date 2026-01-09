@@ -15,40 +15,27 @@ from src.utils.config import Config
 from src.utils.logger import get_logger
 from src.utils.validator import normalize_path_separators
 from src.utils.language_profile import load_language_profile
-from src.utils import vector_index, write_json
+from src.utils import vector_index, write_json, load_prompt_template, load_yaml_file, load_yaml_list, read_jsonl, append_jsonl, clean_llm_json_output
 from src.utils.call_chain import expand_call_chain
 from src.engine.llm_client import LLMClient
 
 logger = get_logger(__name__)
 
 
-def load_prompt_template(template_path: str) -> str:
-    """加载 prompt 模板文件"""
-    path = Path(template_path)
-    if not path.exists():
-        raise FileNotFoundError(f"Prompt template not found: {path}")
-    
-    with open(path, 'r', encoding='utf-8') as f:
-        return f.read()
-
-
 def load_architecture_constraints(path_value: str | None) -> list[str]:
+    """加载架构约束"""
     if not path_value:
         return []
-    path = Path(path_value)
-    if not path.exists():
-        logger.warning("Architecture constraints not found: %s", path)
+    data = load_yaml_file(path_value)
+    if not data:
+        logger.warning("Architecture constraints not found: %s", path_value)
         return []
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
-    except Exception as exc:
-        logger.warning("Failed to load architecture constraints: %s", exc)
-        return []
+    
     if isinstance(data, dict):
         items = data.get("constraints", [])
     else:
         items = data
+    
     if not isinstance(items, list):
         return []
     return [item for item in items if isinstance(item, str) and item.strip()]
