@@ -22,9 +22,18 @@
 |---|---|---|---|
 | `data/raw/extracted/symbols.jsonl` | `CodeSymbol` | `ParseStep` → parser | QA/Design/Auto 引擎、Validation、Split |
 | `data/intermediate/*_raw.jsonl` | `TrainingSample`（dict 形态） | `DesignGenerator` / `AnswerGenerator` | Validation、Merge、Dedup、Safety、Split、Export |
+| `data/intermediate/clean/*.jsonl` | `TrainingSample`（clean） | `Validation` | CoverageTagger/Sampler、Merge |
 | `data/intermediate/method_profiles.jsonl` | `MethodProfile` | `AutoMethodUnderstander` | Auto QA（问/答）、Auto Design Questions（可选） |
 | `data/intermediate/auto_questions/questions.jsonl` | `QuestionSample` | `AutoQuestionGenerator` | `AnswerGenerator` |
-| `data/final/*_sft.jsonl` | SFT messages（dict） | `ExportStep` | 训练框架/微调脚本 |
+| `data/intermediate/auto_questions/design_questions_auto.jsonl` | `DesignQuestion`（dict 形态） | `DesignQuestionGenerator` | `DesignGenerator` |
+| `data/reports/coverage_report.json` | CoverageReport（dict） | `CoverageSamplerStep` | 报表可视化、审计 |
+| `data/reports/question_type_report.json` | QuestionTypeReport（dict） | `QuestionTypeReportStep` | 报表可视化、审计 |
+| `data/reports/*_retrieval_report.json` | RetrievalReport（dict） | `AnswerGenerator` / `DesignGenerator` | 报表可视化、审计 |
+| `data/reports/dedup_mapping.json` | DedupMapping（dict） | `DeduplicationStep` | 报表可视化、审计 |
+| `data/reports/secrets_dropped.jsonl` | SecretsScanLog（dict） | `SecretsScanStep` | 审计与溯源 |
+| `data/reports/parsing_report.json` | `ParsingReport` | parser/base | 审计与性能分析 |
+| `data/reports/pipeline_summary.json` | PipelineSummary（dict） | `Orchestrator` | 审计与复盘 |
+| `data/final/*_sft.jsonl` | 训练格式 messages（dict） | `ExportStep` | 训练框架/微调脚本 |
 
 ### 核心关系图
 
@@ -124,10 +133,12 @@ classDiagram
 
 1. Parse：Repo → `CodeSymbol` → `symbols.jsonl`
 2. Generate：`symbols.jsonl` → `TrainingSample` → `*_raw.jsonl`
-3. Validate：`symbols.jsonl` + `*_raw.jsonl` → quality reports + rejected
-4. Post-process：Merge/Dedup/Safety → `all_dedup.jsonl`
-5. Split：`all_dedup.jsonl` + `symbols.jsonl` → train/val/test
-6. Export：split → `*_sft.jsonl`（messages + metadata）
+3. Validate：`symbols.jsonl` + `*_raw.jsonl` → quality reports + rejected + clean
+4. Coverage：CoverageTagger/Sampler → `coverage_report.json`
+5. Report：QuestionTypeReport → `question_type_report.json`
+6. Post-process：Merge/Dedup/Safety → `all_dedup.jsonl`
+7. Split：`all_dedup.jsonl` + `symbols.jsonl` → train/val/test
+8. Export：split → `*_sft.jsonl`（messages + metadata）
 
 ---
 
@@ -252,7 +263,7 @@ classDiagram
 - `thought`：`ReasoningTrace`（结构化推理 + 证据）。
 - `answer`：最终答案/方案输出。
 - `repo_commit`：样本所属仓库版本（应与 evidence 指向符号版本一致）。
-- `quality`：质量评估与 gate 结果容器（Validation 的输出不会回填到 raw，目前为后续演进预留）。
+- `quality`：质量评估与 gate 结果容器（当前生成引擎会写入 `quality.coverage.*`，Validation 会在 clean 中保留/合并该字段）。
 - `created_at`：生成时间戳。
 - `sample_id`：若为空则自动生成：`sha256(f"{scenario}:{instruction}:{context[:100]}")[:16]`。
   - 设计意图：轻量稳定索引，便于去重/统计/排查。
@@ -261,7 +272,7 @@ classDiagram
 生产者/消费者：
 
 - 生产者：`DesignGenerator` / `AnswerGenerator`
-- 消费者：Validation、Dedup（基于 instruction+answer）、Safety（扫描 context+answer）、Split、Export
+- 消费者：Validation、CoverageTagger/Sampler、Dedup（基于 instruction+answer）、Safety（扫描 context+answer）、Split、Export
 
 ---
 
@@ -322,6 +333,72 @@ classDiagram
 
 - 生产者：`AutoQuestionGenerator`
 - 消费者：`AnswerGenerator`
+
+备注：
+
+- `difficulty` 目前主要用于保存标签，代码侧尚未直接消费该字段。
+
+---
+
+### Schema: `DesignQuestion`（Design Questions）
+
+用途：在设计问题生成与设计回答生成之间传递结构化问题。
+
+字段注解（核心）：
+
+- `id`：问题 ID。
+- `goal`：问题目标描述。
+- `constraints`：约束列表。
+- `acceptance_criteria`：验收条件列表。
+- `non_goals`：非目标列表（可为空）。
+- `question_type`：问题类型（默认 `architecture`）。
+
+生产者/消费者：
+
+- 生产者：`DesignQuestionGenerator`
+- 消费者：`DesignGenerator`
+
+---
+
+### Schema: Reports & Operational Artifacts（报表与运维工件）
+
+这些结构不是 Pydantic 模型，但属于稳定契约，供可视化与审计使用。
+
+#### CoverageReport
+
+- 位置：`data/reports/coverage_report.json`
+- 生产者：`CoverageSamplerStep`
+- 核心字段：`qa/design` 的 `bucket/intent/module_span/polarity` 统计、`targets`、`deficits`、`borrowed`、`negative_ratio`
+
+#### QuestionTypeReport
+
+- 位置：`data/reports/question_type_report.json`
+- 生产者：`QuestionTypeReportStep`
+- 核心字段：`distribution`、`targets`、`regression.warnings`
+
+#### RetrievalReport
+
+- 位置：`data/reports/qa_retrieval_report.json` / `data/reports/design_retrieval_report.json`
+- 生产者：`AnswerGenerator` / `DesignGenerator`
+- 核心字段：`total_questions`、命中/回退/调用链扩展统计
+
+#### DedupMapping
+
+- 位置：`data/reports/dedup_mapping.json`
+- 生产者：`DeduplicationStep`
+- 核心字段：`total_input/kept/dropped`、`pairs`、`semantic`（可选）
+
+#### SecretsScanLog
+
+- 位置：`data/reports/secrets_dropped.jsonl`
+- 生产者：`SecretsScanStep`
+- 核心字段：`index`、`findings`、`blacklist_hits`、`action`
+
+#### PipelineSummary
+
+- 位置：`data/reports/pipeline_summary.json`
+- 生产者：`Orchestrator`
+- 核心字段：`steps`、`output_files`、`repo_commit`
 
 ---
 
