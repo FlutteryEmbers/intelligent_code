@@ -210,5 +210,5 @@ logs
 repos
 models
 docs/guides
-/checkpoints
+checkpoints
 /*/implementations/

@@ -2,7 +2,7 @@
 # 适合：快速验证，显存需求约 6-10GB
 
 # ==================== 模型配置 ====================
-base_model: "../models/Qwen2.5-Coder-1.5B-Instruct"
+base_model: "./models/Qwen2.5-Coder-1.5B-Instruct"
 model_type: "qwen2.5-coder"
 trust_remote_code: true
 
@@ -35,7 +35,7 @@ load_in_4bit: false
 load_in_8bit: false
 
 # ==================== 训练超参 ====================
-output_dir: "../checkpoints/lora-qwen2.5-coder-1.5b"
+output_dir: "./checkpoints/lora-qwen2.5-coder-1.5b"
 num_train_epochs: 3
 per_device_train_batch_size: 1
 per_device_eval_batch_size: 2

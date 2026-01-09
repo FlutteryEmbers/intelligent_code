@@ -1,9 +1,9 @@
 repo:
-  path: "./repos/python/Mini-Chat-GPT"
+  path: "./repos/java/spring-ai"
   commit: ""
 
 language:
-  name: "python"
+  name: "java"
   profile_dir: "configs/language"
 
 llm:
@@ -23,13 +23,13 @@ core:
 
 method_understanding:
   enabled: true
-  max_methods: 10
+  max_methods: 300
   prompts:
     generation: "configs/prompts/method_understanding/auto_method_understanding.txt"
 
 question_answer:
   questions_per_method: 3
-  max_questions: 25
+  max_questions: 1000
   batch_size: 5
   embedding_model: "nomic-embed-text"
   user_questions_path: "configs/user_inputs/user_questions.yaml"
@@ -102,8 +102,12 @@ design_questions:
   profiles_top_k: 20
   profiles_max_chars: 6000
   require_layer_coverage: false
-  batch_size: 5
-  max_questions: 30
+  max_questions: 500
+  batching:
+    enabled: true
+    batch_size: 3
+    num_batches: 200
+    diversity_hint: true
   user_questions_path: "configs/user_inputs/design_questions.yaml"
   prompts:
     question_generation: "configs/prompts/design/auto_design_question_generation.txt"
@@ -150,10 +154,7 @@ design_questions:
     targets: {high: 0.8, mid: 0.15, hard: 0.05}
     labeler: "rule"
     # templates_path: "configs/user_inputs/design_templates.yaml"
-  batching:
-    enabled: true
-    max_batches: 5
-    diversity_hint: true
+  
 
 
 artifacts:

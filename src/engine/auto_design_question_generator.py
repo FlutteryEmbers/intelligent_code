@@ -108,11 +108,11 @@ class DesignQuestionGenerator:
         # Batching 配置（可选）
         batching_config = self.config.get('design_questions.batching', {})
         self.batching_enabled = batching_config.get('enabled', False)
-        self.batch_size = self.config.get(
-            'design_questions.batch_size',
+        self.batch_size = batching_config.get(
+            'batch_size',
             self.config.get('core.batch_size', self.config.get('generation.batch_size', 5)),
         )
-        self.max_batches = batching_config.get('max_batches', 5)
+        self.num_batches = batching_config.get('num_batches', 5)
 
         # 输出路径
         self.output_jsonl = Path(self.config.get(
@@ -256,7 +256,7 @@ class DesignQuestionGenerator:
         collected: list[dict] = []
         seen_goals: set[str] = set()
 
-        for batch_idx in range(self.max_batches):
+        for batch_idx in range(self.num_batches):
             remaining = self.max_design_questions - len(collected)
             if remaining <= 0:
                 break
@@ -265,7 +265,7 @@ class DesignQuestionGenerator:
             logger.info(
                 "Batch %s/%s: Generating %s design questions",
                 batch_idx + 1,
-                self.max_batches,
+                self.num_batches,
                 current_batch_size,
             )
 

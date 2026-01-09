@@ -33,7 +33,8 @@
 | `design_questions.use_method_profiles` | 方案增强 | 是否使用方法说明书 | true |
 | `design_questions.profiles_top_k` | 方案增强数量 | 引用多少条方法摘要 | 20 |
 | `design_questions.min_evidence_refs` | 最少证据数 | 设计样本证据下限 | 2 |
-| `design_questions.batch_size` | 批量生成 | 生成问题的批次 | 5 |
+| `design_questions.batching.batch_size` | 批量生成 | 单个 batch 的目标生成数 | 5 |
+| `design_questions.batching.num_batches` | 批次数上限 | 最多发起多少个 batch | 50 |
 | `design_questions.prompts.question_generation` | 设计出题模板 | 控制问题风格 | 默认即可 |
 | `design_questions.prompts.user_prompt` | 设计回答模板 | 控制回答结构 | 默认即可 |
 | `design_questions.retrieval.mode` | 检索模式 | hybrid / symbol_only | hybrid |
@@ -46,6 +47,11 @@
 | `design_questions.constraints.enable_arch_constraints` | 架构约束 | 引用约束清单 | true |
 | `artifacts.design_questions_jsonl` | 设计问题输出 | auto 设计问题文件 | 默认即可 |
 | `artifacts.design_rejected_jsonl` | 设计拒绝记录 | 失败样本日志 | 默认即可 |
+
+**设计问题数量控制逻辑**：
+- `design_questions.max_questions` 是总体上限。
+- 当 `design_questions.batching.enabled = false`：单次调用按 `max_questions` 请求生成。
+- 当 `design_questions.batching.enabled = true`：最多循环 `num_batches` 次，每批请求 `min(batch_size, remaining)`，总数上限仍是 `max_questions`；实际产出可能因解析失败或 goal 去重而小于目标值。
 
 ## Prompt 说明（模板角色）
 
