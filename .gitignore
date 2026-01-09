@@ -213,3 +213,4 @@ docs/guides
 checkpoints
 /*/implementations/
 .github
+/data_validator/results

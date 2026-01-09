@@ -95,7 +95,7 @@ Examples:
         "--output-dir",
         type=str,
         default=None,
-        help="Output directory (default: ../models/<model_name>)"
+        help="Output directory (default: ./models/<model_name>)"
     )
     parser.add_argument(
         "--no-hf-transfer",
@@ -118,9 +118,7 @@ Examples:
         output_dir = Path(args.output_dir)
     else:
         # 默认保存到项目根目录的 models/ 目录
-        script_dir = Path(__file__).parent  # fine_tuning目录
-        project_root = script_dir.parent     # 项目根目录
-        output_dir = project_root / "models" / default_dir_name
+        output_dir = script_dir / "models" / default_dir_name
     
     print("=" * 60)
     print(f"Model Download Utility")

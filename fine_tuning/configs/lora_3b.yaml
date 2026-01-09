@@ -7,9 +7,9 @@ model_type: "qwen2.5-coder"
 trust_remote_code: true
 
 # ==================== 数据配置 ====================
-train_data: "../data/final/train_sft.jsonl"
-val_data: "../data/final/val_sft.jsonl"
-test_data: "../data/final/test_sft.jsonl"
+train_data: "../assets/data/final/train_sft.jsonl"
+val_data: "../assets/data/final/val_sft.jsonl"
+test_data: "../assets/data/final/test_sft.jsonl"
 
 max_seq_length: 4096
 train_on_inputs: false
