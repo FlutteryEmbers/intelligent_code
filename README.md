@@ -79,6 +79,22 @@ flowchart TD
 
 ## 快速开始（保留项）
 
+### 配置目标解析仓库
+
+在 `configs/launch.yaml` 中设置目标仓库路径与可选 commit：
+
+```yaml
+repo:
+  path: "./repos/java/spring-ai"
+  commit: ""
+```
+
+测试仓库（示例）：
+
+- https://github.com/spring-projects/spring-ai
+- https://github.com/FlutteryEmbers/online_shopping_be
+- https://github.com/dieudonneAwa/mini-chatGPT
+
 ### Prerequisites
 
 - Python 3.10+
