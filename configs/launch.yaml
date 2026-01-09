@@ -19,6 +19,7 @@ core:
   retrieval_top_k: 6
   max_context_chars: 16000
   max_items: 50
+  architecture_constraints_path: "configs/user_inputs/architecture_constraints.yaml"
 
 method_understanding:
   enabled: true
@@ -37,6 +38,9 @@ question_answer:
     question_generation: "configs/prompts/question_answer/auto_question_generation.txt"
     coverage_generation: "configs/prompts/question_answer/coverage_question_generation.txt"
     answer_generation: "configs/prompts/question_answer/auto_answer_generation.txt"
+  constraints:
+    enable_counterexample: true
+    enable_arch_constraints: true
   retrieval:
     mode: "symbol_only"  # hybrid | vector_only | symbol_only
     min_score: 0.2
@@ -69,6 +73,9 @@ question_answer:
         consistency: 0.03
         compatibility: 0.02
         edge: 0.0
+      regression:
+        enabled: true
+        max_delta: 0.1
     scenario_injection:
       mode: "ratio"      # off | ratio
       fuzzy_ratio: 0.2
@@ -103,6 +110,9 @@ design_questions:
     coverage_generation: "configs/prompts/design/coverage_design_question_generation.txt"
     system_prompt: "configs/prompts/design/design_system_prompt.txt"
     user_prompt: "configs/prompts/design/design_user_prompt.txt"
+  constraints:
+    enable_counterexample: true
+    enable_arch_constraints: true
   retrieval:
     mode: "hybrid"       # hybrid | symbol_only
     fallback_top_k: 8
@@ -130,6 +140,9 @@ design_questions:
         performance: 0.1
         security: 0.1
         maintenance: 0.1
+      regression:
+        enabled: true
+        max_delta: 0.1
     scenario_injection:
       mode: "ratio"
       fuzzy_ratio: 0.15
@@ -157,6 +170,7 @@ artifacts:
   design_rejected_jsonl: "data/intermediate/rejected/design_rejected.jsonl"
   design_clean_jsonl: "data/intermediate/clean/design_clean.jsonl"
   coverage_report_json: "data/reports/coverage_report.json"
+  question_type_report_json: "data/reports/question_type_report.json"
 
 quality:
   gate_mode: "gate"

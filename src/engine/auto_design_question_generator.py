@@ -758,6 +758,7 @@ class DesignQuestionGenerator:
             'constraints': constraints,
             'acceptance_criteria': acceptance,
             'non_goals': non_goals,
+            'question_type': req.get('question_type') or 'architecture',
             'evidence_refs': evidence_refs,
         }
 

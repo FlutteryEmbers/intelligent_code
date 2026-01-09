@@ -22,6 +22,14 @@
 
 {common_mistakes_examples}
 
+## 架构约束（如有）
+
+{architecture_constraints}
+
+## 反例对比要求（可选）
+
+{counterexample_guidance}
+
 ## 输出要求
 
 你必须输出一个**最小结构**的 JSON 对象，仅包含以下字段：
@@ -30,6 +38,7 @@
   - 结论性陈述
   - 机制/规则说明（条列式）
   - 风险点或注意事项（条列式）
+  - Rejected Alternatives（至少 1 个备选方案及其拒绝原因）
   
   ⚠️ **重要警告**：answer字段必须是字符串类型，例如：
   ```

@@ -8,6 +8,7 @@ from .design_generation import DesignGenerationStep
 from .validation import ValidationStep
 from .coverage_tagger import CoverageTaggerStep
 from .coverage_sampler import CoverageSamplerStep
+from .question_type_report import QuestionTypeReportStep
 from .merge import MergeStep
 from .deduplication import DeduplicationStep
 from .secrets_scan import SecretsScanStep
@@ -22,6 +23,7 @@ __all__ = [
     "ValidationStep",
     "CoverageTaggerStep",
     "CoverageSamplerStep",
+    "QuestionTypeReportStep",
     "MergeStep",
     "DeduplicationStep",
     "SecretsScanStep",

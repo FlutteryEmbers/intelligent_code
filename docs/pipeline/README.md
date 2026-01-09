@@ -10,11 +10,14 @@
 4. `docs/pipeline/03-question-answer-step.md`
 5. `docs/pipeline/04-design-generation-step.md`
 6. `docs/pipeline/05-validation-step.md`
-7. `docs/pipeline/06-merge-step.md`
-8. `docs/pipeline/07-deduplication-step.md`
-9. `docs/pipeline/08-secrets-scan-step.md`
-10. `docs/pipeline/09-split-step.md`
-11. `docs/pipeline/10-export-step.md`
+7. `docs/pipeline/06-coverage-tagger-step.md`
+8. `docs/pipeline/07-coverage-sampler-step.md`
+9. `docs/pipeline/08-question-type-report-step.md`
+10. `docs/pipeline/09-merge-step.md`
+11. `docs/pipeline/10-deduplication-step.md`
+12. `docs/pipeline/11-secrets-scan-step.md`
+13. `docs/pipeline/12-split-step.md`
+14. `docs/pipeline/13-export-step.md`
 
 ## Legacy Docs
 

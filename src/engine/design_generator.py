@@ -41,6 +41,28 @@ def load_prompt_template(template_path: str | Path) -> str:
         return f.read()
 
 
+def load_architecture_constraints(path_value: str | None) -> list[str]:
+    if not path_value:
+        return []
+    path = Path(path_value)
+    if not path.exists():
+        logger.warning("Architecture constraints not found: %s", path)
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+    except Exception as exc:
+        logger.warning("Failed to load architecture constraints: %s", exc)
+        return []
+    if isinstance(data, dict):
+        items = data.get("constraints", [])
+    else:
+        items = data
+    if not isinstance(items, list):
+        return []
+    return [item for item in items if isinstance(item, str) and item.strip()]
+
+
 def load_design_questions_config(config_path: str | Path | None = None) -> list['DesignQuestion']:
     """从 YAML 配置文件加载设计问题定义
     
@@ -71,6 +93,7 @@ def load_design_questions_config(config_path: str | Path | None = None) -> list[
                 constraints=question_data.get('constraints', []),
                 acceptance_criteria=question_data.get('acceptance_criteria', []),
                 non_goals=question_data.get('non_goals', []),
+                question_type=question_data.get('question_type'),
             )
             design_questions.append(question)
         
@@ -90,13 +113,15 @@ class DesignQuestion:
         goal: str,
         constraints: list[str],
         acceptance_criteria: list[str],
-        non_goals: list[str] | None = None
+        non_goals: list[str] | None = None,
+        question_type: str | None = None
     ):
         self.id = id
         self.goal = goal
         self.constraints = constraints
         self.acceptance_criteria = acceptance_criteria
         self.non_goals = non_goals or []
+        self.question_type = question_type or "architecture"
     
     def to_dict(self):
         return {
@@ -104,7 +129,8 @@ class DesignQuestion:
             'goal': self.goal,
             'constraints': self.constraints,
             'acceptance_criteria': self.acceptance_criteria,
-            'non_goals': self.non_goals
+            'non_goals': self.non_goals,
+            'question_type': self.question_type,
         }
     
     @classmethod
@@ -115,7 +141,8 @@ class DesignQuestion:
             goal=data['goal'],
             constraints=data.get('constraints', []),
             acceptance_criteria=data.get('acceptance_criteria', []),
-            non_goals=data.get('non_goals', [])
+            non_goals=data.get('non_goals', []),
+            question_type=data.get('question_type'),
         )
 
 
@@ -192,6 +219,12 @@ class DesignGenerator:
             "negative_samples": 0,
             "positive_samples": 0,
         }
+
+        constraints_cfg = self.config.get("design_questions.constraints", {}) or {}
+        self.enable_counterexample = bool(constraints_cfg.get("enable_counterexample", False))
+        self.enable_arch_constraints = bool(constraints_cfg.get("enable_arch_constraints", False))
+        constraints_path = self.config.get("core.architecture_constraints_path")
+        self.architecture_constraints = load_architecture_constraints(constraints_path)
         
         # 输出路径
         self.output_dir = Path(self.config.get('output.intermediate_dir', 'data/intermediate'))
@@ -420,7 +453,12 @@ class DesignGenerator:
             return None
 
         # 5. 构造 TrainingSample（其余字段由系统填充）
-        quality = self._build_quality(negative_type, design_question.id, len(relevant_symbols))
+        quality = self._build_quality(
+            negative_type,
+            design_question.id,
+            len(relevant_symbols),
+            design_question.question_type,
+        )
         sample = TrainingSample(
             scenario="arch_design",
             instruction=design_question.goal,
@@ -549,6 +587,21 @@ class DesignGenerator:
         keywords = [w for w in words if len(w) > 1 and w not in stopwords]
         
         return keywords
+
+    def _format_architecture_constraints(self) -> str:
+        if not self.enable_arch_constraints:
+            return "None"
+        if not self.architecture_constraints:
+            return "None"
+        return "\n".join(f"- {item}" for item in self.architecture_constraints)
+
+    def _format_counterexample_guidance(self) -> str:
+        if not self.enable_counterexample:
+            return "None"
+        return (
+            "Include a 'Rejected Alternatives' section with at least 1 alternative, "
+            "and explain why it was not chosen."
+        )
     
     def _calculate_relevance_score(self, symbol: CodeSymbol, req_keywords: list[str]) -> int:
         """Calculate relevance score between symbol and design question keywords"""
@@ -775,7 +828,9 @@ Service 核心逻辑：
             service_evidence=service_evidence,
             service_evidence_json=service_evidence_json,
             goal_short=design_question.goal[:50] + "..." if len(design_question.goal) > 50 else design_question.goal,
-            repo_commit=repo_commit
+            repo_commit=repo_commit,
+            architecture_constraints=self._format_architecture_constraints(),
+            counterexample_guidance=self._format_counterexample_guidance(),
         )
         
         return prompt
@@ -833,10 +888,19 @@ Service 核心逻辑：
             f"{lines}"
         )
 
-    def _build_quality(self, negative_type: str | None, design_question_id: str, context_symbols: int) -> dict:
+    def _build_quality(
+        self,
+        negative_type: str | None,
+        design_question_id: str,
+        context_symbols: int,
+        question_type: str | None,
+    ) -> dict:
         coverage = {"polarity": "positive"}
+        if question_type:
+            coverage["question_type"] = question_type
         if negative_type:
-            coverage = {"polarity": "negative", "negative_type": negative_type}
+            coverage["polarity"] = "negative"
+            coverage["negative_type"] = negative_type
         return {
             "schema_ok": True,
             "evidence_ok": True,

@@ -97,6 +97,32 @@ def _plot_ratio_bar(title: str, labels: list[str], ratios: list[float], out_path
     fig.savefig(out_path, dpi=160)
     plt.close(fig)
 
+def _plot_ratio_comparison(
+    title: str,
+    labels: list[str],
+    actual: list[float],
+    target: list[float],
+    out_path: Path,
+) -> None:
+    if not labels or not actual or not target:
+        return
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    x = list(range(len(labels)))
+    width = 0.38
+    ax.bar([i - width / 2 for i in x], actual, width, color="#5a9b6a", label=_label("实际", "Actual"))
+    ax.bar([i + width / 2 for i in x], target, width, color="#e3a64f", label=_label("目标", "Target"))
+    ax.set_title(title)
+    ax.set_ylabel(_label("比例", "Ratio"))
+    ax.set_xlabel(_label("类别", "Category"))
+    ax.set_ylim(0, 1)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=30)
+    ax.legend()
+    fig.tight_layout()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, dpi=160)
+    plt.close(fig)
+
 
 def _plot_quality(report: dict, prefix: str, output_dir: Path) -> None:
     stats = report.get("validation_stats", {})
@@ -142,6 +168,15 @@ def _translate_labels(labels: list[str], mapping: dict[str, str]) -> list[str]:
 
 def _align_counts(counts: dict, keys: list[str]) -> list[float]:
     return [counts.get(key, 0) for key in keys]
+
+def _merge_keys(primary: list[str], secondary: list[str]) -> list[str]:
+    seen: set[str] = set()
+    merged: list[str] = []
+    for key in primary + secondary:
+        if key not in seen:
+            merged.append(key)
+            seen.add(key)
+    return merged
 
 
 def _plot_coverage(scope: str, data: dict, output_dir: Path) -> None:
@@ -330,6 +365,46 @@ def _plot_dedup(report: dict, output_dir: Path) -> None:
         )
 
 
+def _plot_question_type(report: dict, output_dir: Path) -> None:
+    if not report:
+        return
+    for scope in ("qa", "design"):
+        data = report.get(scope, {})
+        dist = data.get("distribution", {})
+        counts = dist.get("counts", {})
+        ratios = dist.get("ratios", {})
+        targets = data.get("targets", {})
+        keys = _merge_keys(list(targets.keys()), list(counts.keys()))
+        if not keys:
+            keys = list(ratios.keys())
+        if counts:
+            _plot_bar(
+                _label(f"{scope.upper()} 问题类型分布", f"{scope.upper()} Question Types"),
+                keys,
+                _align_counts(counts, keys),
+                output_dir / f"{scope}_question_type_counts.png",
+                _label("数量", "Count"),
+            )
+        if ratios:
+            _plot_ratio_bar(
+                _label(f"{scope.upper()} 问题类型比例", f"{scope.upper()} Question Type Ratios"),
+                keys,
+                _align_counts(ratios, keys),
+                output_dir / f"{scope}_question_type_ratios.png",
+            )
+        if targets:
+            _plot_ratio_comparison(
+                _label(
+                    f"{scope.upper()} 问题类型比例（实际 vs 目标）",
+                    f"{scope.upper()} Question Types (Actual vs Target)",
+                ),
+                keys,
+                _align_counts(ratios, keys),
+                _align_counts(targets, keys),
+                output_dir / f"{scope}_question_type_targets.png",
+            )
+
+
 def _resolve_path(base: Path, value: str) -> Path:
     path = Path(value)
     return path if path.is_absolute() else base / path
@@ -477,6 +552,10 @@ def main() -> int:
     dedup_report = _read_json(reports_path / "dedup_mapping.json")
     if dedup_report:
         _plot_dedup(dedup_report, dedup_dir)
+
+    question_type_report = _read_json(reports_path / "question_type_report.json")
+    if question_type_report:
+        _plot_question_type(question_type_report, coverage_dir)
 
     print(f"Rendered reports to {output_dir}")
     return 0

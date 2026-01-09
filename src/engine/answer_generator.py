@@ -8,6 +8,8 @@ import random
 from pathlib import Path
 from typing import List
 
+import yaml
+
 from src.utils.schemas import QuestionSample, TrainingSample, CodeSymbol, EvidenceRef, ReasoningTrace
 from src.utils.config import Config
 from src.utils.logger import get_logger
@@ -28,6 +30,28 @@ def load_prompt_template(template_path: str) -> str:
     
     with open(path, 'r', encoding='utf-8') as f:
         return f.read()
+
+
+def load_architecture_constraints(path_value: str | None) -> list[str]:
+    if not path_value:
+        return []
+    path = Path(path_value)
+    if not path.exists():
+        logger.warning("Architecture constraints not found: %s", path)
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+    except Exception as exc:
+        logger.warning("Failed to load architecture constraints: %s", exc)
+        return []
+    if isinstance(data, dict):
+        items = data.get("constraints", [])
+    else:
+        items = data
+    if not isinstance(items, list):
+        return []
+    return [item for item in items if isinstance(item, str) and item.strip()]
 
 
 class AnswerGenerator:
@@ -85,6 +109,12 @@ class AnswerGenerator:
             "negative_samples": 0,
             "positive_samples": 0,
         }
+
+        constraints_cfg = self.config.get("question_answer.constraints", {}) or {}
+        self.enable_counterexample = bool(constraints_cfg.get("enable_counterexample", False))
+        self.enable_arch_constraints = bool(constraints_cfg.get("enable_arch_constraints", False))
+        constraints_path = self.config.get("core.architecture_constraints_path")
+        self.architecture_constraints = load_architecture_constraints(constraints_path)
         
         # 加载 prompt 模板
         template_path = self.config.get(
@@ -383,7 +413,9 @@ class AnswerGenerator:
             available_evidence_refs=available_evidence_text,
             repo_commit=question.repo_commit,
             format_constraints=format_constraints,
-            common_mistakes_examples=mistakes_text
+            common_mistakes_examples=mistakes_text,
+            architecture_constraints=self._format_architecture_constraints(),
+            counterexample_guidance=self._format_counterexample_guidance(),
         )
         prompt = self._inject_negative_rules(prompt, negative_type)
         
@@ -476,7 +508,7 @@ class AnswerGenerator:
             reasoning_trace = ReasoningTrace(**thought_dict)
 
             # 创建 TrainingSample（其余字段由系统填充）
-            quality = self._build_quality(negative_type)
+            quality = self._build_quality(negative_type, question.question_type)
             sample = TrainingSample(
                 scenario="qa_rule",
                 instruction=question.question,
@@ -512,6 +544,21 @@ class AnswerGenerator:
             parts.append("")
         
         return "\n".join(parts)
+
+    def _format_architecture_constraints(self) -> str:
+        if not self.enable_arch_constraints:
+            return "None"
+        if not self.architecture_constraints:
+            return "None"
+        return "\n".join(f"- {item}" for item in self.architecture_constraints)
+
+    def _format_counterexample_guidance(self) -> str:
+        if not self.enable_counterexample:
+            return "None"
+        return (
+            "Include a 'Rejected Alternatives' section with at least 1 alternative, "
+            "and explain why it was not chosen."
+        )
 
     def _write_retrieval_report(self) -> None:
         reports_dir = Path(self.config.get('output.reports_dir', 'data/reports'))
@@ -572,15 +619,15 @@ class AnswerGenerator:
             f"{lines}"
         )
 
-    def _build_quality(self, negative_type: str | None) -> dict:
+    def _build_quality(self, negative_type: str | None, question_type: str | None) -> dict:
+        coverage = {"polarity": "positive"}
+        if question_type:
+            coverage["question_type"] = question_type
         if not negative_type:
-            return {"coverage": {"polarity": "positive"}}
-        return {
-            "coverage": {
-                "polarity": "negative",
-                "negative_type": negative_type,
-            }
-        }
+            return {"coverage": coverage}
+        coverage["polarity"] = "negative"
+        coverage["negative_type"] = negative_type
+        return {"coverage": coverage}
     
     def _clean_json_output(self, output: str) -> str:
         """清理 LLM 输出，提取纯 JSON"""

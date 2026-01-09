@@ -2,11 +2,11 @@
 
 ## 章节与重点内容
 
-- Architecture Overview：设计问题驱动的设计方案生成（可选 Auto Design Questions）
-- Design Patterns：Two-stage generation（Design Questions → Design）、RAG（轻量检索）
-- Data Flow：`symbols.jsonl` → `design_questions(_auto).jsonl` → `design_raw.jsonl`
-- Modular Detail：设计问题结构、上下文分层、证据最小数约束
-- Trade-offs：设计问题质量与稳定性、fallback 行为、证据覆盖 vs 成本
+- Architecture Overview：自动设计问题 + 设计回答生成
+- Design Patterns：Question-Driven Generation、Artifact boundary
+- Data Flow：`symbols.jsonl` + `design_questions` → `design_raw.jsonl`
+- Modular Detail：Auto/User 设计问题、检索与 evidence 约束
+- Trade-offs：质量/成本、自动问题失败回退
 
 ---
 
@@ -14,34 +14,24 @@
 
 ### 职责边界（Single Responsibility）
 
-DesignGenerationStep 的职责是：为架构设计场景生成 `TrainingSample(scenario=arch_design)`，并确保每个样本带有可验证证据引用。
+DesignGenerationStep 的职责是：生成设计类训练样本（`scenario=arch_design`）。问题来源既可以是 Auto Design Questions，也可以来自用户配置。
 
-### 两种输入设计问题来源
+### 执行模式
 
-1. **Auto Design Questions（可选）**：从代码结构自动生成设计问题集合（用于更贴合仓库现状）。
-2. **Default Design Questions（固定）**：从 `configs/design_questions.yaml` 读取设计问题集合（用于稳定基线与可重复测试）。
+- **Auto 设计问题**：未设置 `--skip-question-answer` 且未设置 `--skip-auto-design-questions`
+- **User 设计问题**：当 Auto 关闭或失败时回退到 `design_questions.user_questions_path`
+- **Skip**：`--skip-design` 或 `--skip-llm`
 
 ### 输入/输出（Artifacts）
 
-- 输入：`symbols.jsonl`
+- 输入：
+  - `symbols.jsonl`
+  - `design_questions.user_questions_path`
 - 输出：
-  - design_questions：`data/intermediate/auto_questions/design_questions.jsonl`（DesignGenerator 默认）或 `auto_questions/design_questions_auto.jsonl`（design_questions 配置）
-  - design：`data/intermediate/design_raw.jsonl`、`data/intermediate/rejected/design_rejected.jsonl`
-
----
-
-## Design Patterns
-
-### 1) Two-stage generation（设计问题生成与方案生成分离）
-
-把“要解决什么问题”（Design Question）与“怎么改”（Design Sample）分开，主要收益：
-
-- 设计问题作为显式对象便于调参、审计与复用；
-- 可独立替换设计问题生成策略（固定设计问题/自动设计问题/人工输入），而不影响设计生成器的主体结构。
-
-### 2) Light RAG（轻量检索）
-
-DesignGenerator 在生成设计方案前，会从 symbols 中选择与设计问题相关的层级/组件，拼装成结构化上下文（Controller/Service/Repository 等），提升模型回答的贴合度与可落地性。
+  - `data/intermediate/auto_questions/design_questions.jsonl`（设计问题快照）
+  - `data/intermediate/design_raw.jsonl`
+  - `data/intermediate/rejected/design_rejected.jsonl`
+  - `data/reports/design_retrieval_report.json`
 
 ---
 
@@ -49,62 +39,46 @@ DesignGenerator 在生成设计方案前，会从 symbols 中选择与设计问�
 
 ```mermaid
 flowchart TD
-  S[(symbols.jsonl)] -->|optional| R[AutoDesignQuestionGenerator]
-  R --> RA[(auto_questions/design_questions_auto.jsonl)]
-  S --> D[DesignGenerator]
-  RA --> D
-  D --> O[(design_raw.jsonl)]
-  D --> X[(rejected/design_rejected.jsonl)]
+  S[(symbols.jsonl)] --> QG[DesignQuestionGenerator]
+  QG --> Q[(design_questions.jsonl)]
+  U[(design_questions.yaml)] --> DG[DesignGenerator]
+  Q --> DG
+  S --> DG
+  DG --> O[(design_raw.jsonl)]
+  DG --> R[(design_rejected.jsonl)]
 ```
 
 ---
 
 ## Modular Detail
 
-### Design Question 数据结构
+### Auto Design Questions
 
-Design Question 作为结构化输入，典型字段：
+- 由 `DesignQuestionGenerator` 从 symbols + method_profiles 生成（若启用）。
+- 生成失败会记录 warning 并回退到用户问题配置。
 
-- `id`
-- `goal`（核心目标）
-- `constraints`（约束条件）
-- `acceptance_criteria`（验收标准）
-- `non_goals`（非目标）
+### 设计回答生成
 
-### 证据引用最小数量
+- `DesignGenerator` 会保存设计问题快照（便于审计），并逐条生成样本。
+- 检索/召回可用 `design_questions.retrieval` 配置；支持调用链扩展（弱规则）。
+- 支持 negative sampling：`design_questions.coverage.negative_ratio` / `negative_types`。
 
-设计方案样本的 `thought.evidence_refs` 通常要求覆盖：
+### 约束注入
 
-- 入口层（Controller/route）
-- 业务层（Service/core logic）
-- 数据层（Repository/DAO）或关键配置点
-
-该约束与 `design_questions.min_evidence_refs` 共同决定样本可接受性与生成成本。
-
-### Auto Design Questions 的上下文增强（可选）
-
-当启用 `design_questions.use_method_profiles=true` 时，DesignQuestionGenerator 会读取 `method_profiles.jsonl` 并将其摘要拼入上下文，提升自动设计问题的语义质量。
+- `design_questions.constraints` 可启用“反例对比”与“架构约束”提示段。
+- 设计问题可包含 `question_type` 与 `scenario_constraints`，影响 prompt 结构与样本风格。
 
 ---
 
-## Coupling Points（与后续步骤的耦合）
+## Coupling Points
 
-- ValidationStep：对 `design_raw.jsonl` 做 schema/evidence/commit 校验并产出报告
-- MergeStep：把 `design_raw.jsonl` 合并进入 `all_raw.jsonl`
-- SplitStep：依赖 `scenario=arch_design` 进行分流
-- ExportStep：把设计样本导出为 SFT messages（默认不在 assistant content 中携带 thought）
+- ValidationStep：依赖证据引用与 schema 完整性。
+- CoverageTagger/Sampler：基于 `quality.coverage` 统计与抽样。
+- MergeStep：默认读取 clean 或 raw 设计工件。
 
 ---
 
 ## Trade-offs
 
-### 1) Auto Design Questions 的不确定性 vs 贴合度
-
-- 贴合度：自动设计问题可针对代码现状提出更具体的改进建议。
-- 不确定性：设计问题质量高度依赖 LLM 输出稳定性；因此实现上提供 fallback 到 default design questions。
-
-### 2) 上下文覆盖 vs token 成本
-
-- 更广的上下文覆盖提高设计方案可落地性与证据充分性。
-- 代价是 token 成本和模型格式稳定性下降（更长的 prompt 更易出现 JSON 结构破坏或遗漏 evidence_refs）。
-
+- Auto 设计问题提升多样性，但生成失败时需回退。
+- Auto 与 User 的双路径提高灵活性，但需要明确配置与路径契约。

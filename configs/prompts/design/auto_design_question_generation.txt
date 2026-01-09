@@ -29,6 +29,7 @@ If "None", ignore this section.
 Return a JSON object with a single key "design_questions". Each design question must include:
 - id: string (format: "DQ-AUTO-001")
 - goal: short goal statement
+- question_type: one of (architecture, integration, consistency, error_handling, performance, security, maintenance)
 - constraints: array of strings
 - acceptance_criteria: array of strings
 - non_goals: array of strings

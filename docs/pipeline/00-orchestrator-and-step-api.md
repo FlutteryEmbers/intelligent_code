@@ -6,7 +6,7 @@
 - Design Patterns：Pipeline、Template Method、Config Singleton、“文件工件即接口”
 - Data Flow：从 CLI args 到文件工件，再到最终 SFT 导出（以文件系统作为持久层）
 - Modular Detail：Step 生命周期、skip/错误处理策略、paths 映射设计
-- Trade-offs：串行/容错执行、弱 gating（Validation 不过滤）、路径耦合风险
+- Trade-offs：串行执行、质量 gate 与 clean 分支、路径契约风险
 
 ---
 
@@ -33,23 +33,30 @@ flowchart TD
   C --> D2[MethodUnderstandingStep]
   C --> D3[QuestionAnswerStep]
   C --> D4[DesignGenerationStep]
-  C --> D5[ValidationStep (report-only)]
-  C --> D6[MergeStep]
-  C --> D7[DeduplicationStep]
-  C --> D8[SecretsScanStep]
-  C --> D9[SplitStep]
-  C --> D10[ExportStep]
+  C --> D5[ValidationStep]
+  C --> D6[CoverageTaggerStep]
+  C --> D7[CoverageSamplerStep]
+  C --> D8[QuestionTypeReportStep]
+  C --> D9[MergeStep]
+  C --> D10[DeduplicationStep]
+  C --> D11[SecretsScanStep]
+  C --> D12[SplitStep]
+  C --> D13[ExportStep]
 
   D1 --> R1[(data/raw/*)]
   D2 --> I1[(data/intermediate/*)]
   D3 --> I1
   D4 --> I1
+  D5 --> C1[(data/intermediate/clean/*)]
   D5 --> RP[(data/reports/*)]
-  D6 --> I1
-  D7 --> I1
-  D8 --> I1
-  D9 --> F1[(data/final/*)]
-  D10 --> F1
+  D6 --> C1
+  D7 --> C1
+  D8 --> RP
+  D9 --> I1
+  D10 --> I1
+  D11 --> I1
+  D12 --> F1[(data/final/*)]
+  D13 --> F1
 ```
 
 ---
@@ -99,7 +106,9 @@ flowchart TD
 当前实现的“DB 等价物”为文件系统，关键工件包括：
 
 - Parse：`data/raw/extracted/symbols.jsonl`、`data/raw/repo_meta/repo_meta.json`
-- Generation：`data/intermediate/auto_qa_raw.jsonl`、`data/intermediate/design_raw.jsonl`
+- QA/Design：`data/intermediate/auto_qa_raw.jsonl`、`data/intermediate/design_raw.jsonl`
+- Validation：`data/intermediate/clean/qa_clean.jsonl`、`data/intermediate/clean/design_clean.jsonl`
+- Coverage：`data/reports/coverage_report.json`、`data/reports/question_type_report.json`
 - Post-process：`data/intermediate/all_raw.jsonl`、`data/intermediate/all_dedup.jsonl`
 - Split：`data/final/{train,val,test}.jsonl` + `data/final/{qa,design}/*`
 - Export：`data/final/*_sft.jsonl` + `data/reports/dataset_stats.json`
@@ -116,18 +125,19 @@ flowchart TD
   - `error`（可选）：失败原因字符串
   - 其他字段：由 step 自行扩展，用于 summary
 
-### Skip 策略
+### Skip 策略（摘要）
 
 - Parse 支持基于 commit cache 命中跳过（`repo_meta.repo_commit` 匹配当前 commit）
-- MethodUnderstanding 支持 `method_understanding.enabled=false` 与 `--skip-llm`
+- MethodUnderstanding 支持 `method_understanding.enabled=false`、`--skip-llm`、用户模式不需要 embeddings
 - QuestionAnswer 支持 `--skip-question-answer` / `--skip-qa` / `--skip-llm`
 - Design 支持 `--skip-design` / `--skip-llm`
 - Dedup 支持 `--skip-dedup` 或缺少输入工件
+- SecretsScan 支持 `--skip-safety` 或缺少输入工件
 - Export 支持 `--skip-export`
 
 ### Paths 映射策略
 
-Orchestrator 统一创建目录并在 `paths` 中固定常用文件名，step 直接引用 `paths[key]`，避免重复拼路径。
+Orchestrator 统一创建目录并在 `paths` 中固定常用文件名，step 直接引用 `paths[key]`，避免重复拼路径。配置可覆盖部分 artifact 路径，但建议统一由 `paths` 生成以减少耦合。
 
 ---
 
@@ -138,18 +148,13 @@ Orchestrator 统一创建目录并在 `paths` 中固定常用文件名，step �
 - 优点：简单、确定性强、便于 debug 与复现。
 - 代价：对 LLM/embedding 等耗时阶段无法并行化；整体吞吐较低。
 
-### 2) 容错继续执行 vs 强一致 gating
+### 2) Report-only vs Clean Gate
 
-- 现状：`BaseStep.run()` 捕获异常并返回 failed，pipeline 默认继续执行后续步骤。
-- 风险：后续步骤若未显式检查输入工件存在性，可能产生级联失败或“空产物”。
+- 现状：Validation 会输出 clean 工件，同时 Merge 在 gate/report 模式之间切换；gate 模式要求 clean 存在，report 模式允许回退 raw。
+- 收益：在不强制阻断的情况下，保留“高质量 clean 分支”并可视化质量报告。
+- 风险：若配置为 report 且允许 fallback，最终训练集仍可能包含低质样本。
 
 ### 3) 文件工件边界 vs 路径/契约耦合
 
 - 优点：可回放、可审计、天然支持断点续跑。
 - 风险：不同模块（step 与 engine）若对输出路径的默认值不一致，会产生隐式耦合与错配成本；建议逐步把引擎输出路径“外显”为显式参数或统一由 `paths` 注入。
-
-### 4) Validation 为 report-only
-
-- 优点：不改变原始生成结果，保留全部样本以便分析。
-- 代价：后续 Merge/Dedup/Split 默认仍使用 raw 数据；若希望产出可训练的强保证数据，应引入“validated/clean”分支或在 Validation 中生成过滤后的 clean 工件。
-

@@ -2,11 +2,11 @@
 
 ## 章节与重点内容
 
-- Architecture Overview：质量校验的定位（report-only gate）
+- Architecture Overview：质量校验与 clean 分支生成
 - Design Patterns：Schema Validation（Pydantic）、Evidence Verification（hash/定位校验）
-- Data Flow：`symbols.jsonl` + `{auto_qa_raw,design}_raw.jsonl` → quality reports + rejected
-- Modular Detail：校验规则、错误分类与统计、输出报告结构
-- Trade-offs：不阻断后续 vs 数据集可训练性保证
+- Data Flow：`symbols.jsonl` + `{qa,design}_raw.jsonl` → quality reports + rejected + clean
+- Modular Detail：trace 结构校验、错误分类与统计、输出报告结构
+- Trade-offs：gate/report 模式下的质量保障
 
 ---
 
@@ -14,9 +14,7 @@
 
 ### 职责边界（Single Responsibility）
 
-ValidationStep 的唯一职责是：对已生成的样本做结构与证据一致性校验，并输出报告与 rejected 列表，用于质量分析与回归。
-
-> 现状重要说明：ValidationStep **不**会产出“过滤后的 clean 数据”供后续步骤使用；它是 report-only。
+ValidationStep 的职责是：对已生成的样本做结构与证据一致性校验，输出质量报告、rejected 样本，并在配置允许时生成 clean 分支供后续步骤消费。
 
 ### 输入/输出（Artifacts）
 
@@ -29,6 +27,8 @@ ValidationStep 的唯一职责是：对已生成的样本做结构与证据一�
   - `data/reports/design_quality.json`
   - `data/intermediate/rejected/qa_validation_rejected.jsonl`
   - `data/intermediate/rejected/design_validation_rejected.jsonl`
+  - `data/intermediate/clean/qa_clean.jsonl`（可选）
+  - `data/intermediate/clean/design_clean.jsonl`（可选）
 
 ---
 
@@ -51,6 +51,13 @@ ValidationStep 的唯一职责是：对已生成的样本做结构与证据一�
 - `file_path` 必须一致
 - `repo_commit` 一致性检查（非 UNKNOWN 时）
 
+### 3) Trace 结构校验（warn-only）
+
+受 `quality.trace_rules` 控制，包含：
+
+- trace 结构与字段存在性
+- evidence anchor / answer alignment 的弱一致性检查
+
 ---
 
 ## Data Flow
@@ -65,6 +72,8 @@ flowchart LR
   V --> R2[(design_quality.json)]
   V --> X1[(qa_validation_rejected.jsonl)]
   V --> X2[(design_validation_rejected.jsonl)]
+  V --> C1[(qa_clean.jsonl)]
+  V --> C2[(design_clean.jsonl)]
 ```
 
 ---
@@ -76,36 +85,24 @@ flowchart LR
 质量报告包含：
 
 - 总样本数、通过/失败、pass_rate
-- top_failures（按错误类型聚合）
-- top_warnings
-- 输出文件路径（report/rejected）
+- top_failures / top_warnings
+- trace_summary（warn-only 统计）
+- output_files（report/rejected/clean）
 
-### 错误分类策略
+### clean 分支
 
-实现上把错误字符串按 `:` 之前的前缀进行聚合统计，方便观察主要失败类型（如 missing evidence、hash mismatch 等）。
+`quality.write_clean=true` 时写入 clean 工件；Merge 会优先读取 clean。
 
 ---
 
 ## Coupling Points（与后续步骤的耦合）
 
-### 与后续步骤“弱耦合”
-
-Validation 的输出不被 Merge/Dedup/Split/Export 消费；后续仍以 raw 工件为准。这意味着：
-
-- Validation 更多用于监控/分析，而非强制保障训练集质量；
-- 若需要“可训练数据强保证”，需要新增 clean artifact 分支并在后续步骤中消费。
+- MergeStep：gate 模式要求 clean 存在，否则报错；report 模式允许 fallback raw。
+- CoverageTagger/Sampler：默认在 clean 上进行标签与抽样。
 
 ---
 
 ## Trade-offs
 
-### 1) report-only 的优点
-
-- 保留全部原始生成结果，便于分析与改进提示词/规则。
-- 不引入额外的数据分支与路径复杂度，保持 pipeline 简洁。
-
-### 2) report-only 的代价
-
-- 后续步骤可能把 evidence 不完整/不一致的样本继续合并、去重、导出，降低最终训练集可用性。
-- 建议演进方向：Validation 输出 `qa_clean.jsonl`/`design_clean.jsonl`，并让 Merge 以 clean 优先。
-
+- gate 模式提高最终数据质量，但对 clean 工件完整性要求更高。
+- report 模式更宽松，便于 demo 运行，但可能放回低质样本。

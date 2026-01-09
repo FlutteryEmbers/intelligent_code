@@ -19,6 +19,14 @@
 
 {context}
 
+# 架构约束（如有）
+
+{architecture_constraints}
+
+# 反例对比要求（可选）
+
+{counterexample_guidance}
+
 # 关键字段的正确值
 
 Controller 入口：

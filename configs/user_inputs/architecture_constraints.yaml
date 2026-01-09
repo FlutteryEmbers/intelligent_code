@@ -1,0 +1,4 @@
+constraints:
+  - "Prefer Controller-to-Service-to-Repository layering instead of direct access when possible."
+  - "Prefer existing shared utilities over duplicating cross-cutting logic."
+  - "Prefer avoiding new external dependencies unless the benefit is clear."
