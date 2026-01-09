@@ -119,20 +119,31 @@ export OLLAMA_MODEL=qwen2.5:7b
 python3 main.py
 ```
 
-常用跳过项：
+常用参数（CLI）：
+
+- `--config`：指定配置文件（默认 `configs/launch.yaml`）
+- `--skip-parse`：跳过解析
+- `--skip-question-answer`：关闭 Auto QA（使用用户问题）
+- `--skip-auto`：`--skip-question-answer` 的旧别名
+- `--skip-auto-design-questions`：跳过自动设计问题生成
+- `--skip-llm`：跳过所有 LLM 生成
+- `--skip-qa`：跳过 QA 生成
+- `--skip-design`：跳过设计生成
+- `--skip-dedup`：跳过去重
+- `--skip-safety`：跳过安全扫描
+- `--skip-export`：跳过导出
+
+示例：
 
 ```bash
-python3 main.py --skip-parse --skip-llm --skip-export
-```
-
-Auto QA 开关：
-
-```bash
-# 默认开启 Auto QA
-python3 main.py
+# 指定配置文件
+python3 main.py --config configs/launch.yaml
 
 # 使用用户问题（关闭 Auto QA）
 python3 main.py --skip-question-answer
+
+# 快速跳过耗时步骤
+python3 main.py --skip-parse --skip-llm --skip-export
 ```
 
 ### Outputs（你应该看到）
