@@ -8,7 +8,7 @@
 - **Evidence-first**：样本通过 `thought.evidence_refs` 回指 `data/raw/extracted/symbols.jsonl`，支持一致性校验与审计
 - **Auto RAG Mode（可选）**：方法画像 → embedding → 自动问题 → 回答（质量与可控性更强）
 - **Config-driven**：语言规则/分层识别通过 `configs/language/*.yaml` 扩展
-- **Offline Pipeline**：Parse → Method Understanding → Question/Answer → Design → Validation → Merge → Dedup → Safety → Split → Export
+- **Offline Pipeline**：Parse → Method Understanding → Question/Answer → Design → Validation → Coverage Tagging → Coverage Sampling → Question Type Report → Merge → Dedup → Safety → Split → Export
 
 ## Getting Started
 
@@ -82,18 +82,19 @@ core:
 
 method_understanding:
   enabled: true
-  max_methods: 50
+  max_methods: 10
 
 question_answer:
   questions_per_method: 5
-  max_questions: 200
+  max_questions: 25
   embedding_model: "nomic-embed-text"
-  user_questions_path: "configs/user_questions.yaml"
+  user_questions_path: "configs/user_inputs/user_questions.yaml"
   build_embeddings_in_user_mode: true
 
 design_questions:
   use_method_profiles: true
-  max_questions: 50
+  max_questions: 30
+  user_questions_path: "configs/user_inputs/design_questions.yaml"
 ```
 
 ### Run
@@ -123,7 +124,7 @@ python3 main.py --skip-question-answer
 - Parse：`data/raw/extracted/symbols.jsonl`、`data/raw/repo_meta/repo_meta.json`
 - Intermediate：`data/intermediate/*.jsonl`
 - Final SFT：`data/final/{train,val,test}_sft.jsonl`（以及 `data/final/qa/*`、`data/final/design/*`）
-- Reports：`data/reports/pipeline_summary.json`、`data/reports/dataset_stats.json`
+- Reports：`data/reports/pipeline_summary.json`、`data/reports/dataset_stats.json`、`data/reports/coverage_report.json`、`data/reports/question_type_report.json`
 
 ## Deep Dive（Design Docs）
 
@@ -131,15 +132,8 @@ python3 main.py --skip-question-answer
 
 - 索引：`docs/pipeline/README.md`
 - 编排与 Step API：`docs/pipeline/00-orchestrator-and-step-api.md`
-- 各步骤：`docs/pipeline/01-parse-step.md` → `docs/pipeline/10-export-step.md`
+- 各步骤：`docs/pipeline/01-parse-step.md` → `docs/pipeline/13-export-step.md`
 
+Feature 说明文档（面向业务视角）：
 
-## Roadmap
-
-- **Quality Gate**：Validation 产出 `*_clean.jsonl`，让 Merge/后处理优先消费（从 report-only 升级为可训练强保证）
-- **Artifact Contract Unification**：统一 step 与 engine 的输出路径/契约（由 Orchestrator `paths` 注入，消除默认路径漂移）
-- **Scalable Retrieval**：把 JSONL embedding 索引升级为可选 FAISS/向量库，支撑大仓库
-- **Dedup Upgrade**：引入 LSH/MinHash 并提供可解释的保留策略与评估
-- **Parallel Generation**：LLM/embedding 阶段并发与重试、成本控制（batch/timeout/backoff）
-- **More Languages**：扩展 JS/TS/Go 等语言（parser + language profile）
-- **Evaluation Harness**：质量回归（schema pass rate、evidence 命中率、覆盖与多样性指标、泄漏风险评估）
+- 索引：`docs/features/README.md`
