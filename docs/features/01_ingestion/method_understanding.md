@@ -103,3 +103,49 @@ flowchart TD
 
 - 若 `method_profiles.jsonl` 缺失，Auto QA 会直接失败。
 - 该步骤本身不写训练样本，只提供后续生成的“原材料”。
+
+## 🎭 MethodProfile 在不同任务中的角色
+
+`MethodProfile` 在下游的**QA（问答）**和**Design（设计）**两个核心任务中，扮演着截然不同的角色。
+
+### 1. 在 QA 任务中：核心驱动者
+
+在 `QA` 流程中，`MethodProfile` 是生成问答对的**核心与起点**。整个 `auto_question_generator`（自动问题生成器）完全依赖 `method_profiles.jsonl` 文件中的结构化摘要来构思问题。
+
+- **角色定位**：事实的源头 (Source of Truth)。
+- **工作方式**：遍历每个 `MethodProfile`，并依据其 `summary`、`business_rules` 等字段，结合预设的模板（`qa_scenario_templates.yaml`）来生成具体、有针对性的问题。
+- **重要性**：**核心依赖**。如果缺少 `MethodProfile`，QA 生成步骤将无法进行。
+
+### 2. 在 Design 任务中：可选的上下文增强器
+
+相比之下，在 `Design` 流程中，`MethodProfile` 的角色要次要得多，其主要作用是在生成**设计问题**的阶段（`DesignQuestionGenerator`）提供辅助性的上下文，并且**此功能默认关闭**。
+
+- **角色定位**：可选的上下文补充材料 (Optional Context Enhancer)。
+- **事实引用**:
+  - **代码**: 在 `src/engine/auto_design_question_generator.py` 中，配置项 `self.use_method_profiles` 由 `design_questions.use_method_profiles` 控制，其**默认为 `False`**。
+
+#### 启用后的工作方式
+
+当在配置中将 `use_method_profiles` 设置为 `True` 时，会发生以下情况：
+
+1.  **加载摘要**: `DesignQuestionGenerator` 会读取 `method_profiles.jsonl` 文件。
+2.  **拼接上下文**: 它会将 `MethodProfile` 中的核心信息（如方法名、`summary`、`business_rules`）提取并整合为一段文本。
+3.  **增强 Prompt**: 这段由 `MethodProfile` 摘要组成的文本，会被附加到由真实源码构成的主上下文之后，一同发送给 LLM，用于生成设计问题。
+    > **比喻**：这就像出题老师在构思一个复杂的设计题目前，除了翻阅代码库的“蓝图”（源码），还会额外看一眼“关键模块功能简介”（MethodProfile 摘要），以获得更深刻的洞察力。
+
+#### 目的：生成更高质量的设计问题
+
+提供这份“高级参考资料”的目的是帮助负责出题的 LLM 对代码库的能力有更丰富、更语义化的理解。有了这份摘要，LLM 不仅能看到代码的“形”，还能理解其“神”（业务逻辑），从而可能构思出更贴近真实业务痛点、更有价值的宏观设计问题。
+
+#### 核心要点：不参与最终方案设计
+
+最重要的一点是，`MethodProfile` 的作用**仅限于辅助生成设计问题**。
+
+在工作流的第二阶段，即 `DesignGenerator`（负责生成最终设计方案），系统**完全不会加载或使用 `MethodProfile`**。负责设计最终方案的 LLM，其唯一的“事实来源”是 `DesignQuestion` 本身，以及通过 RAG 重新检索到的真实代码原文。
+
+### 总结
+
+| 工作流 | MethodProfile 的角色 | 是否核心 |
+| :--- | :--- | :--- |
+| **QA 流程** | 核心驱动：作为生成具体问题的主要输入。 | **是** |
+| **Design 流程** | 可选辅助：作为增强上下文的补充信息，帮助生成更高质量的设计问题。 | **否 (默认关闭)** |

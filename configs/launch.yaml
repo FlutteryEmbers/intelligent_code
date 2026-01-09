@@ -23,7 +23,7 @@ core:
 
 method_understanding:
   enabled: true
-  max_methods: 25
+  max_methods: 200
   prompts:
     generation: "configs/prompts/method_understanding/auto_method_understanding.txt"
   batching:
@@ -34,7 +34,7 @@ method_understanding:
 
 question_answer:
   questions_per_method: 3
-  max_questions: 15
+  max_questions: 500
   batch_size: 3
   embedding_model: "nomic-embed-text"
   user_questions_path: "configs/user_inputs/user_questions.yaml"
@@ -107,7 +107,7 @@ design_questions:
   profiles_top_k: 20
   profiles_max_chars: 6000
   require_layer_coverage: false
-  max_questions: 10
+  max_questions: 500
   batching:
     enabled: true
     batch_size: 3
