@@ -20,14 +20,56 @@
 ### 核心关系图
 ```mermaid
 classDiagram
-  class CodeSymbol
-  class EvidenceRef
-  class TrainingSample
-  class ReasoningTrace
+  class CodeSymbol {
+    symbol_id: str
+    symbol_type: str
+    qualified_name: str
+    file_path: str
+    source_hash: str
+    repo_commit: str
+  }
+
+  class EvidenceRef {
+    symbol_id: str
+    file_path: str
+    start_line: int
+    source_hash: str
+  }
+
+  class ReasoningTrace {
+    observations: list
+    inferences: list
+    evidence_refs: list
+    assumptions: list
+  }
+
+  class TrainingSample {
+    scenario: qa_rule|arch_design
+    instruction: str
+    thought: ReasoningTrace
+    answer: str
+    quality: Quality
+    sample_id: str
+  }
+
+  class Quality {
+    passed: bool
+    gate_version: str
+    errors: list
+    stats: dict
+  }
+
+  class DesignQuestion {
+    id: str
+    goal: str
+    constraints: list
+    evidence_refs: list
+  }
 
   TrainingSample "1" --> "1" ReasoningTrace
+  TrainingSample "1" --> "1" Quality
   ReasoningTrace "1" --> "0..*" EvidenceRef
-  EvidenceRef --> CodeSymbol : via symbol_id & hash
+  EvidenceRef ..> CodeSymbol : anchor
 ```
 
 ### 文件映射表
