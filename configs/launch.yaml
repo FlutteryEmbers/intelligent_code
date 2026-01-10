@@ -23,7 +23,7 @@ core:
 
 method_understanding:
   enabled: true
-  max_methods: 200
+  max_methods: 5
   prompts:
     generation: "configs/prompts/method_understanding/auto_method_understanding.txt"
   batching:
@@ -107,7 +107,7 @@ design_questions:
   profiles_top_k: 20
   profiles_max_chars: 6000
   require_layer_coverage: false
-  max_questions: 500
+  max_questions: 5
   batching:
     enabled: true
     batch_size: 3

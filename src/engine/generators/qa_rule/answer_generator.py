@@ -205,6 +205,7 @@ class AnswerGenerator(BaseGenerator):
             user_prompt = self._inject_negative_rules(user_prompt, negative_type)
             
         logger.info(f"DEBUG: Generated {len(available_evidence)} available evidence items for prompt.")
+        # logger.info(f"DEBUG: FULL PROMPT:\n{user_prompt}") # Uncomment for deep debugging
 
         # 4. LLM 调用
         output_dict = self.generate_with_retry(system_prompt, user_prompt)
@@ -296,12 +297,20 @@ class AnswerGenerator(BaseGenerator):
             coverage["negative_type"] = negative_type
         return {"coverage": coverage}
 
-    def _correct_evidence_refs(self, raw_refs: List[Dict], symbols: List[CodeSymbol]) -> List[EvidenceRef]:
-        """Correlate LLM evidence refs with trusted symbols to fix minor hallucinations (e.g. line offsets)"""
+    def _correct_evidence_refs(self, raw_refs: List[Any], symbols: List[CodeSymbol]) -> List[EvidenceRef]:
+        """Correlate LLM evidence refs with trusted symbols to fix minor hallucinations or re-hydrate from strings"""
         corrected = []
+        
+        # Pre-process raw_refs to handle None or non-list
+        if not raw_refs or not isinstance(raw_refs, list):
+            raw_refs = []
+
         for ref in raw_refs:
+            # Handle string input (symbol_id only)
+            if isinstance(ref, str):
+                ref = {'symbol_id': ref}
+                
             if not isinstance(ref, dict): 
-                corrected.append(ref)
                 continue
                 
             # Try to find exact or fuzzy match in symbols
@@ -337,14 +346,27 @@ class AnswerGenerator(BaseGenerator):
                 ref['source_hash'] = best_match.source_hash
             
             try:
+                # Ensure validation passes
+                if not best_match and 'file_path' not in ref:
+                     logger.warning(f"Dropping invalid ref {ref_id}: missing file_path and no symbol match.")
+                     continue
                 corrected.append(EvidenceRef(**ref))
             except Exception as e:
-                logger.warning(f"Failed to validate corrected ref: {e}. Keeping original.")
-                # Fallback: try to add missing fields if possible
-                if best_match:
-                    ref.setdefault('start_line', best_match.start_line)
-                    ref.setdefault('end_line', best_match.end_line)
-                corrected.append(EvidenceRef(**ref))
+                logger.warning(f"Failed to validate corrected ref: {e}. Dropping.")
+
+        # Fallback Logic (Moved to end): 
+        # If we ended up with no valid refs, but we only had 1 candidate symbol in context,
+        # it is logically safe to assume that single symbol was the evidence used.
+        if not corrected and len(symbols) == 1:
+            s = symbols[0]
+            logger.info(f"DEBUG: No valid refs found from LLM (Raw: {raw_refs}), but only 1 available symbol ({s.symbol_id}). Auto-filling.")
+            return [EvidenceRef(
+                symbol_id=normalize_path_separators(s.symbol_id),
+                file_path=normalize_path_separators(s.file_path),
+                start_line=s.start_line,
+                end_line=s.end_line,
+                source_hash=s.source_hash
+            )]
                 
         return corrected
 

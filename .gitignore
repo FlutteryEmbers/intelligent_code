@@ -206,7 +206,7 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 /data
-logs
+/logs
 repos
 models
 # docs/guides

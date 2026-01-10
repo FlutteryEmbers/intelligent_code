@@ -19,6 +19,7 @@ class CoverageConfig:
     mode: str = "hybrid"
     constraint_strength: str = "hybrid"
     targets: dict = field(default_factory=dict)
+    template_name: str | None = None
     intent_targets: dict = field(default_factory=dict)
     # Diversity
     diversity_mode: str = "off"
@@ -87,6 +88,7 @@ def parse_coverage_config(config, section: str) -> CoverageConfig:
         mode=coverage_dict.get('mode', 'hybrid'),
         constraint_strength=coverage_dict.get('constraint_strength', 'hybrid'),
         targets=coverage_dict.get('targets', {}) or {},
+        template_name=coverage_dict.get('template_name'),
         intent_targets=coverage_dict.get('intent_targets', {}) or {},
         diversity_mode=diversity_dict.get('mode', 'off'),
         question_type_targets=diversity_dict.get('question_type_targets', {}) or {},

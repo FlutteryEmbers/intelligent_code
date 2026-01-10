@@ -220,8 +220,9 @@ class QuestionGenerator(BaseGenerator):
         
         # 3. 组装提示词
         system_prompt = self._build_composed_system_prompt()
+        template_name = getattr(self.coverage_cfg, 'template_name', None) or "gen_q_user"
         user_prompt = self._build_composed_user_prompt(
-            "gen_q_user",
+            template_name,
             method_profile=profile.model_dump_json(indent=2),
             source_code=symbol.source,
             questions_per_method=self.questions_per_method,

@@ -49,20 +49,9 @@
   "answer": {{"结论": "...", "机制": "..."}}  # 错误！answer不是对象
   ```
 
-  - `evidence_refs`: 证据引用（**对象数组** `[{{}}, {{}}]`，必须从上面的"可用证据引用"中选择，至少1个）
-    ⚠️ **注意**：evidence_refs必须是对象数组，严禁使用嵌套数组（如 `[[...]]` 是错误的）。
-    ✅ 正确示例（注意双大括号）：
-    ```json
-    "evidence_refs": [
-      {{
-        "symbol_id": "...",
-        "file_path": "...",
-        "start_line": 10,
-        "end_line": 20,
-        "source_hash": "..."
-      }}
-    ]
-    ```
+  - `evidence_refs`: **必须**引用检索到的代码。**请仅输出 `symbol_id` 的字符串数组**。
+    ✅ 正确示例：`["com.example.Service:method", "com.example.Util"]`
+    (无需复制完整对象，只需 ID，系统会自动补全详情)
   - `assumptions`: 不确定的假设（数组，可为空）
 
 ⚠️ **注意**：`scenario`、`instruction`、`context`、`repo_commit` 会由系统自动填充，你**不要输出这些字段**。

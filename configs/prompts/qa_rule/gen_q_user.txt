@@ -56,6 +56,11 @@
 - `medium`: 中级开发者可回答（需要一定经验）
 - `hard`: 高级开发者/架构师可回答（深度理解）
 
+## 约束规则
+
+{constraint_rules}
+如无特别说明，请忽略。
+
 ## 输出格式
 
 你必须输出一个 JSON 对象，包含 `questions` 数组（长度恰好为 {questions_per_method}）：
@@ -64,21 +69,40 @@
 {{
   "questions": [
     {{
-      "question": "针对该架构的机制，它是如何保证操作原子性的？",
+      "question": "该方法的事务边界如何定义？在什么情况下会回滚？",
       "question_type": "consistency",
       "difficulty": "medium",
-      "evidence_refs": [
-        {{
-          "symbol_id": "{symbol_id}",
-          "file_path": "{file_path}",
-          "start_line": {start_line},
-          "end_line": {end_line},
-          "source_hash": "{source_hash}"
-        }}
-      ],
+      "evidence_refs": [{{ "symbol_id": "...", "file_path": "...", "start_line": 10, "end_line": 20, "source_hash": "..." }}],
       "repo_commit": "{repo_commit}"
     }},
-    ...
+    {{
+      "question": "该方法如何处理用户名重复的情况？异常处理策略是什么？",
+      "question_type": "error",
+      "difficulty": "easy",
+      "evidence_refs": [{{ "symbol_id": "...", "file_path": "...", "start_line": 10, "end_line": 20, "source_hash": "..." }}],
+      "repo_commit": "{repo_commit}"
+    }},
+    {{
+      "question": "邮件发送失败是否会影响用户创建？如何保证核心功能的可靠性？",
+      "question_type": "error",
+      "difficulty": "medium",
+      "evidence_refs": [{{ "symbol_id": "...", "file_path": "...", "start_line": 10, "end_line": 20, "source_hash": "..." }}],
+      "repo_commit": "{repo_commit}"
+    }},
+    {{
+      "question": "该方法依赖了哪些外部服务？如何管理这些依赖的生命周期？",
+      "question_type": "flow",
+      "difficulty": "medium",
+      "evidence_refs": [{{ "symbol_id": "...", "file_path": "...", "start_line": 10, "end_line": 20, "source_hash": "..." }}],
+      "repo_commit": "{repo_commit}"
+    }},
+    {{
+      "question": "如何测试该方法的事务行为和异常分支？需要哪些 mock 策略？",
+      "question_type": "how_to",
+      "difficulty": "hard",
+      "evidence_refs": [{{ "symbol_id": "...", "file_path": "...", "start_line": 10, "end_line": 20, "source_hash": "..." }}],
+      "repo_commit": "{repo_commit}"
+    }}
   ]
 }}
 ```
