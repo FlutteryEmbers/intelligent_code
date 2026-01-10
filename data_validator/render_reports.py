@@ -68,34 +68,93 @@ def _read_jsonl(path: Path) -> list[dict]:
     return items
 
 
-def _plot_bar(title: str, labels: list[str], values: list[float], out_path: Path, y_label: str) -> None:
+def _plot_pie(title: str, labels: list[str], values: list[float], out_path: Path) -> None:
     if not labels or not values:
         return
-    fig, ax = plt.subplots(figsize=(8, 4.5))
-    ax.bar(labels, values, color="#2d6a9f")
-    ax.set_title(title)
-    ax.set_ylabel(y_label)
-    ax.set_xlabel(_label("类别", "Category"))
-    ax.tick_params(axis="x", rotation=30)
+    
+    # Calculate percentages for ALL items
+    total = sum(values)
+    if total == 0:
+        return
+        
+    legend_labels = []
+    for l, v in zip(labels, values):
+        pct = (v / total) * 100
+        # If value is integer-like (count), show count. If float (ratio), just show pct
+        if all(isinstance(x, int) or (isinstance(x, float) and x.is_integer()) for x in values):
+            legend_labels.append(f"{l}: {int(v)} ({pct:.1f}%)")
+        else:
+            legend_labels.append(f"{l} ({pct:.1f}%)")
+
+    # Use a small epsilon for 0 values so they render as a sliver
+    epsilon = total * 0.005 if total > 0 else 1.0
+    
+    plot_values = []
+    plot_colors = []
+    original_values = []
+    
+    colors = plt.get_cmap("tab20c")(range(len(labels)))
+    
+    for i, v in enumerate(values):
+        original_values.append(v)
+        plot_values.append(max(v, epsilon)) # Force at least epsilon for rendering
+        plot_colors.append(colors[i])
+            
+    fig, ax = plt.subplots(figsize=(12, 7))
+    
+    # Define autopct to hide label for small/zero items
+    def custom_autopct(pct):
+        # Hide percentage on the chart if it's less than 3% to avoid clutter
+        return f'{pct:.1f}%' if pct > 3 else ''
+
+    wedges, texts, autotexts = ax.pie(
+        plot_values, 
+        labels=None, # Hide labels on the wheel itself to prevent overlap. Relies on Legend.
+        autopct=custom_autopct, 
+        startangle=140, 
+        colors=plot_colors,
+        pctdistance=0.85,
+        textprops=dict(color="black")
+    )
+    
+    # Post-process: ensure hidden text is actually hidden (handled by custom_autopct mostly)
+    # But we double check the original values for 0s just in case
+    for i, val in enumerate(original_values):
+        if val == 0:
+            autotexts[i].set_text("")
+    
+    # Draw circle for donut style
+    centre_circle = plt.Circle((0,0),0.70,fc='white')
+    fig.gca().add_artist(centre_circle)
+    
+    ax.set_title(title, pad=20)
+    ax.axis('equal')
+    
+    # Create legend handles explicitly to match original values logic
+    import matplotlib.patches as mpatches
+    handles = []
+    for i, label in enumerate(legend_labels):
+        handles.append(mpatches.Patch(color=colors[i], label=label))
+
+    # Legend
+    ax.legend(handles=handles,
+          loc="center left",
+          bbox_to_anchor=(1, 0, 0.5, 1))
+
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=160)
     plt.close(fig)
+
+
+def _plot_bar(title: str, labels: list[str], values: list[float], out_path: Path, y_label: str = "") -> None:
+    # User requested Pie chart instead of Bar chart
+    _plot_pie(title, labels, values, out_path)
 
 
 def _plot_ratio_bar(title: str, labels: list[str], ratios: list[float], out_path: Path) -> None:
-    if not labels or not ratios:
-        return
-    fig, ax = plt.subplots(figsize=(8, 4.5))
-    ax.bar(labels, ratios, color="#5a9b6a")
-    ax.set_title(title)
-    ax.set_ylabel(_label("比例", "Ratio"))
-    ax.set_ylim(0, 1)
-    ax.tick_params(axis="x", rotation=30)
-    fig.tight_layout()
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=160)
-    plt.close(fig)
+    # User requested Pie chart instead of Bar chart
+    _plot_pie(title, labels, ratios, out_path)
 
 def _plot_ratio_comparison(
     title: str,
