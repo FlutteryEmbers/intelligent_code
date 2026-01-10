@@ -1,0 +1,156 @@
+{
+  "qa": {
+    "total": 283,
+    "targets": {
+      "high": 0.8,
+      "mid": 0.15,
+      "hard": 0.05
+    },
+    "raw_targets": {},
+    "used_default_targets": true,
+    "desired_counts": {
+      "high": 227,
+      "mid": 42,
+      "hard": 14
+    },
+    "final_counts": {
+      "high": 227,
+      "mid": 38,
+      "hard": 14
+    },
+    "deficits": {
+      "high": 0,
+      "mid": 4,
+      "hard": 0
+    },
+    "borrowed": {
+      "mid": {
+        "high": 26
+      }
+    },
+    "negative_ratio": null,
+    "negative_deficits": {},
+    "bucket_distribution": {
+      "counts": {
+        "high": 253,
+        "mid": 12,
+        "hard": 14
+      },
+      "ratios": {
+        "high": 0.9068,
+        "mid": 0.043,
+        "hard": 0.0502
+      }
+    },
+    "intent_distribution": {
+      "counts": {
+        "config": 176,
+        "error": 50,
+        "how_to": 22,
+        "auth": 1,
+        "impact": 15,
+        "deploy": 3,
+        "consistency": 10,
+        "perf": 2
+      },
+      "ratios": {
+        "config": 0.6308,
+        "error": 0.1792,
+        "how_to": 0.0789,
+        "auth": 0.0036,
+        "impact": 0.0538,
+        "deploy": 0.0108,
+        "consistency": 0.0358,
+        "perf": 0.0072
+      }
+    },
+    "module_span_distribution": {
+      "counts": {
+        "single": 279
+      },
+      "ratios": {
+        "single": 1.0
+      }
+    },
+    "polarity_distribution": {
+      "counts": {
+        "positive": 262,
+        "negative": 17
+      },
+      "ratios": {
+        "positive": 0.9391,
+        "negative": 0.0609
+      }
+    },
+    "path": "data\\intermediate\\clean\\qa_clean.jsonl"
+  },
+  "design": {
+    "total": 43,
+    "targets": {
+      "high": 0.8,
+      "mid": 0.15,
+      "hard": 0.05
+    },
+    "raw_targets": {},
+    "used_default_targets": true,
+    "desired_counts": {
+      "high": 35,
+      "mid": 6,
+      "hard": 2
+    },
+    "final_counts": {
+      "high": 35,
+      "mid": 2,
+      "hard": 2
+    },
+    "deficits": {
+      "high": 0,
+      "mid": 4,
+      "hard": 0
+    },
+    "borrowed": {
+      "mid": {
+        "high": 2
+      }
+    },
+    "negative_ratio": null,
+    "negative_deficits": {},
+    "bucket_distribution": {
+      "counts": {
+        "high": 37,
+        "hard": 2
+      },
+      "ratios": {
+        "high": 0.9487,
+        "hard": 0.0513
+      }
+    },
+    "intent_distribution": {
+      "counts": {
+        "config": 39
+      },
+      "ratios": {
+        "config": 1.0
+      }
+    },
+    "module_span_distribution": {
+      "counts": {
+        "single": 39
+      },
+      "ratios": {
+        "single": 1.0
+      }
+    },
+    "polarity_distribution": {
+      "counts": {
+        "positive": 35,
+        "negative": 4
+      },
+      "ratios": {
+        "positive": 0.8974,
+        "negative": 0.1026
+      }
+    },
+    "path": "data\\intermediate\\clean\\design_clean.jsonl"
+  }
+}

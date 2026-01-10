@@ -55,7 +55,7 @@ max_grad_norm: 1.0
 
 # ==================== 保存和评估 ====================
 save_strategy: "steps"
-save_steps: 100
+save_steps: 20
 save_total_limit: 3  # 只保留最近 3 个 checkpoint
 
 eval_strategy: "steps"
@@ -67,7 +67,7 @@ logging_first_step: true
 
 # ==================== 其他配置 ====================
 seed: 42
-dataloader_num_workers: 4
+dataloader_num_workers: 0
 dataloader_pin_memory: true
 
 # 混合精度

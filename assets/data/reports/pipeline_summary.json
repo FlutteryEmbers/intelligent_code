@@ -1,56 +1,102 @@
 {
-  "start_time": "2026-01-06T23:13:46.577830",
-  "config_file": "configs/pipeline.yaml",
+  "start_time": "2026-01-09T10:01:57.143336",
+  "config_file": "configs/launch.yaml",
   "steps": {
     "parse": {
       "status": "success",
       "symbols_count": 233,
       "license": "Apache-2.0"
     },
-    "auto": {
+    "method_understanding": {
       "status": "success",
-      "method_profiles": 199,
-      "questions": 595,
-      "qa_samples": 527
+      "method_profiles": 200
     },
-    "qa_generation": {
-      "status": "skipped",
-      "reason": "auto_enabled"
+    "question_answer": {
+      "status": "success",
+      "method_profiles": 0,
+      "questions": 500,
+      "qa_samples": 374
     },
     "design_generation": {
       "status": "success",
-      "auto_requirements_count": 8,
-      "samples_count": 8
+      "auto_design_questions_count": 395,
+      "samples_count": 43
     },
     "validation": {
       "status": "success"
     },
+    "coverage_tagger": {
+      "status": "success",
+      "qa": {
+        "path": "data\\intermediate\\clean\\qa_clean.jsonl",
+        "tagged": 283,
+        "total": 283,
+        "bucket_counts": {
+          "high": 253,
+          "hard": 18,
+          "mid": 12
+        }
+      },
+      "design": {
+        "path": "data\\intermediate\\clean\\design_clean.jsonl",
+        "tagged": 43,
+        "total": 43,
+        "bucket_counts": {
+          "hard": 6,
+          "high": 37
+        }
+      }
+    },
+    "coverage_sampler": {
+      "status": "success",
+      "report_path": "data\\reports\\coverage_report.json",
+      "qa_total": 283,
+      "design_total": 43
+    },
+    "question_type_report": {
+      "status": "success",
+      "report_path": "data\\reports\\question_type_report.json",
+      "qa_total": 279,
+      "design_total": 39,
+      "warnings": []
+    },
     "merge": {
       "status": "success",
-      "total_samples": 535
+      "total_samples": 318
     },
     "deduplication": {
       "status": "success"
     },
     "secrets_scan": {
       "status": "success",
-      "mode": "drop",
+      "mode": "keep",
       "filtered_count": 0
     },
     "split": {
       "status": "success",
-      "train_count": 393,
-      "val_count": 68,
-      "test_count": 74,
+      "train_count": 243,
+      "val_count": 14,
+      "test_count": 61,
+      "split_mode": "independent",
       "qa": {
-        "train_count": 385,
-        "val_count": 68,
-        "test_count": 74
+        "train_count": 204,
+        "val_count": 14,
+        "test_count": 61
+      },
+      "qa_from_combined": {
+        "train_count": 204,
+        "val_count": 14,
+        "test_count": 61
       },
       "design": {
-        "train_count": 6,
-        "val_count": 1,
-        "test_count": 1
+        "train_count": 31,
+        "val_count": 3,
+        "test_count": 5
+      },
+      "design_from_combined": {
+        "train_count": 39,
+        "val_count": 0,
+        "test_count": 0
       }
     },
     "export": {
@@ -64,7 +110,7 @@
   },
   "repo_path": "repos\\java\\spring-ai",
   "repo_commit": "c5f4313f5c9a5b49f68f92a865f322091f6649d1",
-  "end_time": "2026-01-07T02:30:23.374038",
+  "end_time": "2026-01-09T12:13:29.390337",
   "output_files": {
     "symbols": "data\\raw\\extracted\\symbols.jsonl",
     "repo_meta": "data\\raw\\repo_meta\\repo_meta.json",

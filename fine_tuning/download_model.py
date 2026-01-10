@@ -118,6 +118,7 @@ Examples:
         output_dir = Path(args.output_dir)
     else:
         # 默认保存到项目根目录的 models/ 目录
+        script_dir = Path(__file__).parent
         output_dir = script_dir / "models" / default_dir_name
     
     print("=" * 60)

@@ -1,0 +1,15 @@
+{
+  "mode": "symbol_only",
+  "min_score": 0.2,
+  "fallback_top_k": 6,
+  "total_questions": 500,
+  "symbol_evidence_used": 497,
+  "vector_used": 0,
+  "vector_filtered": 0,
+  "vector_fallback_used": 0,
+  "vector_empty": 0,
+  "symbol_only_failures": 3,
+  "call_chain_expanded": 1205,
+  "negative_samples": 52,
+  "positive_samples": 448
+}

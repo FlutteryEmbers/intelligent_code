@@ -1,0 +1,11 @@
+{
+  "mode": "hybrid",
+  "fallback_top_k": 8,
+  "total_questions": 395,
+  "candidates_empty": 0,
+  "scored_non_empty": 50,
+  "fallback_used": 0,
+  "call_chain_expanded": 287,
+  "negative_samples": 5,
+  "positive_samples": 45
+}

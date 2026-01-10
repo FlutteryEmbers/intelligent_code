@@ -1,16 +1,23 @@
 {
   "input_file": "data\\intermediate\\design_raw.jsonl",
   "symbols_count": 233,
+  "gate_version": "v1",
   "validation_stats": {
-    "total": 8,
-    "passed": 8,
+    "total": 43,
+    "passed": 43,
     "failed": 0,
     "pass_rate": 1.0
   },
   "top_failures": [],
   "top_warnings": [],
+  "trace_summary": {
+    "warning_samples": 0,
+    "warning_rate": 0.0,
+    "warning_counts": {}
+  },
   "output_files": {
-    "rejected": "data\\intermediate\\design_validation_rejected.jsonl",
-    "report": "data\\reports\\design_quality.json"
+    "rejected": "data\\intermediate\\rejected\\design_validation_rejected.jsonl",
+    "report": "data\\reports\\design_quality.json",
+    "clean": "data\\intermediate\\clean\\design_clean.jsonl"
   }
 }

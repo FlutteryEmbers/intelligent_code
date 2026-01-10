@@ -66,20 +66,35 @@ def setup_model_and_tokenizer(config: Dict):
     - 标准 LoRA
     - QLoRA（4bit/8bit 量化）
     """
+    import os
     model_name_or_path = config["base_model"]
     logger.info(f"Loading model from: {model_name_or_path}")
+    
+    # 检查是否为本地路径 (多重检查确保正确检测)
+    # 1. 检查是否存在为目录
+    # 2. 检查路径是否包含路径分隔符 (表示是路径而非 HF repo id)
+    is_local = os.path.isdir(model_name_or_path) or os.path.exists(model_name_or_path)
+    # 如果路径包含驱动器号(Windows)或以/开头(Unix)，也视为本地路径
+    if not is_local:
+        is_local = (os.sep in model_name_or_path or 
+                    model_name_or_path.startswith('/') or 
+                    (len(model_name_or_path) > 2 and model_name_or_path[1] == ':'))
+    logger.info(f"Is local model: {is_local}, path exists: {os.path.exists(model_name_or_path)}")
     
     # 加载 tokenizer
     tokenizer = AutoTokenizer.from_pretrained(
         model_name_or_path,
         trust_remote_code=config.get("trust_remote_code", True),
-        use_fast=True
+        use_fast=True,
+        local_files_only=is_local
     )
     
     # 确保有 pad_token
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
         tokenizer.pad_token_id = tokenizer.eos_token_id
+    
+
     
     # 配置量化（如果使用 QLoRA）
     quantization_config = None
@@ -100,8 +115,9 @@ def setup_model_and_tokenizer(config: Dict):
         model_name_or_path,
         quantization_config=quantization_config,
         trust_remote_code=config.get("trust_remote_code", True),
-        torch_dtype=torch.bfloat16 if config.get("bf16", True) else torch.float16,
-        device_map="auto"  # 自动分配设备
+        dtype=torch.bfloat16 if config.get("bf16", True) else torch.float16,
+        device_map="auto",  # 自动分配设备
+        local_files_only=is_local
     )
     
     # 如果使用量化，准备模型
@@ -110,6 +126,15 @@ def setup_model_and_tokenizer(config: Dict):
             model,
             use_gradient_checkpointing=config.get("gradient_checkpointing", True)
         )
+    
+    # 同步 model config
+    model.config.pad_token_id = tokenizer.pad_token_id
+    if tokenizer.bos_token_id is not None:
+        model.config.bos_token_id = tokenizer.bos_token_id
+    if hasattr(model, "generation_config") and model.generation_config:
+        model.generation_config.pad_token_id = tokenizer.pad_token_id
+        if tokenizer.bos_token_id is not None:
+            model.generation_config.bos_token_id = tokenizer.bos_token_id
     
     # 配置 LoRA
     if config.get("use_lora", True):
@@ -184,7 +209,7 @@ def setup_training_arguments(config: Dict) -> TrainingArguments:
         
         # 数据加载
         dataloader_num_workers=config.get("dataloader_num_workers", 4),
-        dataloader_pin_memory=config.get("dataloader_pin_memory", True),
+        dataloader_pin_memory=config.get("dataloader_pin_memory", True) and torch.cuda.is_available(),
         
         # 其他
         seed=config.get("seed", 42),
@@ -247,7 +272,7 @@ def train(config_path: str | Path):
         args=training_args,
         train_dataset=tokenized_datasets["train"],
         eval_dataset=tokenized_datasets.get("validation"),
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         data_collator=data_collator,
     )
     

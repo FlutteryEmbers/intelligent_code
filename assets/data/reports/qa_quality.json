@@ -1,0 +1,39 @@
+{
+  "input_file": "data\\intermediate\\auto_qa_raw.jsonl",
+  "symbols_count": 233,
+  "gate_version": "v1",
+  "validation_stats": {
+    "total": 374,
+    "passed": 283,
+    "failed": 91,
+    "pass_rate": 0.7567
+  },
+  "top_failures": [
+    {
+      "error": "EVIDENCE_SYMBOL_NOT_FOUND",
+      "count": 108
+    },
+    {
+      "error": "EVIDENCE_SOURCE_HASH_MISMATCH",
+      "count": 19
+    }
+  ],
+  "top_warnings": [
+    {
+      "warning": "TRACE_MAX_OBSERVATIONS",
+      "count": 1
+    }
+  ],
+  "trace_summary": {
+    "warning_samples": 1,
+    "warning_rate": 0.0027,
+    "warning_counts": {
+      "TRACE_MAX_OBSERVATIONS": 1
+    }
+  },
+  "output_files": {
+    "rejected": "data\\intermediate\\rejected\\qa_validation_rejected.jsonl",
+    "report": "data\\reports\\qa_quality.json",
+    "clean": "data\\intermediate\\clean\\qa_clean.jsonl"
+  }
+}
