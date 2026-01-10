@@ -10,7 +10,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from src.pipeline.steps.secrets_scan import SecretsScanStep
 from src.utils.io.file_ops import read_jsonl, write_jsonl
-from src.utils.core.schemas import sha256_text
+from src.schemas import sha256_text
 from src.utils.data.validator import load_symbols_map, validate_dataset
 
 

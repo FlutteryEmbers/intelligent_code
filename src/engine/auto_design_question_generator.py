@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from typing import Generator
 
-from src.utils.core.schemas import CodeSymbol
+from src.schemas import CodeSymbol
 from src.utils.core.config import Config
 from src.utils.core.logger import get_logger
 from src.utils.data.validator import normalize_path_separators

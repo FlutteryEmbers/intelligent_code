@@ -11,7 +11,7 @@ from collections import Counter
 
 import yaml
 
-from src.utils.core.schemas import CodeSymbol, TrainingSample, ReasoningTrace, EvidenceRef, sha256_text
+from src.schemas import CodeSymbol, TrainingSample, ReasoningTrace, EvidenceRef, sha256_text
 from src.utils.core.config import Config
 from src.utils.core.logger import get_logger
 from src.utils.data.validator import normalize_path_separators

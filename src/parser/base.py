@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Generator
 
-from src.utils.core.schemas import CodeSymbol, ParsingReport
+from src.schemas import CodeSymbol, ParsingReport
 
 
 class BaseParser(ABC):

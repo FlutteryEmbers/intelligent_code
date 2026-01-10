@@ -3,7 +3,7 @@
 本文档定义了系统中流转的核心数据结构，它们是系统进行解析、训练样本生成、校验与导出的基础。
 
 ## class `CodeSymbol`
-> 定义位置: `src/utils/schemas.py`
+> 定义位置: `src/schemas/symbols.py`
 
 代码证据的标准化单位（类/方法/字段/文件）。训练数据中所有证据引用最终都应指向某个 `CodeSymbol`。
 
@@ -23,7 +23,7 @@
 | `repo_commit` | str | 仓库版本 | 必须与样本的 commit 一致。 |
 
 ## class `EvidenceRef`
-> 定义位置: `src/utils/schemas.py`
+> 定义位置: `src/schemas/symbols.py`
 
 用最小字段指向“可验证的代码证据片段”。
 
@@ -36,7 +36,7 @@
 | `source_hash` | str | **关键校验位**：必须匹配 `CodeSymbol.source_hash`。 |
 
 ## class `ReasoningTrace`
-> 定义位置: `src/utils/schemas.py`
+> 定义位置: `src/schemas/samples.py`
 
 结构化表达“推理痕迹”，避免自由文本 CoT 直接进入训练输出。
 
@@ -46,7 +46,7 @@
 *   `assumptions` (`list[str]`): 无法直接验证的假设。
 
 ## class `TrainingSample`
-> 定义位置: `src/utils/schemas.py`
+> 定义位置: `src/schemas/samples.py`
 
 Pipeline 的核心业务对象，统一表达 QA 与 Architecture Design 样本。
 

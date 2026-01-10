@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from typing import Generator
 
-from src.utils.core.schemas import CodeSymbol, MethodProfile, EvidenceRef, sha256_text
+from src.schemas import CodeSymbol, MethodProfile, EvidenceRef, sha256_text
 from src.utils.core.config import Config
 from src.utils.core.logger import get_logger
 from src.utils.generation.language_profile import load_language_profile

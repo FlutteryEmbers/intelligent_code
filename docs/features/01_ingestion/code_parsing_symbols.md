@@ -9,7 +9,7 @@
   - `src/pipeline/steps/parse.py`
   - `src/parser/java_parser.py`
   - `src/parser/python_parser.py`
-  - `src/utils/schemas.py`（CodeSymbol）
+  - `src/schemas/symbols.py`（CodeSymbol）
   - `src/utils/safety.py`（license 检测）
   - `configs/launch.yaml`
 

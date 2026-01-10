@@ -29,7 +29,7 @@ ParseStep 的唯一职责是：**将目标代码仓库解析为标准化的 `Cod
 ### 内部依赖
 
 - Parser：`src/parser/java_parser.py` 或 `src/parser/python_parser.py`
-- Schema：`src/utils/schemas.py::CodeSymbol`
+- Schema：`src/schemas/symbols.py::CodeSymbol`
 - Safety/Compliance：`src/utils/safety.py::detect_license`
 
 ---

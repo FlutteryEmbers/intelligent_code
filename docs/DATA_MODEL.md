@@ -1,6 +1,6 @@
 # Schema Design
 
-本文档解释本项目核心数据结构（`src/utils/schemas.py`）的设计目标与跨模块契约。
+本文档解释本项目核心数据结构（`src/schemas/`）的设计目标与跨模块契约。
 
 ## 🔹 核心理念
 1.  **Evidence-first (证据优先)**: 所有 Reasoning 必须锚定到具体的 `source_hash`，确保数据可追溯、可验证。

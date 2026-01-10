@@ -3,7 +3,7 @@
 这些模型作为生成过程中的中间状态，用于承载 LLM 对代码的理解、生成的问题等。
 
 ## class `MethodProfile`
-> 定义位置: `src/utils/schemas.py`
+> 定义位置: `src/schemas/generation.py`
 
 方法级理解的中间表示（语义文档），支撑 Auto QA 生成。
 
@@ -17,7 +17,7 @@
 | `evidence_refs` | 支撑理解的证据引用。 |
 
 ## class `QuestionSample`
-> 定义位置: `src/utils/schemas.py`
+> 定义位置: `src/schemas/generation.py`
 
 在 Auto Question Generator 与 Answer Generator 之间传递的对象。
 

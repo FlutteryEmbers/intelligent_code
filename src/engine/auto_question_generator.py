@@ -10,7 +10,7 @@ from typing import List
 
 import yaml
 
-from src.utils.core.schemas import MethodProfile, QuestionSample, CodeSymbol, EvidenceRef
+from src.schemas import MethodProfile, QuestionSample, CodeSymbol, EvidenceRef
 from src.utils.core.config import Config
 from src.utils.core.logger import get_logger
 from src.utils.data.validator import normalize_path_separators

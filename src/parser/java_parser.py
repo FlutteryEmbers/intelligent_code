@@ -10,7 +10,7 @@ import tree_sitter_java as tsjava
 from tree_sitter import Language, Parser, Node
 
 from src.parser.base import BaseParser
-from src.utils.core.schemas import CodeSymbol, Annotation, ParsingReport, sha256_text
+from src.schemas import CodeSymbol, Annotation, ParsingReport, sha256_text
 from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)

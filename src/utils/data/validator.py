@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 from collections import Counter
 
-from src.utils.core.schemas import CodeSymbol, TrainingSample
+from src.schemas import CodeSymbol, TrainingSample
 from src.utils.io.file_ops import read_jsonl, write_json, append_jsonl
 
 

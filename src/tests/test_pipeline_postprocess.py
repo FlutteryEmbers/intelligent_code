@@ -13,7 +13,7 @@ from src.pipeline.steps.deduplication import DeduplicationStep
 from src.pipeline.steps.merge import MergeStep
 from src.pipeline.steps.split import SplitStep
 from src.utils.io.file_ops import read_jsonl, write_jsonl
-from src.utils.core.schemas import sha256_text
+from src.schemas import sha256_text
 
 
 class _Args:

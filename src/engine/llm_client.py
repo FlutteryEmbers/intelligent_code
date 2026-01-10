@@ -12,7 +12,7 @@ from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import ValidationError
 
-from src.utils.core.schemas import TrainingSample
+from src.schemas import TrainingSample
 from src.utils.core.config import config
 from src.utils.core.logger import get_logger
 

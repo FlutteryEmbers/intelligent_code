@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 from collections import defaultdict
 
-from src.utils.core.schemas import CodeSymbol
+from src.schemas import CodeSymbol
 
 
 def extract_package_from_qualified_name(qualified_name: str) -> str:

@@ -6,7 +6,7 @@ Core - 核心基础设施模块
 
 from .config import Config, config, get_config, reload_config
 from .logger import get_logger, LoggerManager
-from .schemas import (
+from src.schemas import (
     Annotation,
     CodeSymbol,
     EvidenceRef,

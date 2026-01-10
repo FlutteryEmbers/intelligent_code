@@ -4,7 +4,7 @@ from typing import List
 import ast
 import re
 
-from src.utils.core.schemas import CodeSymbol, Annotation
+from src.schemas import CodeSymbol, Annotation
 from src.utils.core.logger import get_logger
 from src.parser.base import BaseParser
 
@@ -108,7 +108,7 @@ class PythonParser(BaseParser):
             node.lineno
         )
         
-        from src.utils.core.schemas import sha256_text
+        from src.schemas import sha256_text
         
         return CodeSymbol(
             symbol_id=symbol_id,
@@ -172,7 +172,7 @@ class PythonParser(BaseParser):
             node.lineno
         )
         
-        from src.utils.core.schemas import sha256_text
+        from src.schemas import sha256_text
         
         return CodeSymbol(
             symbol_id=symbol_id,

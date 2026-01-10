@@ -7,7 +7,7 @@ import re
 from collections import defaultdict
 from typing import Iterable
 
-from src.utils.core.schemas import CodeSymbol
+from src.schemas import CodeSymbol
 
 _CALL_NAME_RE = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 _STOPWORDS = {

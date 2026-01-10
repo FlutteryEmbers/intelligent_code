@@ -22,7 +22,7 @@ def load_symbols_jsonl(path: Path | str) -> list:
     Raises:
         FileNotFoundError: If file doesn't exist
     """
-    from src.utils.core.schemas import CodeSymbol
+    from src.schemas import CodeSymbol
     from src.utils.core.logger import get_logger
     logger = get_logger(__name__)
     
@@ -57,7 +57,7 @@ def load_profiles_jsonl(path: Path | str) -> list:
     Returns:
         list[MethodProfile]: List of method profiles
     """
-    from src.utils.core.schemas import MethodProfile, EvidenceRef
+    from src.schemas import MethodProfile, EvidenceRef
     from src.utils.core.logger import get_logger
     logger = get_logger(__name__)
     

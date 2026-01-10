@@ -55,7 +55,7 @@ flowchart TD
 
 1.  **静态解析，建立索引 (`CodeSymbol`)**
     *   **过程**：首先，系统通过静态分析（非 LLM）扫描整个代码库，将每个类、方法等解析成一个结构化的 `CodeSymbol` 对象，并建立索引。
-    *   **证据**：此过程由 `src/parser/` 中的解析器完成，其数据结构在 `src/utils/schemas.py` 中定义，并被 `docs/SCHEMAS.md` 详细记录。
+    *   **证据**：此过程由 `src/parser/` 中的解析器完成，其数据结构在 `src/schemas/` 中定义，并被 `docs/DATA_MODEL.md` 详细记录。
 
 2.  **LLM 生成方法摘要 (`MethodProfile`)**
     *   **过程**：对于解析出的关键方法，系统调用一个 LLM，让其扮演“代码分析专家”，为方法生成一份结构化的“摘要”（`MethodProfile`），其中包含业务规则、依赖关系等深度语义。
