@@ -1,10 +1,10 @@
 ﻿"""
 Step 3: Design Generation (Auto Design Questions + Design Samples)
 """
-from src.engine.auto_design_question_generator import DesignQuestionGenerator
-from src.engine.design_generator import (
+from src.engine.generators.arch_design import (
     DesignGenerator,
     DesignQuestion,
+    DesignQuestionGenerator,
     load_design_questions_config,
 )
 from src.pipeline.base_step import BaseStep
@@ -59,7 +59,7 @@ class DesignGenerationStep(BaseStep):
                     for question_dict in design_question_dicts
                 ]
                 
-                max_q = question_gen.max_design_questions
+                max_q = question_gen.max_questions
                 self.logger.info(
                     f"Generated {len(custom_design_questions)}/{max_q} auto design questions"
                 )
@@ -101,8 +101,8 @@ class DesignGenerationStep(BaseStep):
             )
         
         self.logger.info(
-            f"Generated {len(design_samples)}/{design_gen.stats['total_design_questions']} design samples "
-            f"(rejected: {design_gen.stats['rejected_samples']})"
+            f"Generated {len(design_samples)}/{design_gen.stats['total']} design samples "
+            f"(rejected: {design_gen.stats['failed']})"
         )
         
         return {

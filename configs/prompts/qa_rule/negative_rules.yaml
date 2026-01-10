@@ -1,0 +1,22 @@
+# Negative sampling rules for QA and Design scenarios
+insufficient_evidence:
+  title: "证据不足"
+  rules:
+    - "明确说明证据不足，无法给出完整结论或设计方案。"
+    - "指出需要补充的具体上下文、代码位置或关键信息。"
+    - "严禁编造未出现的实现细节、组件或配置。"
+wrong_premise:
+  title: "前提错误"
+  rules:
+    - "先指出问题的前提条件不成立，再给出基于事实的正确前提。"
+    - "基于代码证据深入解释为何原前提是错误的。"
+conflict_spec:
+  title: "实现冲突"
+  rules:
+    - "指出当前代码实现与需求描述、架构规范或业务文档之间存在的冲突。"
+    - "以代码客观证据为准，并明确说明潜在的架构风险。"
+ambiguous_question:
+  title: "模糊问题"
+  rules:
+    - "说明问题描述过于模糊、语义不明或范围过广，无法直接生成方案。"
+    - "列出需要进一步澄清的关键点或缺失的业务细节。"

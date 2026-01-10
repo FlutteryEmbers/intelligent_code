@@ -50,7 +50,7 @@ MethodUnderstandingStep 的职责是：从 `symbols.jsonl` 中选择候选方法
 
 ```mermaid
 flowchart LR
-  S[(symbols.jsonl)] --> U[AutoMethodUnderstander]
+  S[(symbols.jsonl)] --> U[MethodUnderstander]
   U --> P[(method_profiles.jsonl)]
   U --> R[(auto_method_understanding_rejected.jsonl)]
 ```
@@ -84,15 +84,15 @@ flowchart LR
 
 ---
 
-## Prompt 说明（模板角色）
-
-### 模板：`configs/prompts/method_understanding/auto_method_understanding.txt`
+### 模板：`configs/prompts/method_profile/user.txt`
 
 #### 🌟 核心概念
+>
 > 就像给方法做“统一说明书”，让后续生成有稳定语义输入。
 
 #### 📋 运作基石（元数据与规则）
-- **存放位置**：`configs/prompts/method_understanding/auto_method_understanding.txt`
+
+- **存放位置**：`configs/prompts/method_profile/user.txt`
 - **工序位置**：MethodUnderstandingStep
 - **变量注入**：`symbol_id`、`file_path`、`qualified_name`、`annotations`、`javadoc`、`source_code`、`start_line`、`end_line`、`source_hash`、`repo_commit`
 - **核心准则**：只输出严格 JSON、`evidence_refs` 必须逐字复制、字段固定不可缺失
@@ -115,6 +115,7 @@ flowchart TD
 ```
 
 #### 🧩 解决的痛点
+
 - **以前的乱象**：方法语义靠人工解释，难以复用。
 - **现在的秩序**：结构化 MethodProfile 可统一消费。
 

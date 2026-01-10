@@ -1,7 +1,7 @@
 ﻿"""
 Step A1: Method Understanding
 """
-from src.engine.auto_method_understander import AutoMethodUnderstander
+from src.engine.generators.method_profile import MethodUnderstander
 from src.pipeline.base_step import BaseStep
 from src.utils.core.config import Config
 
@@ -43,7 +43,7 @@ class MethodUnderstandingStep(BaseStep):
         config_instance = Config()
         config_instance.reload(self.args.config)
 
-        understander = AutoMethodUnderstander(config_instance)
+        understander = MethodUnderstander(config_instance)
         method_profiles = understander.generate_from_symbols(
             symbols_path=self.paths["symbols_jsonl"],
             repo_commit=self.repo_commit,

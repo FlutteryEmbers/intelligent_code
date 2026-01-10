@@ -70,16 +70,16 @@ flowchart TD
 
 ---
 
-## Prompt 说明（模板角色）
-
 ### 设计出题模板（DesignQuestionGenerator）
 
 #### 🌟 核心概念
+>
 > 就像“设计题库模板”，保证问题结构与覆盖目标一致。
 
 #### 📋 运作基石（元数据与规则）
-- **存放位置**：`configs/prompts/design/auto_design_question_generation.txt`、`coverage_design_question_generation.txt`
-- **工序位置**：DesignGenerationStep → Step 3a
+
+- **存放位置**：`configs/prompts/arch_design/gen_q_user.txt`
+- **工序位置**：DesignGenerationStep
 - **推理模式**：覆盖约束驱动的结构化出题
 - **核心准则**：JSON-only、`design_questions` 列表、证据来自 `evidence_pool`
 
@@ -100,6 +100,7 @@ flowchart TD
 ```
 
 #### 🧩 解决的痛点
+
 - **以前的乱象**：设计问题难以标准化。
 - **现在的秩序**：模板化出题，覆盖目标可控。
 
@@ -108,11 +109,13 @@ flowchart TD
 ### 设计回答模板（DesignGenerator）
 
 #### 🌟 核心概念
+>
 > 就像“设计方案写作规范”，保证输出结构统一。
 
 #### 📋 运作基石（元数据与规则）
-- **存放位置**：`configs/prompts/design/design_system_prompt.txt`、`design_user_prompt.txt`
-- **工序位置**：DesignGenerationStep → Step 3b
+
+- **存放位置**：`configs/prompts/arch_design/gen_s_user.txt`
+- **工序位置**：DesignGenerationStep
 - **推理模式**：证据锚定的结构化设计方案
 - **核心准则**：JSON-only、answer 六段式、证据逐字复制
 
@@ -133,6 +136,7 @@ flowchart TD
 ```
 
 #### 🧩 解决的痛点
+
 - **以前的乱象**：设计答案结构不一致。
 - **现在的秩序**：结构固定、易审计。
 

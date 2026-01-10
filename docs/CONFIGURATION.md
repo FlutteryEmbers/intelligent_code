@@ -22,6 +22,7 @@
 除了 `.yaml` 配置文件，系统也支持使用环境变量进行覆盖配置。
 
 ### Windows
+
 ```bash
 set REPO_PATH=D:\path\to\repo
 set OLLAMA_BASE_URL=http://localhost:11434
@@ -29,6 +30,7 @@ set OLLAMA_MODEL=qwen2.5:7b
 ```
 
 ### Linux/Mac
+
 ```bash
 export REPO_PATH=/path/to/repo
 export OLLAMA_BASE_URL=http://localhost:11434
@@ -51,6 +53,7 @@ export OLLAMA_MODEL=qwen2.5:7b
 - `--skip-export`：跳过导出
 
 示例：
+
 ```bash
 # 指定配置文件
 python3 main.py --config configs/launch.yaml
@@ -59,7 +62,43 @@ python3 main.py --config configs/launch.yaml
 python3 main.py --skip-parse --skip-llm --skip-export
 ```
 
+## 🎭 Prompt 管理指南
+
+系统采用 **“结构化骨架 + 语言 Profile”** 的混合管理模式，以实现多语言支持的逻辑复用。
+
+### 1. 目录结构
+
+所有 Prompt 模板位于 `configs/prompts/` 目录下：
+
+- `common/`: 存放跨场景通用的 JSON 规则、架构约束等。
+- `qa_rule/`: 问答对生成相关的 system 和 user 模板。
+- `arch_design/`: 架构设计方案生成相关的模板。
+- `method_profile/`: 方法摘要理解相关的模板。
+
+### 2. 骨架模板 (Skeletons)
+
+模板中使用 `{placeholder}` 语法进行动态注入，核心占位符包括：
+
+- `{role_identity}`: 从 `configs/language/*.yaml` 中抽取的角色定义。
+- `{language}`: 目标编程语言名称。
+- `{common_json_rules}`: 从 `configs/prompts/common/json_rules.txt` 加载的通用格式约束。
+
+### 3. 多语言支持 (Language Profiles)
+
+在 `configs/language/java.yaml` 或 `python.yaml` 中定义了场景特定的角色描述：
+
+```yaml
+roles:
+  qa_rule_role: "你是一个资深的 Java 业务分析师..."
+  arch_design_role: "你是一个精通 Spring 生态的架构师..."
+  method_profile_role: "你是一个 Java 代码审计专家..."
+```
+
+系统会根据 `launch.yaml` 中的 `language.name` 自动加载对应的 Profile。
+
 ## 📐 样本数量计算逻辑
+
+...
 
 ### QA 样本数量决定链
 
@@ -89,6 +128,7 @@ python3 main.py --skip-parse --skip-llm --skip-export
 | `max_questions` | `question_answer.max_questions` | 15 | QA 问题总数上限 |
 
 **公式**:
+
 ```
 最终 QA 数 = min(max_methods × questions_per_method, max_questions) - rejected
            = min(25 × 3, 15) - rejected
@@ -120,6 +160,7 @@ python3 main.py --skip-parse --skip-llm --skip-export
 | `use_method_profiles` | `design_questions.use_method_profiles` | true | 是否用 profiles 增强 |
 
 **公式**:
+
 ```
 最终 Design 数 = min(design_questions_count, max_samples) - rejected
               = min(10, 50) - rejected
@@ -127,6 +168,7 @@ python3 main.py --skip-parse --skip-llm --skip-export
 ```
 
 **关键结论**:
+
 1. **QA 瓶颈在 `max_questions`**
 2. **Design 瓶颈在 `design_questions.max_questions`**
 3. **Rejected 样本不影响生成数量计算** (它们是生成后被过滤的)

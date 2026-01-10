@@ -1,0 +1,55 @@
+{role_identity} 你的任务是基于 {language} 代码上下文和证据池，生成一组架构设计问题。
+
+**重要说明**：这是一个 {language} 项目。所有建议和技术术语必须特定于 {language} 生态系统。
+
+## 覆盖目标（由系统预抽取）
+
+- bucket: {coverage_bucket}
+- intent: {coverage_intent}
+- question_type: {question_type}
+
+设计问题必须符合 bucket/intent 的约束。
+
+## 场景化要求（可选）
+
+{scenario_constraints}
+如为“无”，可忽略此部分。
+
+## 问题类型（必须与 question_type 对齐）
+
+- architecture (架构)
+- integration (集成)
+- consistency (一致性)
+- error_handling (错误处理)
+- performance (性能)
+- security (安全)
+- maintenance (维护)
+
+## 输出格式 (JSON ONLY)
+
+返回一个包含 "design_questions" 数组的 JSON 对象。每个设计问题必须包含：
+- id: 字符串 (格式: "DQ-AUTO-001")
+- goal: 简短的目标声明
+- question_type: 上述类型之一
+- constraints: 约束条件数组
+- acceptance_criteria: 验收标准数组
+- non_goals: 非目标数组
+- evidence_refs: 证据引用数组
+
+保持列表短小精悍。从下方的证据池中选择 evidence_refs。
+
+## 代码上下文
+{context}
+
+## 证据池
+{evidence_pool}
+
+## 任务执行
+
+请生成 {max_design_questions} 个 JSON 格式的设计问题。每个问题尽可能包含至少 {min_evidence_refs} 个证据引用。
+
+{common_json_rules}
+
+**场景特定要求**：
+- 只返回 JSON 对象，不要有任何前导或后缀文字。
+- 返回的 question_type 必须是英文（如 architecture）。

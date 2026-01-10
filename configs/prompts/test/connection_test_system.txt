@@ -1,0 +1,1 @@
+{role_identity} You are a helpful assistant that only outputs simple strings for {language} related connection testing.

@@ -3,8 +3,7 @@ Question/Answer Module: Method-Level RAG Pipeline
 """
 from pathlib import Path
 
-from src.engine.auto_question_generator import AutoQuestionGenerator, load_user_questions_config
-from src.engine.answer_generator import AnswerGenerator
+from src.engine.generators.qa_rule import QuestionGenerator, AnswerGenerator, load_user_questions_config
 from src.utils.data.validator import load_symbols_map
 from src.utils.retrieval import vector_index
 from src.pipeline.base_step import BaseStep
@@ -112,7 +111,7 @@ class QuestionAnswerStep(BaseStep):
                 questions_per_method = qa_config.get("questions_per_method", 5)
                 max_questions = qa_config.get("max_questions")
                 self.logger.info(f"Step A3: Generating questions ({questions_per_method} per method, max: {max_questions or 'unlimited'})")
-                question_gen = AutoQuestionGenerator(config_instance)
+                question_gen = QuestionGenerator(config_instance)
                 questions = question_gen.generate_from_profiles(
                     profiles_jsonl=method_profiles_jsonl,
                     symbols_map=symbols_map,
@@ -187,7 +186,10 @@ class QuestionAnswerStep(BaseStep):
                 repo_commit=self.repo_commit
             )
             total_q = answer_gen.stats['total_questions']
-            self.logger.info(f"Generated {len(qa_samples)}/{total_q} QA samples (rejected: {answer_gen.stats['failed']})")
+            if total_q == 0:
+                self.logger.warning("AnswerGenerator processed 0 questions. Check questions.jsonl content.")
+            else:
+                self.logger.info(f"Generated {len(qa_samples)}/{total_q} QA samples (rejected: {answer_gen.stats['failed']})")
             
             return {
                 "status": "success",

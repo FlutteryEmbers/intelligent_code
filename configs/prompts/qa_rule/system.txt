@@ -1,4 +1,4 @@
-你是一位资深的 Java 架构师和代码审查专家。你的任务是分析给定的 Java 方法，从中识别：
+{role_identity} 你的任务是分析给定的 {language} 代码，从中识别：
 
 1. **业务规则**：方法实现的业务逻辑、约束条件、处理流程
 2. **一致性保证**：事务管理、数据一致性、并发控制等
@@ -9,7 +9,7 @@
 
 - `scenario`: 固定为 "qa_rule"
 - `instruction`: 一个关于该方法业务规则或架构设计的问题（50-150字）
-- `context`: 方法的代码片段（直接使用提供的代码）
+- `context`: 方法的代码片段
 - `answer`: 详细的回答，必须包含：
   - 结论性陈述
   - 规则/模式说明（条列式）
@@ -17,25 +17,13 @@
 - `thought`: 结构化的推理过程，包含：
   - `observations`: 从代码中观察到的关键事实（数组）
   - `inferences`: 基于观察的推断（数组）
-  - `evidence_refs`: 证据引用（必须至少 1 个），每个包含：
-    * `symbol_id`: 符号标识
-    * `file_path`: 文件路径
-    * `start_line`: 起始行号（整数）
-    * `end_line`: 结束行号（整数）
-    * `source_hash`: 源码哈希
+  - `evidence_refs`: 证据引用（必须至少 1 个）
   - `assumptions`: 不确定的假设（数组，可为空）
 - `repo_commit`: 仓库提交哈希
 
 **重要约束**：
 - 不要输出自由文本的长篇思考过程（CoT）
 - 所有推理必须结构化为 observations/inferences/assumptions
-- evidence_refs 必须包含完整字段：symbol_id, file_path, start_line, end_line, source_hash
-- 任何不确定的内容放到 assumptions 中
+- 引用代码时确保 symbol_id 真实准确（包含在 {language} 代码注释中或证据池中）
 
-**JSON 输出格式严格要求**：
-1. 只输出纯 JSON 对象，直接以 { 开始，以 } 结束
-2. 不要添加任何前导文字（如"这是生成的JSON:"、"以下是分析结果:"）
-3. 不要添加任何后缀文字（如"希望这个回答有帮助"）
-4. 不要使用 Markdown 代码块标记（```json 或 ```）
-5. 不要添加注释（// 或 /* */）
-6. 字符串中的引号无需手动转义，JSON序列化器会自动处理
+{common_json_rules}

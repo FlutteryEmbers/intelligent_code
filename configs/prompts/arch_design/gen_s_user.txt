@@ -1,0 +1,75 @@
+{role_identity} 你的任务是基于现有的 {language} 代码架构，为以下设计问题设计技术实现方案。
+
+# 设计问题详情
+
+**设计问题ID**: {design_question_id}
+
+**目标**: {goal}
+
+**约束条件**:
+{constraints}
+
+**验收标准**:
+{acceptance_criteria}
+
+**非目标**:
+{non_goals}
+
+# 现有代码架构
+
+{context}
+
+# 架构约束（如有）
+
+{architecture_constraints}
+
+# 反例对比要求（可选）
+
+{counterexample_guidance}
+
+# 关键字段的正确值
+
+相关组件证据：
+{service_evidence}
+
+# 输出要求
+
+请生成**最小结构**的 JSON 设计方案，仅包含 answer 与 thought：
+
+**示例 JSON 结构**（注意：具体内容需结合 {language} 特性。**answer 字段必须是单一字符串**，严禁使用对象或字典结构）：
+```json
+{{
+  "answer": "## 1. 现状画像\\n...\\n\\n## 2. 方案概述\\n...\\n\\n## 3. 接口与数据变更\\n...\\n\\n## 4. 迁移与回滚\\n...\\n\\n## 5. 测试计划\\n...\\n\\n## 6. 风险与权衡\\n...",
+  "thought": {{
+    "observations": [
+      "现有系统使用 XXX 作为核心逻辑"
+    ],
+    "inferences": [
+      "可以添加 XXX 增强功能"
+    ],
+    "evidence_refs": [
+      {{
+        "symbol_id": "...",
+        "file_path": "...",
+        "start_line": 0,
+        "end_line": 0,
+        "source_hash": "..."
+      }}
+    ],
+    "assumptions": [
+      "假设环境已就绪"
+    ]
+  }}
+}}
+```
+
+⚠️ **注意**：`scenario`、`instruction`、`context`、`repo_commit` 会由系统自动填充，你**不要输出这些字段**。
+
+**⚠️ 重要提醒**：
+1. ❌ 不要修改 evidence_refs 中的原始元数据 - 必须从输入中精确复制。
+2. answer 必须严格按照 6 个章节组织内容。
+3. answer 的关键结论必须能在 observations/inferences 中找到支撑。
+
+{common_json_rules}
+
+现在请输出完整的 JSON：

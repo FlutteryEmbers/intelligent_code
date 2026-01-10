@@ -1,0 +1,92 @@
+{role_identity} 你的任务是基于给定 {language} 函数/方法的深度理解（MethodProfile），生成多样化的业务问题，用于训练代码理解模型。
+
+## 输入信息
+
+**Method Profile**:
+```json
+{method_profile}
+```
+
+**方法源码**:
+```
+{source_code}
+```
+
+## 覆盖目标（由系统预先抽取）
+
+- bucket: {coverage_bucket}
+- intent: {coverage_intent}
+- question_type: {question_type}
+
+说明：
+1. 问题内容必须符合 bucket/intent 的语义范围。
+2. difficulty 建议与 bucket 对齐：high→easy，mid→medium，hard→hard（如冲突，以 bucket 为准）。
+
+## 场景化要求（可为空）
+
+{scenario_constraints}
+如为“无”，无需额外场景化要求。
+
+## 任务要求
+
+生成 **恰好 {questions_per_method} 个** 业务问题，要求：
+
+1. **多样化**: 在 question_type 约束下保持表述与角度多样
+2. **针对性**: 每个问题必须针对该方法的具体特征
+3. **深度**: 不要问"这个方法做什么"这种浅层问题
+4. **业务视角**: 关注业务规则、架构设计、风险控制等
+
+## 问题类型（必须与 question_type 对齐）
+
+- `how_to`: 上手/调用/使用流程
+- `config`: 配置项、默认值、开关影响
+- `flow`: 流程步骤、状态流转
+- `auth`: 权限/鉴权/访问控制
+- `error`: 异常处理与错误码
+- `deploy`: 部署/发布/迁移
+- `impact`: 变更影响/兼容性风险
+- `perf`: 性能/吞吐/延迟
+- `consistency`: 一致性/事务
+- `compatibility`: 历史兼容/老版本约束
+- `edge`: 边界条件/极端场景
+
+## 难度级别
+
+- `easy`: 初级开发者可回答（基础概念）
+- `medium`: 中级开发者可回答（需要一定经验）
+- `hard`: 高级开发者/架构师可回答（深度理解）
+
+## 输出格式
+
+你必须输出一个 JSON 对象，包含 `questions` 数组（长度恰好为 {questions_per_method}）：
+
+```json
+{{
+  "questions": [
+    {{
+      "question": "针对该架构的机制，它是如何保证操作原子性的？",
+      "question_type": "consistency",
+      "difficulty": "medium",
+      "evidence_refs": [
+        {{
+          "symbol_id": "{symbol_id}",
+          "file_path": "{file_path}",
+          "start_line": {start_line},
+          "end_line": {end_line},
+          "source_hash": "{source_hash}"
+        }}
+      ],
+      "repo_commit": "{repo_commit}"
+    }},
+    ...
+  ]
+}}
+```
+
+{common_json_rules}
+
+**场景特定要求**：
+- questions 数组长度必须恰好等于 {questions_per_method}。
+- 每个问题的 evidence_refs 必须从提供的信息中精确复制。
+
+现在为上面给定的方法生成 {questions_per_method} 个问题：

@@ -200,6 +200,19 @@ class Config:
         """确保所有输出目录存在"""
         for dir_path in self.output_dirs.values():
             Path(dir_path).mkdir(parents=True, exist_ok=True)
+    
+    def get_language_profile(self, language_name: str | None = None):
+        """
+        获取语言 Profile
+        
+        Args:
+            language_name: 语言名称（如 'java', 'python'），如果为 None 则从配置中读取
+            
+        Returns:
+            LanguageProfile: 语言 Profile 對像
+        """
+        from src.utils.generation.language_profile import load_language_profile
+        return load_language_profile(self, language_name=language_name)
 
 
 # 全局配置实例

@@ -64,14 +64,14 @@ Question/Answer 模块把 QA 生成分解为：
 ```mermaid
 flowchart TD
   P[(method_profiles.jsonl)] --> C[vector_index.build_embeddings]
-  P --> D[AutoQuestionGenerator]
+  P --> QG[QuestionGenerator]
   U[(user_questions.yaml)] --> Q[(auto_questions/questions.jsonl)]
-  D --> Q
+  QG --> Q
   C --> E[(method_embeddings.jsonl)]
-  Q --> F[AnswerGenerator]
-  E --> F
-  F --> O[(auto_qa_raw.jsonl)]
-  F --> R[(auto_answer_rejected.jsonl)]
+  Q --> AG[AnswerGenerator]
+  E --> AG
+  AG --> O[(auto_qa_raw.jsonl)]
+  AG --> R[(auto_answer_rejected.jsonl)]
 ```
 
 ---
@@ -103,16 +103,16 @@ flowchart TD
 
 ---
 
-## Prompt 说明（模板角色）
-
-### 出题模板（AutoQuestionGenerator）
+### 出题模板（QuestionGenerator）
 
 #### 🌟 核心概念
+>
 > 就像“出题标准模板”，保证问题结构一致、分布可控。
 
 #### 📋 运作基石（元数据与规则）
-- **存放位置**：`configs/prompts/question_answer/auto_question_generation.txt` 与 `coverage_question_generation.txt`
-- **工序位置**：QuestionAnswerStep → AutoQuestionGenerator
+
+- **存放位置**：`configs/prompts/qa_rule/gen_q_user.txt`
+- **工序位置**：QuestionAnswerStep → QuestionGenerator
 - **推理模式**：配额/约束驱动的结构化出题
 - **核心准则**：JSON-only、固定数量、`evidence_refs` 必须逐字复制、bucket/intent/question_type 对齐
 
@@ -133,6 +133,7 @@ flowchart TD
 ```
 
 #### 🧩 解决的痛点
+
 - **以前的乱象**：问题风格飘忽、难以抽样。
 - **现在的秩序**：问题结构统一、覆盖可控。
 
@@ -141,10 +142,12 @@ flowchart TD
 ### 回答模板（AnswerGenerator）
 
 #### 🌟 核心概念
+>
 > 就像“标准答案模板”，确保答案有证据、有结构。
 
 #### 📋 运作基石（元数据与规则）
-- **存放位置**：`configs/prompts/question_answer/auto_answer_generation.txt`
+
+- **存放位置**：`configs/prompts/qa_rule/gen_a_user.txt`
 - **工序位置**：QuestionAnswerStep → AnswerGenerator
 - **推理模式**：证据锚定的结构化回答
 - **核心准则**：JSON-only、`answer` 为字符串、`evidence_refs` 必须来自证据池
@@ -166,6 +169,7 @@ flowchart TD
 ```
 
 #### 🧩 解决的痛点
+
 - **以前的乱象**：回答缺证据、格式不一致。
 - **现在的秩序**：回答结构统一、证据可追溯。
 

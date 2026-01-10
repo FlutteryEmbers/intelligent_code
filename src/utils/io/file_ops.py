@@ -235,4 +235,40 @@ def clean_llm_json_output(output: str) -> str:
     if start_idx != -1 and end_idx != -1:
         output = output[start_idx:end_idx+1]
     
-    return output
+    return _fix_json_control_chars(output)
+
+
+def _fix_json_control_chars(json_str: str) -> str:
+    """
+    Fix common JSON errors in LLM output:
+    1. Unescaped newlines/tabs inside string values.
+    """
+    result = []
+    in_string = False
+    escape_next = False
+    
+    for char in json_str:
+        if escape_next:
+            result.append(char)
+            escape_next = False
+            continue
+            
+        if char == '"':
+            in_string = not in_string
+            result.append(char)
+        elif char == '\\':
+            escape_next = True
+            result.append(char)
+        elif in_string:
+            if char == '\n':
+                result.append('\\n')
+            elif char == '\t':
+                result.append('\\t')
+            elif char == '\r':
+                result.append('\\r')
+            else:
+                result.append(char)
+        else:
+            result.append(char)
+            
+    return "".join(result)

@@ -1,6 +1,7 @@
 # 架构设计生成（Architecture Design Generation）
 
 ## 🌟 核心概念：像“设计评审题库”一样
+
 > 就像设计评审会准备一组关键问题，系统会先生成设计问题，再输出可追溯的设计方案。
 
 ## 📋 运作基石（必要元数据）
@@ -50,18 +51,22 @@
 | `artifacts.design_rejected_jsonl` | 设计拒绝记录 | 失败样本日志 | 默认即可 |
 
 **设计问题数量控制逻辑**：
+
 - `design_questions.max_questions` 是总体上限。
-- 当 `design_questions.batching.enabled = false`：单次调用按 `max_questions` 请求生成。
-- 当 `design_questions.batching.enabled = true`：最多循环 `num_batches` 次，每批请求 `min(batch_size, remaining)`，总数上限仍是 `max_questions`；实际产出可能因解析失败或 goal 去重而小于目标值。
+- **强制批处理策略**：为保证 LLM 生成质量并防止上下文溢出，系统强制采用“循环批处理”模式。
+- 系统会自动循环调用，每批次生成少量问题（默认 5 个），直到达到 `max_questions` 总量或无新问题生成。
+- 每一批次都会**重新随机采样**上下文证据，以确保生成的设计问题覆盖仓库的不同角落。
 
 ## Prompt 说明（模板角色）
 
 ### 模板：`configs/prompts/design/auto_design_question_generation.txt` / `coverage_design_question_generation.txt`
 
-#### 🌟 核心概念
+#### 🌟 核心概念 (出题)
+
 > 就像“设计题库模板”一样，保证问题结构清晰、覆盖目标明确。
 
-#### 📋 运作基石（元数据与规则）
+#### 📋 运作基石 (出题)
+
 - **存放位置**：`configs/prompts/design/auto_design_question_generation.txt`（基础）/ `coverage_design_question_generation.txt`（带覆盖约束）
 - **工序位置**：DesignGenerationStep → DesignQuestionGenerator（Step 3a）
 - **变量注入**：`language`、`coverage_bucket/intent/question_type`、`constraint_strength/constraint_rules`、`scenario_constraints`、`context`、`evidence_pool`、`max_design_questions`、`min_evidence_refs`
@@ -71,7 +76,7 @@
   - 证据必须来自 `evidence_pool`
   - 问题必须符合 bucket/intent/类型要求
 
-#### ⚙️ 仪表盘：我该如何控制它？
+#### ⚙️ 仪表盘 (出题配置)
 
 | 配置参数 | 业务直观名称 | 调节它的效果 |
 | :--- | :--- | :--- |
@@ -79,7 +84,7 @@
 | `design_questions.prompts.coverage_generation` | 覆盖出题模板 | 启用覆盖约束 |
 | `design_questions.coverage.*` | 覆盖与场景规则 | 控制 bucket/intent/场景注入 |
 
-#### 🛠️ 逻辑流向图 (Mermaid)
+#### 🛠️ 逻辑流向图 (出题流程)
 
 ```mermaid
 flowchart TD
@@ -89,7 +94,8 @@ flowchart TD
   D --> E[design_questions_auto.jsonl]
 ```
 
-#### 🧩 解决的痛点
+#### 🧩 解决的痛点 (出题)
+
 - **以前的乱象**：设计问题来源单一、分布不可控。
 - **现在的秩序**：设计问题有模板、有证据池、有覆盖目标。
 
@@ -97,10 +103,12 @@ flowchart TD
 
 ### 模板：`configs/prompts/design/design_system_prompt.txt` + `design_user_prompt.txt`
 
-#### 🌟 核心概念
+#### 🌟 核心概念 (回答)
+
 > 就像“设计方案写作规范”一样，保证输出结构统一、证据可审计。
 
-#### 📋 运作基石（元数据与规则）
+#### 📋 运作基石 (回答)
+
 - **存放位置**：`configs/prompts/design/design_system_prompt.txt`、`configs/prompts/design/design_user_prompt.txt`
 - **工序位置**：DesignGenerationStep → DesignGenerator（Step 3b）
 - **变量注入**：`design_question_id/goal/constraints/acceptance_criteria/non_goals`、`context`、`architecture_constraints`、`counterexample_guidance`、`controller_symbol_id`、`service_evidence`、`repo_commit`
@@ -110,7 +118,7 @@ flowchart TD
   - answer 必须包含 6 个章节
   - evidence_refs 必须逐字复制提供的值
 
-#### ⚙️ 仪表盘：我该如何控制它？
+#### ⚙️ 仪表盘 (回答配置)
 
 | 配置参数 | 业务直观名称 | 调节它的效果 |
 | :--- | :--- | :--- |
@@ -118,7 +126,7 @@ flowchart TD
 | `design_questions.prompts.user_prompt` | 用户提示模板 | 注入问题与证据 |
 | `design_questions.constraints.*` | 反例/架构约束 | 强化审计性 |
 
-#### 🛠️ 逻辑流向图 (Mermaid)
+#### 🛠️ 逻辑流向图 (回答流程)
 
 ```mermaid
 flowchart TD
@@ -127,7 +135,8 @@ flowchart TD
   C --> D[LLM 输出 design_raw.jsonl]
 ```
 
-#### 🧩 解决的痛点
+#### 🧩 解决的痛点 (回答)
+
 - **以前的乱象**：设计方案结构不一致、证据难追溯。
 - **现在的秩序**：结构统一、证据明确、可审计。
 
@@ -143,12 +152,12 @@ flowchart TD
 
 与 QA 流程类似，设计方案的生成也始于一个严格的“寻找证据”阶段。系统需要为抽象的设计问题，找到最相关的代码作为“开卷材料”。
 
-1.  **精确制导 (Direct Hit)**：设计问题（`DesignQuestion`）通常不直接携带 `evidence_refs`。但如果存在，系统会优先加载这些代码。
-2.  **语义搜索 (Vector Search)**：这是最核心的步骤。
-    *   **查询**: 系统将设计问题的 `goal`（目标描述）作为查询向量。
-    *   **索引**: 与 QA 流程**共享同一个“方法语义索引”** (`method_embeddings.jsonl`)。这个索引的向量正是由 `MethodProfile` 的内容（业务摘要、逻辑规则）和方法签名等信息生成的，因此它蕴含了代码的“业务语义”。
-    *   **召回**: 通过在索引中搜索，系统能够找出那些在**业务功能**上与设计目标最相关的方法。例如，一个关于“实现用户认证”的设计问题，会高分匹配到那些在 `MethodProfile` 中描述了“登录逻辑”、“权限校验”或“Token 生成”的方法。
-3.  **关联扩展 (Graph Expansion)**：找到核心相关方法后，`DesignGenerator` 同样会通过 `expand_call_chain` 分析其调用关系，将被调用或调用它的其他方法也纳入上下文，形成更完整的代码视图。
+1. **精确制导 (Direct Hit)**：设计问题（`DesignQuestion`）通常不直接携带 `evidence_refs`。但如果存在，系统会优先加载这些代码。
+2. **语义搜索 (Vector Search)**：这是最核心的步骤。
+    - **查询**: 系统将设计问题的 `goal`（目标描述）作为查询向量。
+    - **索引**: 与 QA 流程**共享同一个“方法语义索引”** (`method_embeddings.jsonl`)。这个索引的向量正是由 `MethodProfile` 的内容（业务摘要、逻辑规则）和方法签名等信息生成的，因此它蕴含了代码的“业务语义”。
+    - **召回**: 通过在索引中搜索，系统能够找出那些在**业务功能**上与设计目标最相关的方法。例如，一个关于“实现用户认证”的设计问题，会高分匹配到那些在 `MethodProfile` 中描述了“登录逻辑”、“权限校验”或“Token 生成”的方法。
+3. **关联扩展 (Graph Expansion)**：找到核心相关方法后，`DesignGenerator` 同样会通过 `expand_call_chain` 分析其调用关系，将被调用或调用它的其他方法也纳入上下文，形成更完整的代码视图。
 
 这个阶段的产物是一个 `context` 变量，其中包含了所有检索到的**真实源码片段**，它们是设计方案的基石。`MethodProfile` 的价值在此阶段体现为：它在构建索引时提供了丰富的业务语义，使得向量搜索能够超越关键词匹配，实现真正的“意图理解”。
 
@@ -156,19 +165,18 @@ flowchart TD
 
 获得全面的上下文证据后，系统进入“架构师”角色，开始撰写设计方案。这个过程同样受到“Prompt 合同”和“代码校验”的双重保障。
 
-1.  **事前约束 (Prompt 合同)**：
-    *   **角色扮演**: `configs/prompts/design/design_system_prompt.txt` 首先会赋予 LLM 一个“资深软件架构师”的角色，并设定好输出的结构化格式（例如，必须包含“方案概述”、“风险分析”等六大章节）。
-    *   **证据注入**: `configs/prompts/design/design_user_prompt.txt` 则会将具体的设计问题 `{design_question}`、检索到的上下文 `{context}`、架构约束 `{architecture_constraints}` 等一并提供给 LLM。
-    *   **强制引用**: Prompt 明确要求，在 `thought`（思考过程）中，必须引用在 `{context}` 中出现的 `evidence_refs`，确保所有设计决策都有据可依。
+1. **事前约束 (Prompt 合同)**：
+    - **角色扮演**: `configs/prompts/design/design_system_prompt.txt` 首先会赋予 LLM 一个“资深软件架构师”的角色，并设定好输出的结构化格式（例如，必须包含“方案概述”、“风险分析”等六大章节）。
+    - **证据注入**: `configs/prompts/design/design_user_prompt.txt` 则会将具体的设计问题 `{design_question}`、检索到的上下文 `{context}`、架构约束 `{architecture_constraints}` 等一并提供给 LLM。
+    - **强制引用**: Prompt 明确要求，在 `thought`（思考过程）中，必须引用在 `{context}` 中出现的 `evidence_refs`，确保所有设计决策都有据可依。
 
-2.  **事后验证 (代码校验)**：
-    *   **结构监察**: `DesignGenerator` 在收到 LLM 的回复后，会立刻用 `_validate_sample` 方法进行检查。
-    *   **证据有效性**: 校验 `thought.evidence_refs` 中的引用是否真实存在于原始的证据池中。
-    *   **内容完整性**: 检查 `answer` 文本中是否包含了所有被要求的章节标题。
-    *   **失败品回收**: 任何无法通过校验的设计方案都会被视为不合格，记录到 `design_rejected.jsonl` 文件中，并被**彻底丢弃**。
+2. **事后验证 (代码校验)**：
+    - **结构监察**: `DesignGenerator` 在收到 LLM 的回复后，会立刻用 `_validate_sample` 方法进行检查。
+    - **证据有效性**: 校验 `thought.evidence_refs` 中的引用是否真实存在于原始的证据池中。
+    - **内容完整性**: 检查 `answer` 文本中是否包含了所有被要求的章节标题。
+    - **失败品回收**: 任何无法通过校验的设计方案都会被视为不合格，记录到 `design_rejected.jsonl` 文件中，并被**彻底丢弃**。
 
 通过这个 RAG 闭环，系统不仅生成了一份设计文档，更确保了这份文档是**基于现有代码、遵循架构约束、且思考过程透明可追溯的**高质量产出。`MethodProfile` 在此流程中起到了至关重要的作用，它既是 RAG 检索阶段的核心“导航仪”，也为 LLM 在生成阶段提供了超越原始代码的“语义洞察力”。
-
 
 ## 🧩 解决的痛点与带来的改变
 
