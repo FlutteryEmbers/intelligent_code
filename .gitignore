@@ -209,7 +209,7 @@ __marimo__/
 logs
 repos
 models
-docs/guides
+# docs/guides
 checkpoints
 /*/implementations/
 .github

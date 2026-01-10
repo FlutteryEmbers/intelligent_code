@@ -122,7 +122,7 @@ class TrainingSample(BaseModel):
     repo_commit: str = Field(..., description="数据来源的 commit hash")
     quality: dict = Field(
         default_factory=dict, 
-        description="质量评估结果（后续填充）"
+        description="质量评估结果（结构参考下方 Quality 模型）"
     )
     
     # 元数据
@@ -197,6 +197,63 @@ class QuestionSample(BaseModel):
             # 自动生成 question_id
             content = f"{self.question}:{self.question_type}"
             self.question_id = sha256_text(content)[:16]
+
+    class Config:
+        frozen = False
+
+
+# ==================== Pending / Semi-structured Schemas ====================
+# 下列模型已在代码中使用字典形式流转，此处将其结构化定义以供参考或未来重构。
+
+class DesignQuestion(BaseModel):
+    """架构设计问题 (原字典结构化)"""
+    id: str = Field(..., description="问题 ID (e.g. DQ-AUTO-001)")
+    goal: str = Field(..., description="设计目标")
+    constraints: list[str] = Field(default_factory=list, description="约束条件")
+    acceptance_criteria: list[str] = Field(default_factory=list, description="验收标准")
+    non_goals: list[str] = Field(default_factory=list, description="非目标")
+    evidence_refs: list[EvidenceRef] = Field(default_factory=list, description="相关证据")
+    question_type: str = Field(default="architecture", description="问题类型")
+
+    class Config:
+        frozen = False
+
+
+class Quality(BaseModel):
+    """质量评估详情 (注入到 TrainingSample.quality)"""
+    passed: bool = Field(..., description="是否通过质量门禁")
+    gate_version: str = Field(..., description="门禁版本")
+    errors: list[dict] = Field(default_factory=list, description="阻断性错误列表")
+    warnings: list[dict] = Field(default_factory=list, description="非阻断性警告列表")
+    stats: dict = Field(default_factory=dict, description="统计信息 (chars, refs)")
+    checks: dict[str, str] = Field(default_factory=dict, description="各维度检查状态 (pass/warn/fail)")
+
+    class Config:
+        frozen = False
+
+
+class RejectedSample(BaseModel):
+    """被淘汰样本包装器 (写入 rejected/*.jsonl)"""
+    line: int = Field(..., description="原始行号")
+    scenario: str | None = Field(default=None, description="场景类型")
+    error: str | None = Field(default=None, description="错误摘要")
+    quality: Quality | None = Field(default=None, description="质量详情")
+    raw: dict = Field(default_factory=dict, description="原始样本数据")
+
+    class Config:
+        frozen = False
+
+
+class QualityReport(BaseModel):
+    """校验报告 (写入 *_validation_report.json)"""
+    input_file: str
+    symbols_count: int
+    gate_version: str
+    validation_stats: dict = Field(..., description="{total, passed, failed, pass_rate}")
+    top_failures: list[dict]
+    top_warnings: list[dict]
+    trace_summary: dict
+    output_files: dict
 
     class Config:
         frozen = False
