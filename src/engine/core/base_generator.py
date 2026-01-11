@@ -159,6 +159,19 @@ class BaseGenerator:
         from langchain_core.messages import SystemMessage, HumanMessage
         
         last_error = None
+        max_context_chars = self.config.get("core.max_context_chars")
+        if isinstance(max_context_chars, int) and max_context_chars > 0:
+            total_chars = len(system_prompt) + len(user_prompt)
+            if total_chars > max_context_chars:
+                logger.warning(
+                    "[%s] Prompt length %s chars exceeds core.max_context_chars=%s (system=%s, user=%s)",
+                    self.scenario,
+                    total_chars,
+                    max_context_chars,
+                    len(system_prompt),
+                    len(user_prompt),
+                )
+
         for attempt in range(max_retries + 1):
             try:
                 response = self.llm_client.llm.invoke(

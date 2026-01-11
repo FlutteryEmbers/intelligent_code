@@ -9,7 +9,7 @@ language:
 llm:
   provider: "ollama"
   base_url: "http://localhost:11434/v1"
-  model: "qwen2.5:3b"
+  model: "qwen2.5:7b"
   temperature: 0.2
   max_tokens: 10000
   timeout_sec: 180
@@ -33,7 +33,7 @@ method_understanding:
 
 question_answer:
   questions_per_method: 3
-  max_questions: 500
+  max_questions: 200
   batch_size: 3
   embedding_model: "nomic-embed-text"
   user_questions_path: "configs/user_inputs/user_questions.yaml"

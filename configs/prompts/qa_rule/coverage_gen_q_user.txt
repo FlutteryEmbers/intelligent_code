@@ -12,6 +12,11 @@
 {source_code}
 ```
 
+**可用证据引用（必须从下方逐字段复制，包含 source_hash）**:
+```json
+{available_evidence_refs}
+```
+
 ## 覆盖目标（硬约束）
 
 - bucket: {coverage_bucket}
@@ -97,7 +102,8 @@
 
 **强制要求**：
 - questions 数组长度必须恰好等于 {questions_per_method}。
-- 每个问题的 evidence_refs 必须从提供的信息中精确复制。
+- 每个问题的 evidence_refs 必须从「可用证据引用」中精确复制，字段必须完整（含 source_hash）。
+- evidence_refs 任意字段缺失将视为无效输出。
 - 不得输出任何额外字段或解释性文本。
 
 现在为上面给定的方法生成 {questions_per_method} 个问题：

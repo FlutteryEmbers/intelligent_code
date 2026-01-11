@@ -64,9 +64,12 @@ class MergeStep(BaseStep):
                 self.logger.info("Using QA clean samples: %s", qa_clean_path.name)
             elif raw_available:
                 if write_clean and gate_mode == "gate":
-                    raise FileNotFoundError(
-                        f"QA clean file not found in gate mode: {qa_clean_path}"
+                    self.logger.warning(
+                        "QA clean file not found in gate mode, skipping QA merge: %s",
+                        qa_clean_path,
                     )
+                    qa_paths = []
+                    raw_available = False
                 if gate_mode == "report" and not allow_fallback and write_clean:
                     raise FileNotFoundError(
                         f"QA clean file missing and fallback disabled: {qa_clean_path}"

@@ -23,19 +23,72 @@ def simple_hash(text: str) -> str:
     """简单哈希去重"""
     return hashlib.md5(text.lower().encode('utf-8')).hexdigest()[:16]
 
+REQUIRED_EVIDENCE_FIELDS = ("symbol_id", "file_path", "start_line", "end_line", "source_hash")
+
+
 def evidence_refs_missing_fields(raw_refs: Any) -> bool:
     """Check whether evidence_refs is missing or has incomplete fields."""
     if not isinstance(raw_refs, list) or not raw_refs:
         return True
-    required = ("symbol_id", "file_path", "start_line", "end_line", "source_hash")
     for ref in raw_refs:
         if not isinstance(ref, dict):
             return True
-        for key in required:
+        for key in REQUIRED_EVIDENCE_FIELDS:
             value = ref.get(key)
             if value is None or value == "":
                 return True
     return False
+
+
+def _is_ref_complete(ref: dict) -> bool:
+    for key in REQUIRED_EVIDENCE_FIELDS:
+        value = ref.get(key)
+        if value is None or value == "":
+            return False
+    return True
+
+
+def _repair_evidence_refs(raw_refs: Any, default_ref: dict) -> tuple[list[dict], bool]:
+    if not isinstance(raw_refs, list):
+        return [], False
+    repaired: list[dict] = []
+    changed = False
+    for ref in raw_refs:
+        if not isinstance(ref, dict):
+            return [], False
+        fixed = dict(ref)
+        if fixed.get("symbol_id") == default_ref.get("symbol_id") or fixed.get("file_path") == default_ref.get("file_path"):
+            for key in REQUIRED_EVIDENCE_FIELDS:
+                if not fixed.get(key):
+                    fixed[key] = default_ref.get(key)
+                    changed = True
+        repaired.append(fixed)
+    return repaired, changed
+
+
+def _build_available_evidence_refs(
+    profile: MethodProfile, default_ref: dict, max_refs: int = 3
+) -> list[dict]:
+    refs: list[dict] = []
+    seen: set[tuple[str, int, int]] = set()
+    refs.append(default_ref)
+    seen.add((default_ref.get("symbol_id", ""), default_ref.get("start_line", 0), default_ref.get("end_line", 0)))
+    for ref in profile.evidence_refs:
+        ref_data = ref.model_dump() if hasattr(ref, "model_dump") else dict(ref)
+        if ref_data.get("symbol_id") == default_ref.get("symbol_id") or ref_data.get("file_path") == default_ref.get("file_path"):
+            for key in REQUIRED_EVIDENCE_FIELDS:
+                if not ref_data.get(key):
+                    ref_data[key] = default_ref.get(key)
+        if not _is_ref_complete(ref_data):
+            continue
+        key = (ref_data.get("symbol_id", ""), ref_data.get("start_line", 0), ref_data.get("end_line", 0))
+        if key in seen:
+            continue
+        seen.add(key)
+        refs.append(ref_data)
+        if len(refs) >= max_refs:
+            break
+    return refs
 
 def load_user_questions_config(
     config_path: str | Path | None = None,
@@ -240,6 +293,8 @@ class QuestionGenerator(BaseGenerator):
             end_line=symbol.end_line,
             source_hash=symbol.source_hash
         )
+        default_ref_data = default_ref.model_dump()
+        available_evidence_refs = _build_available_evidence_refs(profile, default_ref_data)
         
         # 3. 组装提示词
         system_prompt = self._build_composed_system_prompt()
@@ -265,7 +320,8 @@ class QuestionGenerator(BaseGenerator):
             question_type=question_type,
             scenario_constraints=scenario_constraints or "无",
             constraint_strength=constraint_strength,
-            constraint_rules=constraint_rules
+            constraint_rules=constraint_rules,
+            available_evidence_refs=json.dumps(available_evidence_refs, ensure_ascii=False, indent=2),
         )
         
         # 4. LLM 调用
@@ -277,6 +333,12 @@ class QuestionGenerator(BaseGenerator):
         for q_data in questions_data:
             # 补齐关键字段
             q_data.setdefault('question_type', question_type)
+            raw_refs = q_data.get("evidence_refs")
+            if self.gate_mode != "gate":
+                repaired_refs, repaired = _repair_evidence_refs(raw_refs, default_ref_data)
+                if repaired:
+                    q_data["evidence_refs"] = repaired_refs
+                    q_data["evidence_autofill"] = True
             missing_fields = evidence_refs_missing_fields(q_data.get('evidence_refs'))
             if missing_fields:
                 if self.gate_mode == "gate":
@@ -292,7 +354,7 @@ class QuestionGenerator(BaseGenerator):
                         },
                     )
                     continue
-                q_data['evidence_refs'] = [default_ref]
+                q_data['evidence_refs'] = [default_ref_data]
                 q_data['evidence_autofill'] = True
             q_data.setdefault('repo_commit', profile.repo_commit)
             
