@@ -12,6 +12,13 @@ Prompt 源码：[在此粘贴模板文本，如 .jinja2 或 .yaml 内容]
 
 输入变量说明：[说明模板中 {{variable}} 的具体含义]
 
+## Workflow
+
+1. **Summarize**: 总结问题，给出更加清晰的问题表述 {{question}}，给出问题的类别 {{question_type}}。
+2. **Ingest**: 解析模板文本与加载/注入逻辑，提取关键约束点。
+3. **Analyze**: 对意图、规则、推理模式与业务映射进行审计。
+4. **Report**: 输出可读的业务价值总结。
+
 ## Task: 深度解析要求
 
 请通过审计以上信息，回答并整合以下维度：
@@ -30,7 +37,7 @@ Prompt 源码：[在此粘贴模板文本，如 .jinja2 或 .yaml 内容]
 
 业务映射：它如何将底层的技术细节转化为非技术人员可理解的价值？
 
-## Output Format (遵循 ai_readme_rules)
+## Output Format (遵循 docs/ai_rules/docs/ai_readme_rules.md)
 
 请输出为 Markdown 格式，包含以下章节：
 

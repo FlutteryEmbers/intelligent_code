@@ -27,18 +27,19 @@
 
 ## Workflow
 
-1. **Ingest**: 解析设计文档，提取关键约束点（Specs）。
-2. **Scan**: 扫描目标代码模块，构建逻辑映射。
-3. **Compare**: 执行逐项对比，识别“缺失”、“偏差”或“未文档化的实现”。
-4. **Report**: 生成差异报告。
+1. **Summarize**: 总结问题，给出更加清晰的问题表述 {{question}}，给出问题的类别 {{question_type}}
+2. **Ingest**: 解析设计文档，提取关键约束点（Specs）。
+3. **Scan**: 扫描目标代码模块，构建逻辑映射。
+4. **Compare**: 执行逐项对比，识别“缺失”、“偏差”或“未文档化的实现”。
+5. **Report**: 生成差异报告。
 
 ## Output Format (Audit Report)
 
-请在 `docs/logs/{{YYYY-MM-DD}}_design_audit_report.md` 中输出：
+请在 `docs/logs/{{YYYY-MM-DD}}_{{question_type}}_design_audit_report.md` 中输出，如果文档已存在，通过后缀版本号来区别文档，避免覆盖写入。
 
 ```markdown
 # 设计一致性审计报告
->
+> 问题总结: {{question}}
 > 审计对象: {{审计目标}}
 > 审计基准: {{基准文档}}
 > 日期: {{YYYY-MM-DD}}

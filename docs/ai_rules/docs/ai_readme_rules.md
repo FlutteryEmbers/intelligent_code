@@ -10,6 +10,12 @@
 4. **配置文件片段 (Config)**：[粘贴对应的 YAML/JSON 参数]
 5. **核心代码逻辑**：[粘贴关键代码段]
 
+## Workflow
+
+1. **Ingest**: 解析输入要点与核心约束。
+2. **Draft**: 按模板输出 Feature 总结。
+3. **Report**: 输出最终文档。
+
 ## Output Requirements
 
 请生成包含以下维度的总结：

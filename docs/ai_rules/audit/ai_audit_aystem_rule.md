@@ -17,6 +17,14 @@
 # Task
 请在 `docs/architecture/design_pattern_analysis.md` 中生成报告，包含以下章节：
 
+## Workflow
+
+1. **Summarize**: 总结问题，给出更加清晰的问题表述 {{question}}，给出问题的类别 {{question_type}}。
+2. **Ingest**: 提取系统目标与关键架构约束。
+3. **Scan**: 识别现有设计模式与耦合点。
+4. **Compare**: 评估模式合理性与缺失点。
+5. **Report**: 生成架构分析报告。
+
 ## 1. 核心架构风格 (Architectural Style)
 - 简述系统目前是倾向于 **管道过滤器 (Pipe & Filter)** 风格，还是 **批处理 (Batch Processing)** 风格？
 - 用 Mermaid `graph LR` 画出数据流动的高层架构图。
@@ -37,6 +45,10 @@
 ## 4. 总结与评分
 - **可扩展性评分 (1-10)**: 增加新的数据源或输出格式的难度。
 - **一句话总结**: 对当前架构成熟度的评价。
+
+## Output Format
+
+请在 `docs/logs/{{YYYY-MM-DD}}_{{question_type}}_design_pattern_audit.md` 中输出，如果文档已存在，通过后缀版本号来区别文档，避免覆盖写入。
 
 ---
 **Constraints**:

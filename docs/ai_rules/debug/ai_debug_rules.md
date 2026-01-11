@@ -20,6 +20,11 @@
 
 请按以下步骤执行：
 
+## Phase 0: Summarize
+
+- 总结问题，给出更加清晰的问题表述 {{question}}。
+- 给出问题的类别 {{question_type}}。
+
 ## Phase 1: 业务逻辑映射与追踪
 
 - 根据提供的业务背景，在代码库中追踪完整的数据流向（Data Flow）。
@@ -37,11 +42,14 @@
 
 ## Phase 4: 生成审计日志
 
-- 在 `docs/logs/` 下创建一个名为 `{{YYYY-MM-DD}}_issue_trace_report.md` 的文件。
+- 在 `docs/logs/` 下创建一个名为 `{{YYYY-MM-DD}}_{{question_type}}_issue_trace_report.md` 的文件。
 - 如果目录不存在，请先创建目录。
+- 如果文档已存在，通过后缀版本号来区别文档，避免覆盖写入。
 - 将 Phase 2 和 Phase 3 的分析结果写入该文件。
 
 ## Output Format (For the Log File)
+
+请在 `docs/logs/{{YYYY-MM-DD}}_{{question_type}}_issue_trace_report.md` 中输出，如果文档已存在，通过后缀版本号来区别文档，避免覆盖写入。
 
 日志文件内容需包含以下 Markdown 结构：
 

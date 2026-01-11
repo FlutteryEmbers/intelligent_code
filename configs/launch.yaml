@@ -46,7 +46,12 @@ question_answer:
     enable_counterexample: true
     enable_arch_constraints: true
   retrieval:
-    mode: "symbol_only"  # hybrid | vector_only | symbol_only
+    # mode:
+    #   hybrid: vector search + symbol recall
+    #   vector_only: embeddings only
+    #   symbol_only: direct symbol match / no embeddings
+    # DEPRECATED (unused): retrieval.mode is not consumed by code
+    # mode: "symbol_only"  # hybrid | vector_only | symbol_only
     min_score: 0.2
     fallback_top_k: 6
     call_chain:
@@ -54,16 +59,31 @@ question_answer:
       max_depth: 1
       max_expansion: 20
   coverage:
+    # mode:
+    #   upstream: enforce targets at question generation
+    #   downstream: enforce targets at sampling stage
+    #   hybrid: both (light at generation + sampling)
     mode: "hybrid"                 # upstream | downstream | hybrid
+    # constraint_strength:
+    #   strong: force constraints in prompts
+    #   weak: allow softer constraints
+    #   hybrid: strong for mid/hard buckets, weak for high
     constraint_strength: "strong"  # strong | weak | hybrid
     min_sample_size: 1
     negative_ratio: 0.1
     negative_types: ["insufficient_evidence", "wrong_premise", "conflict_spec"]
     evidence_refs:
+      # mode:
+      #   off: do not adjust buckets by evidence count
+      #   assist: only upgrade difficulty when evidence count is high
+      #   strict: set difficulty purely by evidence count thresholds
       mode: "assist"     # off | assist | strict
       mid_min: 2
       hard_min: 3
     diversity:
+      # mode:
+      #   off: no quota sampling for question_type
+      #   quota: sample by configured question_type_targets
       mode: "quota"      # off | quota
       question_type_targets:
         how_to: 0.2
@@ -81,6 +101,9 @@ question_answer:
         enabled: true
         max_delta: 0.1
     scenario_injection:
+      # mode:
+      #   off: no fuzzy scenario injection
+      #   ratio: inject fuzzy scenarios by fuzzy_ratio
       mode: "ratio"      # off | ratio
       fuzzy_ratio: 0.2
       templates_path: "configs/prompts/qa_rule/scenario_rules.yaml"
@@ -106,7 +129,7 @@ design_questions:
   profiles_top_k: 20
   profiles_max_chars: 6000
   require_layer_coverage: false
-  max_questions: 5
+  max_questions: 300
   max_samples: 1000
   batching:
     enabled: true
@@ -123,23 +146,42 @@ design_questions:
     enable_counterexample: true
     enable_arch_constraints: true
   retrieval:
-    mode: "hybrid"       # hybrid | symbol_only
+    # mode:
+    #   hybrid: vector search + symbol recall
+    #   symbol_only: direct symbol match / no embeddings
+    # DEPRECATED (unused): retrieval.mode is not consumed by code
+    # mode: "hybrid"       # hybrid | symbol_only
     fallback_top_k: 8
     call_chain:
       enabled: true
       max_depth: 1
       max_expansion: 20
   coverage:
+    # mode:
+    #   upstream: enforce targets at question generation
+    #   downstream: enforce targets at sampling stage
+    #   hybrid: both (light at generation + sampling)
     mode: "hybrid"
+    # constraint_strength:
+    #   strong: force constraints in prompts
+    #   weak: allow softer constraints
+    #   hybrid: strong for mid/hard buckets, weak for high
     constraint_strength: "strong"
     min_sample_size: 1
     negative_ratio: 0.05
     negative_types: ["conflict_spec", "ambiguous_question"]
     evidence_refs:
+      # mode:
+      #   off: do not adjust buckets by evidence count
+      #   assist: only upgrade difficulty when evidence count is high
+      #   strict: set difficulty purely by evidence count thresholds
       mode: "assist"
       mid_min: 2
       hard_min: 3
     diversity:
+      # mode:
+      #   off: no quota sampling for question_type
+      #   quota: sample by configured question_type_targets
       mode: "quota"
       question_type_targets:
         architecture: 0.25
@@ -153,6 +195,9 @@ design_questions:
         enabled: true
         max_delta: 0.1
     scenario_injection:
+      # mode:
+      #   off: no fuzzy scenario injection
+      #   ratio: inject fuzzy scenarios by fuzzy_ratio
       mode: "ratio"
       fuzzy_ratio: 0.15
       templates_path: "configs/prompts/arch_design/scenario_rules.yaml"
@@ -179,13 +224,22 @@ artifacts:
   question_type_report_json: "data/reports/question_type_report.json"
 
 quality:
+  # gate_mode:
+  #   gate: fail-fast if clean is missing or invalid
+  #   report: allow raw fallback (controlled by allow_fallback_in_report)
   gate_mode: "gate"
   write_clean: true
   allow_fallback_in_report: true
   allow_negative_without_evidence: false
   fail_on_warnings: false
   trace_rules:
+    # mode:
+    #   warning: keep sample with trace warnings
+    #   reject: drop sample on trace warnings
     mode: "warning"               # warning | reject
+    # scope:
+    #   all: apply to QA and Design
+    #   arch_design: only apply to design samples
     scope: "all"                  # all | arch_design
     require_evidence_refs: false  # false=所有样本校验
     require_trace_structure: true
@@ -219,6 +273,10 @@ split:
   group_by: "package"
 
 safety:
+  # mode:
+  #   drop: remove samples with secrets/blacklist hits
+  #   sanitize: redact secrets/blacklist hits
+  #   keep: keep samples but log findings
   mode: "keep"            # drop | keep | sanitize
   blacklist_keywords:
     - "作为人工智能"

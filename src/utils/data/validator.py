@@ -103,6 +103,7 @@ def validate_sample_obj(
     quality_cfg = config.get("quality", {})
     design_cfg = config.get("design_questions", {})
     trace_cfg = quality_cfg.get("trace_rules", {}) if isinstance(quality_cfg, dict) else {}
+    gate_mode = quality_cfg.get("gate_mode", "report")
 
     errors: list[dict[str, str]] = []
     warnings: list[dict[str, str]] = []
@@ -119,6 +120,11 @@ def validate_sample_obj(
     trace = sample.thought
     if trace:
         evidence_refs = trace.evidence_refs or []
+    evidence_autofill = (
+        bool(sample.quality.get("evidence_autofill"))
+        if isinstance(sample.quality, dict)
+        else False
+    )
 
     if not evidence_refs:
         allow_negative_no_evidence = bool(quality_cfg.get("allow_negative_without_evidence", False))
@@ -203,6 +209,15 @@ def validate_sample_obj(
                         )
                     )
                     _set_check(checks, "commit", "warn")
+
+    if gate_mode == "gate" and evidence_autofill:
+        errors.append(
+            _quality_issue(
+                "EVIDENCE_AUTOFILL",
+                "Auto-filled evidence is not allowed in gate mode",
+            )
+        )
+        _set_check(checks, "evidence", "fail")
 
     instruction_len = len(sample.instruction or "")
     answer_len = len(sample.answer or "")
@@ -505,6 +520,8 @@ def validate_dataset(
             coverage = sample.quality.get("coverage")
             if isinstance(coverage, dict):
                 quality["coverage"] = coverage
+            if sample.quality.get("evidence_autofill"):
+                quality["evidence_autofill"] = True
 
         # Track warnings regardless of pass/fail
         for warning in quality["warnings"]:

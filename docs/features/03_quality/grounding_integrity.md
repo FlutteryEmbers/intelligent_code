@@ -66,3 +66,4 @@ flowchart TD
 
 - 证据一致性失败会直接判为不合格样本。
 - 调用链扩展是弱规则，适合 demo，但不会强行改变原有证据结构。
+- report 模式下可能出现 `quality.evidence_autofill=true` 的样本；gate 模式会拒绝此类样本。

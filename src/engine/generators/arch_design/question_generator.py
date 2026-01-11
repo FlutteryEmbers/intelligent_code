@@ -39,6 +39,7 @@ class DesignQuestionGenerator(BaseGenerator):
         self.top_k_symbols = self.config.get('generation.retrieval_top_k', 6)
         self.coverage_cfg = parse_coverage_config(self.config, 'design_questions')
         self.coverage_rng = create_seeded_rng(self.config)
+        self.gate_mode = self.config.get('quality.gate_mode', 'report')
         
         # 3. 输出路径
         self.output_jsonl = Path(self.config.get(
@@ -149,9 +150,11 @@ class DesignQuestionGenerator(BaseGenerator):
 
                 q['id'] = f"DQ-AUTO-{int(time.time())}-{len(all_normalized_questions)+1}"
                 q.setdefault('question_type', question_type)
-                # 如果 LLM 没有产出证据，则赋予刚才上下文中的一个
+                # 如果 LLM 没有产出证据，则仅在非 gate 模式补齐
                 if not q.get('evidence_refs'):
-                    q['evidence_refs'] = [evidence_pool[0]]
+                    if self.gate_mode != "gate":
+                        q['evidence_refs'] = [evidence_pool[0]]
+                        q['evidence_autofill'] = True
                 
                 all_normalized_questions.append(q)
                 append_jsonl(self.output_jsonl, q)

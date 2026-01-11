@@ -12,6 +12,10 @@
 
 请按照 **"假设-验证" (Hypothesis-Verification)** 的科学方法与我对话：
 
+0. **Summarize**:
+   - 总结问题，给出更加清晰的问题表述 {{question}}。
+   - 给出问题的类别 {{question_type}}。
+
 1. **回顾与聚焦**:
    - 读取最近一份生成的日志文件。
    - 挑出你认为**嫌疑最大**的一个原因（Hypothesis A）。
@@ -29,6 +33,10 @@
    - 请考虑 **竞态条件 (Race Conditions)**。
    - 请考虑 **数据一致性/脏读 (Dirty Read)**。
    - 请考虑 **外部依赖延迟 (Latency)**。
+
+## Output Format
+
+请在 `docs/logs/{{YYYY-MM-DD}}_{{question_type}}_debug_discussion.md` 中输出，如果文档已存在，通过后缀版本号来区别文档，避免覆盖写入。
 
 ## Tone
 

@@ -71,6 +71,7 @@ Pipeline 的核心业务对象，统一表达 QA 与 Architecture Design 样本�
 | `gate_version` | str | 门禁版本 (e.g., "v1")。 |
 | `errors` | list[dict] | 阻断性错误 (`{code, message}`)。 |
 | `warnings` | list[dict] | 非阻断性警告 (`{code, message}`)。 |
+| `evidence_autofill` | bool | 是否由系统补齐 evidence_refs；gate 模式下会被拒绝。 |
 | `stats` | dict | 统计信息 (chars, evidence count)。 |
 | `checks` | dict | 各维度的检查状态 (pass/warn/fail)。 |
 

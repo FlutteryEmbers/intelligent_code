@@ -50,4 +50,4 @@ flowchart TD
 ## 💡 开发者笔记
 
 - gate 模式适合严格数据产出；report 模式适合 demo 与调试。
-- QA 与 Design 各自独立走门禁逻辑。
+- QA 与 Design 均采用 fail-fast 行为（clean 缺失直接报错）。

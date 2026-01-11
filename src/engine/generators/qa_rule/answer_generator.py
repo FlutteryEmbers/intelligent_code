@@ -41,6 +41,7 @@ class AnswerGenerator(BaseGenerator):
         self.coverage_cfg = parse_coverage_config(self.config, 'question_answer')
         self.constraints_cfg = parse_constraints_config(self.config, 'question_answer')
         self.negative_rng = create_seeded_rng(self.config)
+        self.gate_mode = self.config.get('quality.gate_mode', 'report')
         
         # 3. 输出路径解析
         self.output_paths = parse_output_paths(
@@ -222,12 +223,15 @@ class AnswerGenerator(BaseGenerator):
         raw_refs = thought_data.get("evidence_refs", [])
         logger.debug("Raw LLM evidence_refs: %s", raw_refs)
         
+        self._last_evidence_autofill = False
         evidence_refs = self._correct_evidence_refs(raw_refs, relevant_symbols)
         logger.debug("Corrected evidence_refs: %s", evidence_refs)
         
         thought_data["evidence_refs"] = evidence_refs
         
         quality = self._build_quality_metadata(negative_type, question.question_type)
+        if self._last_evidence_autofill:
+            quality["evidence_autofill"] = True
         
         return TrainingSample(
             scenario="qa_rule",
@@ -358,12 +362,15 @@ class AnswerGenerator(BaseGenerator):
         # If we ended up with no valid refs, but we only had 1 candidate symbol in context,
         # it is logically safe to assume that single symbol was the evidence used.
         if not corrected and len(symbols) == 1:
+            if self.gate_mode == "gate":
+                return corrected
             s = symbols[0]
             logger.debug(
                 "No valid refs found from LLM (Raw: %s), but only 1 available symbol (%s). Auto-filling.",
                 raw_refs,
                 s.symbol_id,
             )
+            self._last_evidence_autofill = True
             return [EvidenceRef(
                 symbol_id=normalize_path_separators(s.symbol_id),
                 file_path=normalize_path_separators(s.file_path),

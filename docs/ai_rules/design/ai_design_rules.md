@@ -6,6 +6,13 @@
 
 为 [此处填写具体 Feature 或重构目标] 编写一份设计文档。该文档需存放于 `docs/patchs/` 下。
 
+## Workflow
+
+1. **Summarize**: 总结问题，给出更加清晰的问题表述 {{question}}，给出问题的类别 {{question_type}}。
+2. **Audit**: 快速盘点现有逻辑、配置与依赖边界。
+3. **Design**: 给出目标架构与迁移映射。
+4. **Report**: 输出设计文档。
+
 ## Constraints
 
 1. 增量优先：严禁推倒重来。方案必须支持新旧逻辑并存。
@@ -20,3 +27,7 @@
 3. 迁移映射 (Migration Mapping): 旧 Key -> 新 Key, 旧接口 -> 新接口。
 4. 阶段性路径 (Phases): 分步实施步骤（影子配置 -> 逻辑重定向 -> 旧逻辑弃用）。
 5. 决策平衡 (Trade-offs): 方案对比表格。
+
+## Output Format
+
+请在 `docs/logs/{{YYYY-MM-DD}}_{{question_type}}_design_plan.md` 中输出，如果文档已存在，通过后缀版本号来区别文档，避免覆盖写入。

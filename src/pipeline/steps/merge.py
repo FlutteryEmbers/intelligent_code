@@ -98,8 +98,8 @@ class MergeStep(BaseStep):
             self.logger.info("Using design clean samples: %s", design_clean_path.name)
         elif Path(design_path).exists():
             if write_clean and gate_mode == "gate":
-                self.logger.warning(
-                    f"Design clean file not found in gate mode: {design_clean_path}. Proceeding with 0 design samples."
+                raise FileNotFoundError(
+                    f"Design clean file not found in gate mode: {design_clean_path}"
                 )
             if gate_mode == "report" and not allow_fallback and write_clean:
                 raise FileNotFoundError(

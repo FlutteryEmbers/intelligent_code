@@ -116,6 +116,7 @@ class QuestionGenerator(BaseGenerator):
         self.questions_per_method = self.config.get('question_answer.questions_per_method', 5)
         self.max_questions = self.config.get('question_answer.max_questions', None)
         self.batch_size = self.config.get('question_answer.batch_size', None)
+        self.gate_mode = self.config.get('quality.gate_mode', 'report')
         
         # 2. 覆盖率与采样配置
         self.coverage_cfg = parse_coverage_config(self.config, 'question_answer')
@@ -254,7 +255,12 @@ class QuestionGenerator(BaseGenerator):
         for q_data in questions_data:
             # 补齐关键字段
             q_data.setdefault('question_type', question_type)
-            q_data['evidence_refs'] = [default_ref] # 强制覆盖，确保引用有效
+            if not q_data.get('evidence_refs'):
+                if self.gate_mode != "gate":
+                    q_data['evidence_refs'] = [default_ref]
+                    q_data['evidence_autofill'] = True
+                else:
+                    q_data.setdefault('evidence_refs', [])
             q_data.setdefault('repo_commit', profile.repo_commit)
             
             try:

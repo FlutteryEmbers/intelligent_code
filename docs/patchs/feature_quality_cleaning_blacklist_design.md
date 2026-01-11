@@ -1,6 +1,6 @@
 # 质量清洗增强（关键词黑名单过滤）设计文档
 
-遵循 `docs/ai_rules/ai_design_rules.md`：增量优先、配置复用、决策透明、仅做设计。
+遵循 `docs/ai_rules/design/ai_design_rules.md`：增量优先、配置复用、决策透明、仅做设计。
 
 ---
 

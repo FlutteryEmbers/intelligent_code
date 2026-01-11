@@ -27,6 +27,7 @@
 | `question_type` | 问题分类标签 (e.g., `usage`, `logic`)。 |
 | `difficulty` | 难度 (`easy`, `medium`, `hard`)。 |
 | `evidence_refs` | 与问题生成直接相关的证据。 |
+| `evidence_autofill` | 是否由系统自动补齐 evidence_refs（report 模式可出现）。 |
 
 ## dict `DesignQuestion`
 > 定义位置: `src/engine/generators/arch_design/question_generator.py` (非 Pydantic Model)
@@ -41,4 +42,5 @@
 | `acceptance_criteria` | 验收标准。 |
 | `non_goals` | 非目标列表。 |
 | `evidence_refs` | 相关的代码证据列表。 |
+| `evidence_autofill` | 是否由系统自动补齐 evidence_refs（report 模式可出现）。 |
 | `question_type` | 默认 `architecture`。 |

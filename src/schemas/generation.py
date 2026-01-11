@@ -30,6 +30,7 @@ class QuestionSample(BaseModel):
     question_type: str = Field(..., description="问题类型")
     difficulty: Literal["easy", "medium", "hard"] = Field(..., description="难度级别")
     evidence_refs: list[EvidenceRef] = Field(default_factory=list, description="证据引用")
+    evidence_autofill: bool = Field(default=False, description="是否自动补齐证据")
     repo_commit: str = Field(..., description="仓库 commit hash")
     created_at: str = Field(default_factory=now_iso, description="创建时间")
     question_id: str = Field(default="", description="问题唯一标识")
