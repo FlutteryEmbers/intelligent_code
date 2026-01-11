@@ -141,13 +141,13 @@ roles:
 1. DesignQuestionGenerator
    ├── 输入: symbols.jsonl（method_profiles 仅用于 embeddings 构建）
    └── 输出: design_questions_auto.jsonl
-   └── 数量限制: max_questions (默认 10)
+   └── 数量限制: min(max_questions, max_samples) (默认 10)
 
 2. DesignGenerator
    ├── 输入: 10 个设计问题
    ├── 每个问题生成 1 个设计样本
-   └── 内部上限: max_samples (默认 50)
-       └── 实际受限于设计问题数，通常是 10
+   └── 内部上限: min(max_questions, max_samples) (默认 10)
+       └── 实际受限于两者的最小值
 
 3. 输出: 10 个 Design 样本
    └── 质量门禁后: 10 - rejected = 最终 Design 数
@@ -156,19 +156,19 @@ roles:
 | 配置项 | 路径 | 默认值 | 作用 |
 |--------|------|--------|------|
 | `max_questions` | `design_questions.max_questions` | 10 | 设计问题总数上限 |
-| `max_samples` | `core.max_items` | 50 | Design 样本内部上限 |
+| `max_samples` | `design_questions.max_samples` | 50 | Design 样本内部上限 |
 | `use_method_profiles` | `design_questions.use_method_profiles` | true | 是否生成 profiles 供 embeddings 使用 |
 
 **公式**:
 
 ```
-最终 Design 数 = min(design_questions_count, max_samples) - rejected
-              = min(10, 50) - rejected
+最终 Design 数 = min(design_questions_count, max_questions, max_samples) - rejected
+              = min(10, 10, 50) - rejected
               = 10 - rejected
 ```
 
 **关键结论**:
 
 1. **QA 瓶颈在 `max_questions`**
-2. **Design 瓶颈在 `design_questions.max_questions`**
+2. **Design 瓶颈在 `min(design_questions.max_questions, design_questions.max_samples)`**
 3. **Rejected 样本不影响生成数量计算** (它们是生成后被过滤的)

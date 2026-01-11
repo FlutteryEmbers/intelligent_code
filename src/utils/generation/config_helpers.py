@@ -222,6 +222,37 @@ def get_with_fallback(config, primary_key: str, fallback_key: str, default: Any 
     return config.get(fallback_key, default)
 
 
+def resolve_design_limit(config, default: int = 50) -> int:
+    """Resolve design limits from config, using the smallest configured value."""
+    max_questions = config.get("design_questions.max_questions")
+    max_samples = get_with_fallback(config, "design_questions.max_samples", "core.max_items", None)
+
+    def _coerce_limit(value: Any) -> int | None:
+        if value is None:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    max_questions = _coerce_limit(max_questions)
+    max_samples = _coerce_limit(max_samples)
+
+    limits = [limit for limit in (max_questions, max_samples) if limit is not None]
+    if not limits:
+        return int(default)
+
+    effective = min(limits)
+    if max_questions is not None and max_samples is not None and max_questions != max_samples:
+        logger.warning(
+            "Design limits differ: max_questions=%s, max_samples=%s; using min=%s",
+            max_questions,
+            max_samples,
+            effective,
+        )
+    return effective
+
+
 def resolve_prompt_path(preferred: str | None, fallback: str) -> str:
     """解析 prompt 模板路径
     

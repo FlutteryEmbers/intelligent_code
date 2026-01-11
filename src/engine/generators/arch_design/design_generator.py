@@ -11,7 +11,7 @@ from src.utils.data.validator import normalize_path_separators
 from src.utils.data.sampling import sample_negative_type
 from src.utils.generation.config_helpers import (
     parse_coverage_config, parse_constraints_config,
-    parse_output_paths, create_seeded_rng, get_with_fallback,
+    parse_output_paths, create_seeded_rng, resolve_design_limit,
 )
 from src.utils.io.file_ops import (
     load_yaml_file, read_jsonl, append_jsonl, write_json
@@ -95,7 +95,7 @@ class DesignGenerator(BaseGenerator):
         self.retriever = Retriever(self.config, self.profile)
         
         # 2. 配置解析
-        self.max_samples = self.config.get('core.max_items', 50)
+        self.max_samples = resolve_design_limit(self.config, 50)
         self.coverage_cfg = parse_coverage_config(self.config, 'design_questions')
         self.constraints_cfg = parse_constraints_config(self.config, 'design_questions')
         self.negative_rng = create_seeded_rng(self.config)

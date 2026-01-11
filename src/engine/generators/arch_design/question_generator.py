@@ -12,7 +12,7 @@ from src.utils.data.sampling import (
 )
 from src.utils.io.file_ops import load_yaml_list, append_jsonl
 from src.utils.io.loaders import load_symbols_jsonl
-from src.utils.generation.config_helpers import parse_coverage_config, create_seeded_rng, get_with_fallback
+from src.utils.generation.config_helpers import parse_coverage_config, create_seeded_rng, resolve_design_limit
 from src.engine.core import BaseGenerator
 
 logger = get_logger(__name__)
@@ -35,7 +35,7 @@ class DesignQuestionGenerator(BaseGenerator):
         self.profile = self._get_language_profile()
         
         # 2. 采样与配置
-        self.max_questions = get_with_fallback(self.config, 'design_questions.max_questions', 'core.max_items', 50)
+        self.max_questions = resolve_design_limit(self.config, 50)
         self.top_k_symbols = self.config.get('generation.retrieval_top_k', 6)
         self.coverage_cfg = parse_coverage_config(self.config, 'design_questions')
         self.coverage_rng = create_seeded_rng(self.config)

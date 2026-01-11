@@ -18,7 +18,6 @@ core:
   seed: 42
   retrieval_top_k: 6
   max_context_chars: 14000
-  max_items: 1000
   architecture_constraints_path: "configs/prompts/common/arch_constraints.yaml"
 
 method_understanding:
@@ -108,6 +107,7 @@ design_questions:
   profiles_max_chars: 6000
   require_layer_coverage: false
   max_questions: 5
+  max_samples: 1000
   batching:
     enabled: true
     batch_size: 3
