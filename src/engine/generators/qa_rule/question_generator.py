@@ -23,6 +23,20 @@ def simple_hash(text: str) -> str:
     """简单哈希去重"""
     return hashlib.md5(text.lower().encode('utf-8')).hexdigest()[:16]
 
+def evidence_refs_missing_fields(raw_refs: Any) -> bool:
+    """Check whether evidence_refs is missing or has incomplete fields."""
+    if not isinstance(raw_refs, list) or not raw_refs:
+        return True
+    required = ("symbol_id", "file_path", "start_line", "end_line", "source_hash")
+    for ref in raw_refs:
+        if not isinstance(ref, dict):
+            return True
+        for key in required:
+            value = ref.get(key)
+            if value is None or value == "":
+                return True
+    return False
+
 def load_user_questions_config(
     config_path: str | Path | None = None,
     repo_commit: str = "UNKNOWN_COMMIT"
@@ -131,12 +145,17 @@ class QuestionGenerator(BaseGenerator):
             'artifacts.questions_jsonl',
             'data/intermediate/auto_questions/questions.jsonl'
         ))
+        self.warning_jsonl = Path(self.config.get(
+            'artifacts.question_warnings_jsonl',
+            'data/intermediate/warnings/question_generation_warnings.jsonl'
+        ))
         
         # 4. 统计初始化
         self.stats = {
             'total_profiles': 0,
             'total_questions': 0,
             'duplicates_removed': 0,
+            'invalid_samples': 0,
         }
 
     def generate_from_profiles(
@@ -158,6 +177,9 @@ class QuestionGenerator(BaseGenerator):
         self.output_jsonl.parent.mkdir(parents=True, exist_ok=True)
         if self.output_jsonl.exists():
             self.output_jsonl.unlink()
+        self.warning_jsonl.parent.mkdir(parents=True, exist_ok=True)
+        if self.warning_jsonl.exists():
+            self.warning_jsonl.unlink()
             
         profiles_to_process = profiles
         if self.max_questions:
@@ -255,22 +277,49 @@ class QuestionGenerator(BaseGenerator):
         for q_data in questions_data:
             # 补齐关键字段
             q_data.setdefault('question_type', question_type)
-            if not q_data.get('evidence_refs'):
-                if self.gate_mode != "gate":
-                    q_data['evidence_refs'] = [default_ref]
-                    q_data['evidence_autofill'] = True
-                else:
-                    q_data.setdefault('evidence_refs', [])
+            missing_fields = evidence_refs_missing_fields(q_data.get('evidence_refs'))
+            if missing_fields:
+                if self.gate_mode == "gate":
+                    self.stats['invalid_samples'] += 1
+                    append_jsonl(
+                        self.warning_jsonl,
+                        {
+                            "profile_id": profile.symbol_id,
+                            "file_path": profile.file_path,
+                            "question_type": q_data.get("question_type"),
+                            "error": "evidence_refs missing required fields",
+                            "raw": q_data,
+                        },
+                    )
+                    continue
+                q_data['evidence_refs'] = [default_ref]
+                q_data['evidence_autofill'] = True
             q_data.setdefault('repo_commit', profile.repo_commit)
             
             try:
                 questions.append(QuestionSample(**q_data))
             except Exception as e:
                 logger.warning(f"Invalid question sample produced by LLM: {e}")
+                self.stats['invalid_samples'] += 1
+                append_jsonl(
+                    self.warning_jsonl,
+                    {
+                        "profile_id": profile.symbol_id,
+                        "file_path": profile.file_path,
+                        "question_type": q_data.get("question_type"),
+                        "error": str(e),
+                        "raw": q_data,
+                    },
+                )
                 
         return questions
 
     def print_summary(self):
         logger.info("=" * 40)
-        logger.info(f"Question Generation Summary: {self.stats['total_questions']} Generated, {self.stats['duplicates_removed']} Duplicates Removed")
+        logger.info(
+            "Question Generation Summary: %s Generated, %s Duplicates Removed, %s Invalid",
+            self.stats['total_questions'],
+            self.stats['duplicates_removed'],
+            self.stats['invalid_samples'],
+        )
         logger.info("=" * 40)

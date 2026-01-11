@@ -14,6 +14,8 @@
 | `design_questions.max_questions` | 设计问题上限 | 控制设计样本规模 | 30 |
 | `quality.gate_mode` | 质量门禁 | gate / report | demo 可 report |
 | `question_answer.coverage.targets` | QA 难度分布 | 高/中/难比例 | 0.8/0.15/0.05 |
+| `artifacts.question_warnings_jsonl` | QA 问题告警样本 | 无效问题样本输出路径 | 默认即可 |
+| `artifacts.question_warnings_report_json` | QA 问题告警报告 | 无效问题统计报告路径 | 默认即可 |
 | `safety.mode` | 敏感信息处理 | drop / sanitize / keep | demo 可 keep |
 | `dedup.semantic.enabled` | 语义去重开关 | 是否开启语义去重 | demo 可关闭 |
 

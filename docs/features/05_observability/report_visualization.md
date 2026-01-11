@@ -9,12 +9,15 @@
   - `tools/render_reports.py`
   - `tools/README.md`
   - `configs/launch.yaml`
+  - `configs/types/coverage_keys.yaml`
+  - `configs/types/report_visualization.yaml`
   - `data/reports/*`
 
 - **执行准则 (Business Rules)**：
   - 读取质量、分布、检索、去重等报表并生成图表。
   - 当报表与实际 clean 数据不一致时直接报错。
   - 默认输出目录为 `tools/results/`（按类别分组，可通过 CLI 覆盖）。
+  - 覆盖 key 顺序与展示文案由类型配置文件提供（可通过 CLI 覆盖路径）。
 
 - **参考证据**：
   - `coverage_report.json`、`question_type_report.json`、`qa_quality.json`、`design_quality.json` 等。
@@ -27,6 +30,9 @@
 | `artifacts.coverage_report_json` | 分布报表路径 | 覆盖分布图来源 | 默认即可 |
 | `artifacts.question_type_report_json` | 类型报表路径 | 类型分布图来源 | 默认即可 |
 | CLI: `--output-dir` | 图表输出目录 | 自定义图表输出 | tools/results |
+| CLI: `--chart-style` | 图表样式 | 选择饼图或柱状图 | pie |
+| CLI: `--coverage-keys` | 覆盖 keys 配置 | 覆盖分布的 key 顺序 | configs/types/coverage_keys.yaml |
+| CLI: `--viz-config` | 可视化映射 | label/retrieval 映射 | configs/types/report_visualization.yaml |
 
 ## 🛠️ 它是如何工作的（逻辑流向）
 

@@ -1,0 +1,10 @@
+qa:
+  bucket: [high, mid, hard]
+  intent: [how_to, config, flow, auth, error, deploy, impact, perf, consistency, compatibility, edge]
+  module_span: [single, multi]
+  polarity: [positive, negative]
+design:
+  bucket: [high, mid, hard]
+  intent: [architecture, integration, consistency, error_handling, performance, security, maintenance]
+  module_span: [single, multi]
+  polarity: [positive, negative]

@@ -26,6 +26,13 @@ Validator 运行后的总体验收报告。
 *   记录问题类型的分布。
 *   包含 `regression.warnings`，当分布严重偏离目标时发出警告。
 
+## QuestionGenerationWarnings
+> 文件: `data/reports/question_generation_warnings.json`
+
+由 `QuestionAnswerStep` 生成。
+*   统计 QuestionGenerator 中因样本校验失败而被丢弃的数量。
+*   `warnings_path` 指向 `data/intermediate/warnings/question_generation_warnings.jsonl`。
+
 ## ParsingReport
 > 文件: `data/reports/parsing_report.json`
 

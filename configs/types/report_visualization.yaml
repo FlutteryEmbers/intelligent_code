@@ -1,0 +1,49 @@
+label_map:
+  bucket:
+    high: "高频"
+    mid: "中等"
+    hard: "困难"
+    unknown: "未知"
+  intent:
+    how_to: "操作"
+    config: "配置"
+    flow: "流程"
+    auth: "鉴权"
+    error: "异常"
+    deploy: "部署"
+    impact: "变更影响"
+    perf: "性能"
+    consistency: "一致性"
+    compatibility: "兼容"
+    edge: "边界"
+    unknown: "未知"
+    architecture: "架构"
+    integration: "集成"
+    error_handling: "错误处理"
+    performance: "性能"
+    security: "安全"
+    maintenance: "维护"
+  module_span:
+    single: "单模块"
+    multi: "多模块"
+    unknown: "未知"
+  polarity:
+    positive: "正向"
+    negative: "负向"
+retrieval_keys:
+  qa: [symbol_evidence_used, vector_used, vector_filtered, vector_fallback_used, vector_empty, symbol_only_failures, call_chain_expanded]
+  design: [scored_non_empty, fallback_used, candidates_empty, call_chain_expanded]
+retrieval_labels:
+  qa:
+    symbol_evidence_used: "证据命中"
+    vector_used: "向量检索"
+    vector_filtered: "阈值过滤"
+    vector_fallback_used: "回退使用"
+    vector_empty: "向量空召回"
+    symbol_only_failures: "仅证据失败"
+    call_chain_expanded: "调用链扩展"
+  design:
+    scored_non_empty: "关键词命中"
+    fallback_used: "候选回退"
+    candidates_empty: "候选为空"
+    call_chain_expanded: "调用链扩展"

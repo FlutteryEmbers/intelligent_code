@@ -5,6 +5,7 @@ from pathlib import Path
 
 from src.engine.generators.qa_rule import QuestionGenerator, AnswerGenerator, load_user_questions_config
 from src.utils.data.validator import load_symbols_map
+from src.utils.io.file_ops import write_json
 from src.utils.retrieval import vector_index
 from src.pipeline.base_step import BaseStep
 
@@ -117,11 +118,33 @@ class QuestionAnswerStep(BaseStep):
                     symbols_map=symbols_map,
                     repo_commit=self.repo_commit
                 )
+                warnings_report_path = Path(
+                    artifacts.get(
+                        "question_warnings_report_json",
+                        "data/reports/question_generation_warnings.json",
+                    )
+                )
+                warnings_report_path.parent.mkdir(parents=True, exist_ok=True)
+                write_json(
+                    warnings_report_path,
+                    {
+                        "total_profiles": question_gen.stats['total_profiles'],
+                        "generated_questions": len(questions),
+                        "invalid_samples": question_gen.stats['invalid_samples'],
+                        "warnings_path": str(question_gen.warning_jsonl),
+                    },
+                )
                 potential = question_gen.stats['total_profiles'] * questions_per_method
                 self.logger.info(
                     f"Generated {len(questions)}/{max_questions or potential} questions "
                     f"(potential: {potential} from {question_gen.stats['total_profiles']} profiles)"
                 )
+                if question_gen.stats['invalid_samples']:
+                    self.logger.warning(
+                        "Question warnings: %s invalid samples -> %s",
+                        question_gen.stats['invalid_samples'],
+                        question_gen.warning_jsonl,
+                    )
             else:
                 if self.build_embeddings_in_user_mode:
                     if not method_profiles_jsonl.exists():
@@ -195,7 +218,8 @@ class QuestionAnswerStep(BaseStep):
                 "status": "success",
                 "method_profiles": 0,
                 "questions": len(questions),
-                "qa_samples": len(qa_samples)
+                "qa_samples": len(qa_samples),
+                "question_warnings": question_gen.stats['invalid_samples'] if self.auto_enabled else 0,
             }
         else:
             # No QA needed in this step

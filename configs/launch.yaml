@@ -220,6 +220,8 @@ artifacts:
   design_questions_snapshot_jsonl: "data/intermediate/auto_questions/design_questions.jsonl"
   design_rejected_jsonl: "data/intermediate/rejected/design_rejected.jsonl"
   design_clean_jsonl: "data/intermediate/clean/design_clean.jsonl"
+  question_warnings_jsonl: "data/intermediate/warnings/question_generation_warnings.jsonl"
+  question_warnings_report_json: "data/reports/question_generation_warnings.json"
   coverage_report_json: "data/reports/coverage_report.json"
   question_type_report_json: "data/reports/question_type_report.json"
 

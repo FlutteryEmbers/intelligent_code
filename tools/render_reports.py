@@ -39,6 +39,8 @@ def _configure_fonts() -> bool:
 
 
 USE_CHINESE = _configure_fonts()
+CHART_STYLE = "pie"
+SMALL_SLICE_THRESHOLD = 0.03
 
 
 def _label(chinese: str, english: str) -> str:
@@ -52,10 +54,11 @@ def _read_json(path: Path) -> dict | None:
         return json.load(fh)
 
 
-def _read_jsonl(path: Path) -> list[dict]:
+def _read_jsonl(path: Path) -> tuple[list[dict], int]:
     if not path.exists():
-        return []
+        return [], 0
     items = []
+    invalid_lines = 0
     with path.open("r", encoding="utf-8") as fh:
         for line in fh:
             line = line.strip()
@@ -64,8 +67,9 @@ def _read_jsonl(path: Path) -> list[dict]:
             try:
                 items.append(json.loads(line))
             except json.JSONDecodeError:
+                invalid_lines += 1
                 continue
-    return items
+    return items, invalid_lines
 
 
 def _plot_pie(title: str, labels: list[str], values: list[float], out_path: Path) -> None:
@@ -103,9 +107,11 @@ def _plot_pie(title: str, labels: list[str], values: list[float], out_path: Path
     fig, ax = plt.subplots(figsize=(12, 7))
     
     # Define autopct to hide label for small/zero items
+    threshold = SMALL_SLICE_THRESHOLD * 100
+
     def custom_autopct(pct):
-        # Hide percentage on the chart if it's less than 3% to avoid clutter
-        return f'{pct:.1f}%' if pct > 3 else ''
+        # Hide percentage on the chart if it's less than threshold to avoid clutter
+        return f"{pct:.1f}%" if pct > threshold else ""
 
     wedges, texts, autotexts = ax.pie(
         plot_values, 
@@ -147,14 +153,38 @@ def _plot_pie(title: str, labels: list[str], values: list[float], out_path: Path
     plt.close(fig)
 
 
+def _plot_bar_impl(title: str, labels: list[str], values: list[float], out_path: Path, y_label: str = "") -> None:
+    if not labels or not values:
+        return
+    fig, ax = plt.subplots(figsize=(12, 7))
+    x = list(range(len(labels)))
+    ax.bar(x, values, color="#4c78a8")
+    ax.set_title(title, pad=20)
+    if y_label:
+        ax.set_ylabel(y_label)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=30, ha="right")
+    fig.tight_layout()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, dpi=160)
+    plt.close(fig)
+
+
+def _plot_by_style(
+    style: str, title: str, labels: list[str], values: list[float], out_path: Path, y_label: str = ""
+) -> None:
+    if style == "pie":
+        _plot_pie(title, labels, values, out_path)
+    else:
+        _plot_bar_impl(title, labels, values, out_path, y_label)
+
+
 def _plot_bar(title: str, labels: list[str], values: list[float], out_path: Path, y_label: str = "") -> None:
-    # User requested Pie chart instead of Bar chart
-    _plot_pie(title, labels, values, out_path)
+    _plot_by_style(CHART_STYLE, title, labels, values, out_path, y_label)
 
 
 def _plot_ratio_bar(title: str, labels: list[str], ratios: list[float], out_path: Path) -> None:
-    # User requested Pie chart instead of Bar chart
-    _plot_pie(title, labels, ratios, out_path)
+    _plot_by_style(CHART_STYLE, title, labels, ratios, out_path)
 
 def _plot_ratio_comparison(
     title: str,
@@ -238,34 +268,29 @@ def _merge_keys(primary: list[str], secondary: list[str]) -> list[str]:
     return merged
 
 
-def _plot_coverage(scope: str, data: dict, output_dir: Path) -> None:
-    bucket_map = {
-        "high": _label("高频", "High"),
-        "mid": _label("中等", "Mid"),
-        "hard": _label("困难", "Hard"),
-    }
-    module_map = {
-        "single": _label("单模块", "Single"),
-        "multi": _label("多模块", "Multi"),
-    }
-    polarity_map = {
-        "positive": _label("正向", "Positive"),
-        "negative": _label("负向", "Negative"),
-    }
-    intent_map = {
-        "how_to": _label("操作", "How-to"),
-        "config": _label("配置", "Config"),
-        "flow": _label("流程", "Flow"),
-        "auth": _label("鉴权", "Auth"),
-        "error": _label("异常", "Error"),
-        "deploy": _label("部署", "Deploy"),
-        "impact": _label("变更影响", "Impact"),
-        "perf": _label("性能", "Performance"),
-        "consistency": _label("一致性", "Consistency"),
-        "compatibility": _label("兼容", "Compatibility"),
-        "edge": _label("边界", "Edge"),
-        "unknown": _label("未知", "Unknown"),
-    }
+def _merge_config_and_actual(config_keys: list[str], counts: dict, ratios: dict) -> list[str]:
+    keys = list(config_keys) if config_keys else []
+    for key in list(counts.keys()) + list(ratios.keys()):
+        if key not in keys:
+            keys.append(key)
+    return keys
+
+
+def _plot_coverage(
+    scope: str, data: dict, output_dir: Path, coverage_keys: dict, label_map: dict
+) -> None:
+    bucket_map = label_map.get("bucket", {})
+    if not isinstance(bucket_map, dict):
+        bucket_map = {}
+    module_map = label_map.get("module_span", {})
+    if not isinstance(module_map, dict):
+        module_map = {}
+    polarity_map = label_map.get("polarity", {})
+    if not isinstance(polarity_map, dict):
+        polarity_map = {}
+    intent_map = label_map.get("intent", {})
+    if not isinstance(intent_map, dict):
+        intent_map = {}
     for key, label in [
         ("bucket_distribution", "bucket"),
         ("intent_distribution", "intent"),
@@ -276,7 +301,8 @@ def _plot_coverage(scope: str, data: dict, output_dir: Path) -> None:
         counts = dist.get("counts", {})
         ratios = dist.get("ratios", {})
         if label == "bucket":
-            keys = ["high", "mid", "hard"]
+            config_keys = coverage_keys.get("bucket", [])
+            keys = _merge_config_and_actual(config_keys, counts, ratios)
             labels = _translate_labels(keys, bucket_map)
             ratio_labels = labels
             title = _label(
@@ -286,7 +312,8 @@ def _plot_coverage(scope: str, data: dict, output_dir: Path) -> None:
             count_values = _align_counts(counts, keys)
             ratio_values = _align_counts(ratios, keys)
         elif label == "intent":
-            keys = list(intent_map.keys())
+            config_keys = coverage_keys.get("intent", [])
+            keys = _merge_config_and_actual(config_keys, counts, ratios)
             labels = _translate_labels(keys, intent_map)
             ratio_labels = labels
             title = _label(
@@ -296,7 +323,8 @@ def _plot_coverage(scope: str, data: dict, output_dir: Path) -> None:
             count_values = _align_counts(counts, keys)
             ratio_values = _align_counts(ratios, keys)
         elif label == "module_span":
-            keys = ["single", "multi"]
+            config_keys = coverage_keys.get("module_span", [])
+            keys = _merge_config_and_actual(config_keys, counts, ratios)
             labels = _translate_labels(keys, module_map)
             ratio_labels = labels
             title = _label(
@@ -306,7 +334,8 @@ def _plot_coverage(scope: str, data: dict, output_dir: Path) -> None:
             count_values = _align_counts(counts, keys)
             ratio_values = _align_counts(ratios, keys)
         else:
-            keys = ["positive", "negative"]
+            config_keys = coverage_keys.get("polarity", [])
+            keys = _merge_config_and_actual(config_keys, counts, ratios)
             labels = _translate_labels(keys, polarity_map)
             ratio_labels = labels
             title = _label(
@@ -355,28 +384,34 @@ def _plot_parsing(report: dict, output_dir: Path) -> None:
         )
 
 
-def _plot_retrieval(report: dict, scope: str, output_dir: Path) -> None:
+def _build_retrieval_mapping(
+    scope: str, retrieval_keys: dict, retrieval_labels: dict, report: dict
+) -> list[tuple[str, str]]:
+    keys = retrieval_keys.get(scope, [])
+    if not keys:
+        keys = list(report.keys())
+    labels = retrieval_labels.get(scope, {})
+    mapping = []
+    for key in keys:
+        label = labels.get(key, key)
+        if isinstance(label, dict):
+            label = label.get("zh") if USE_CHINESE else label.get("en", key)
+        mapping.append((key, label))
+    return mapping
+
+
+def _plot_retrieval(
+    report: dict,
+    scope: str,
+    output_dir: Path,
+    retrieval_keys: dict,
+    retrieval_labels: dict,
+) -> None:
     if not report:
         return
     labels = []
     values = []
-    if scope == "qa":
-        mapping = [
-            ("symbol_evidence_used", _label("证据命中", "Symbol Evidence")),
-            ("vector_used", _label("向量检索", "Vector Search")),
-            ("vector_filtered", _label("阈值过滤", "Filtered by Score")),
-            ("vector_fallback_used", _label("回退使用", "Fallback Used")),
-            ("vector_empty", _label("向量空召回", "Vector Empty")),
-            ("symbol_only_failures", _label("仅证据失败", "Symbol-only Failures")),
-            ("call_chain_expanded", _label("调用链扩展", "Call-chain Expanded")),
-        ]
-    else:
-        mapping = [
-            ("scored_non_empty", _label("关键词命中", "Keyword Hit")),
-            ("fallback_used", _label("候选回退", "Fallback Used")),
-            ("candidates_empty", _label("候选为空", "No Candidates")),
-            ("call_chain_expanded", _label("调用链扩展", "Call-chain Expanded")),
-        ]
+    mapping = _build_retrieval_mapping(scope, retrieval_keys, retrieval_labels, report)
 
     for key, label in mapping:
         if key in report:
@@ -522,10 +557,39 @@ def main() -> int:
     parser.add_argument("--config", default="configs/launch.yaml", help="Path to launch.yaml")
     parser.add_argument("--reports-dir", default=None, help="Override reports directory")
     parser.add_argument("--output-dir", default="tools/results", help="Output directory for charts")
+    parser.add_argument("--chart-style", default="pie", choices=["bar", "pie"], help="Chart style")
+    parser.add_argument(
+        "--coverage-keys",
+        default="configs/types/coverage_keys.yaml",
+        help="Coverage key ordering config",
+    )
+    parser.add_argument(
+        "--viz-config",
+        default="configs/types/report_visualization.yaml",
+        help="Visualization label and mapping config",
+    )
+    parser.add_argument(
+        "--small-slice-threshold",
+        type=float,
+        default=0.03,
+        help="Hide pie labels below this ratio",
+    )
     args = parser.parse_args()
+
+    global CHART_STYLE
+    global SMALL_SLICE_THRESHOLD
+    CHART_STYLE = args.chart_style
+    SMALL_SLICE_THRESHOLD = args.small_slice_threshold
 
     config_path = _resolve_path(REPO_ROOT, args.config)
     cfg = _load_config(config_path)
+    coverage_cfg = _load_config(_resolve_path(REPO_ROOT, args.coverage_keys))
+    qa_coverage_keys = coverage_cfg.get("qa", {})
+    design_coverage_keys = coverage_cfg.get("design", {})
+    viz_cfg = _load_config(_resolve_path(REPO_ROOT, args.viz_config))
+    label_map = viz_cfg.get("label_map", {})
+    retrieval_keys = viz_cfg.get("retrieval_keys", {})
+    retrieval_labels = viz_cfg.get("retrieval_labels", {})
 
     reports_dir = args.reports_dir
     if not reports_dir:
@@ -555,13 +619,13 @@ def main() -> int:
         qa_data = coverage_report.get("qa", {})
         design_data = coverage_report.get("design", {})
         if qa_data:
-            _plot_coverage("qa", qa_data, coverage_dir)
+            _plot_coverage("qa", qa_data, coverage_dir, qa_coverage_keys, label_map)
         if design_data:
-            _plot_coverage("design", design_data, coverage_dir)
+            _plot_coverage("design", design_data, coverage_dir, design_coverage_keys, label_map)
 
         errors = []
         if qa_clean_path:
-            qa_samples = _read_jsonl(_resolve_path(REPO_ROOT, qa_clean_path))
+            qa_samples, qa_invalid = _read_jsonl(_resolve_path(REPO_ROOT, qa_clean_path))
             if qa_samples:
                 qa_actual = _compute_distribution(qa_samples)
                 for key in (
@@ -571,8 +635,10 @@ def main() -> int:
                     "polarity_distribution",
                 ):
                     errors.extend(_compare_counts("qa", qa_data, qa_actual, key))
+            if qa_invalid:
+                print(f"[WARN] {qa_invalid} invalid JSONL lines ignored: {qa_clean_path}")
         if design_clean_path:
-            design_samples = _read_jsonl(_resolve_path(REPO_ROOT, design_clean_path))
+            design_samples, design_invalid = _read_jsonl(_resolve_path(REPO_ROOT, design_clean_path))
             if design_samples:
                 design_actual = _compute_distribution(design_samples)
                 for key in (
@@ -582,6 +648,8 @@ def main() -> int:
                     "polarity_distribution",
                 ):
                     errors.extend(_compare_counts("design", design_data, design_actual, key))
+            if design_invalid:
+                print(f"[WARN] {design_invalid} invalid JSONL lines ignored: {design_clean_path}")
 
         if errors:
             for item in errors:
@@ -602,11 +670,11 @@ def main() -> int:
 
     qa_retrieval = _read_json(reports_path / "qa_retrieval_report.json")
     if qa_retrieval:
-        _plot_retrieval(qa_retrieval, "qa", retrieval_dir)
+        _plot_retrieval(qa_retrieval, "qa", retrieval_dir, retrieval_keys, retrieval_labels)
 
     design_retrieval = _read_json(reports_path / "design_retrieval_report.json")
     if design_retrieval:
-        _plot_retrieval(design_retrieval, "design", retrieval_dir)
+        _plot_retrieval(design_retrieval, "design", retrieval_dir, retrieval_keys, retrieval_labels)
 
     dedup_report = _read_json(reports_path / "dedup_mapping.json")
     if dedup_report:
@@ -616,6 +684,12 @@ def main() -> int:
     if question_type_report:
         _plot_question_type(question_type_report, coverage_dir)
 
+    print("[INFO] Render summary:")
+    print(f"[INFO] reports_dir={reports_dir}")
+    print(f"[INFO] output_dir={output_dir}")
+    print(f"[INFO] chart_style={args.chart_style}")
+    print(f"[INFO] coverage_keys={args.coverage_keys}")
+    print(f"[INFO] viz_config={args.viz_config}")
     print(f"Rendered reports to {output_dir}")
     return 0
 

@@ -65,6 +65,19 @@
 
 你必须输出一个 JSON 对象，包含 `questions` 数组（长度恰好为 {questions_per_method}）：
 
+**可复制的 evidence_refs 模板（务必包含 source_hash）**：
+```json
+[
+  {{
+    "symbol_id": "{symbol_id}",
+    "file_path": "{file_path}",
+    "start_line": {start_line},
+    "end_line": {end_line},
+    "source_hash": "{source_hash}"
+  }}
+]
+```
+
 ```json
 {{
   "questions": [
