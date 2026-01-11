@@ -74,7 +74,7 @@ flowchart TD
 
 5. **基于证据生成答案 (`Evidence-Based Answers`)**
     - **过程**：最后，系统将问题和检索到的源码上下文一起交给 LLM，并用一份极其严格的 Prompt “合同”来强迫它必须基于源码回答，且在结构化的 `thought`（思考过程）中引用具体的代码证据（`evidence_refs`）。
-    - **证据**：`configs/prompts/qa_rule/gen_a_user.txt` 配合 `configs/prompts/common/json_rules.txt` 强制要求输出格式。`answer_generator.py` 会对结果进行解析与二次校验。
+    - **证据**：`configs/prompts/qa_rule/gen_a_user.txt` 配合 `configs/prompts/common/json_rules.txt` 强制要求输出格式。`src/engine/generators/qa_rule/answer_generator.py` 会对结果进行解析与二次校验。
 
 6. **自动化质量门禁 (`Quality Gates`)**
     - **过程**：在流程的每一步，系统都会进行自动化校验。例如，答案是否引用了有效的证据、JSON 格式是否正确等。不符合质量要求的样本会被拒绝，并记录在案。
@@ -86,19 +86,19 @@ Design方案模拟一个架构师接到需求后，被要求基于现有代码�
 
 1. **混合式问题来源 (Top-Down & Bottom-Up)**
     - **过程**: 设计问题的来源是多样的。一方面，可以由用户在 `configs/user_inputs/design_questions.yaml` 中定义明确的、自上而下的设计任务（Top-Down）。另一方面，系统也能基于对现有代码的分析，自动生成与当前架构相关的设计问题（Bottom-Up）。
-    - **证据**: `src/engine/generators/arch_design/question_generator.py` 负责从代码符号（`CodeSymbol`）和可选的方法摘要（`MethodProfile`）中获取灵感。
+    - **证据**: `src/engine/generators/arch_design/question_generator.py` 负责从代码符号（`CodeSymbol`）中获取灵感。
 
 2. **广域RAG，检索架构上下文**
     - **过程**: 收到一个设计问题后，`design_generator` 会进行一个广域的RAG检索。它通过关键字匹配和架构分层规则（如Controller、Service），从整个代码库中筛选出一组最相关的代码片段，共同组成回答该设计问题所需的“架构上下文”。
     - **证据**: `src/engine/generators/arch_design/design_generator.py` 集成了 `Retriever`，通过对各分层组件的评分与调用链分析来确定证据集合。
 
 3. **基于约束与证据生成方案**
-    - **过程**: LLM会获取到设计问题、以及上一步检索到的架构上下文。它被要求扮演一个“架构师”，在遵循 `configs/user_inputs/architecture_constraints.yaml` 中定义的架构约束的前提下，给出一份包含“现状分析”、“方案概述”、“风险权衡”等多个部分的结构化设计文档。
+    - **过程**: LLM会获取到设计问题、以及上一步检索到的架构上下文。它被要求扮演一个“架构师”，在遵循 `configs/prompts/common/arch_constraints.yaml` 中定义的架构约束的前提下，给出一份包含“现状分析”、“方案概述”、“风险权衡”等多个部分的结构化设计文档。
     - **证据**: `configs/prompts/arch_design/gen_s_user.txt` 结合语言 Profile 中的 `arch_design_role` 指导 LLM 输出。
 
 4. **严格的方案合理性校验**
-    - **过程**: 系统会对LLM输出的方案进行严格的自动化校验。这不仅包括检查 `evidence_refs` 是否真实有效，还会检查方案 `answer` 的文本中是否包含了所有被要求的设计章节。
-    - **证据**: `src/engine/design_generator.py` 中的 `_validate_sample` 方法负责执行这些检查。
+    - **过程**: LLM 输出会先通过 schema 解析，再由独立的 Validation 步骤执行结构与证据的校验（例如 `evidence_refs` 的有效性与字段完整性）。
+    - **证据**: `src/pipeline/steps/validation.py` 与 `src/utils/data/validator.py` 提供统一的校验逻辑。
 
 ## 详细实现文档
 

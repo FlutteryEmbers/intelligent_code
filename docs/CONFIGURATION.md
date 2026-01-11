@@ -108,7 +108,7 @@ roles:
    └── 输出: method_profiles.jsonl
        └── 数量限制: max_methods (默认 25)
 
-2. AutoQuestionGenerator
+2. QuestionGenerator
    ├── 输入: method_profiles (最多 25 个)
    ├── 每个 profile 生成问题数: questions_per_method (默认 3)
    ├── 潜在问题数 = 25 × 3 = 75 个
@@ -139,7 +139,7 @@ roles:
 
 ```
 1. DesignQuestionGenerator
-   ├── 输入: symbols.jsonl + method_profiles.jsonl (可选)
+   ├── 输入: symbols.jsonl（method_profiles 仅用于 embeddings 构建）
    └── 输出: design_questions_auto.jsonl
    └── 数量限制: max_questions (默认 10)
 
@@ -157,7 +157,7 @@ roles:
 |--------|------|--------|------|
 | `max_questions` | `design_questions.max_questions` | 10 | 设计问题总数上限 |
 | `max_samples` | `core.max_items` | 50 | Design 样本内部上限 |
-| `use_method_profiles` | `design_questions.use_method_profiles` | true | 是否用 profiles 增强 |
+| `use_method_profiles` | `design_questions.use_method_profiles` | true | 是否生成 profiles 供 embeddings 使用 |
 
 **公式**:
 

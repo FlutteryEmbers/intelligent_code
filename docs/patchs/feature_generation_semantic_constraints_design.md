@@ -8,8 +8,8 @@
 
 ### 1.1 现有逻辑分布
 
-- **问题生成**：`src/engine/auto_question_generator.py` 使用 `configs/prompts/question_answer/auto_question_generation.txt`。
-- **设计问题生成**：`src/engine/auto_design_question_generator.py` 使用 `configs/prompts/design/auto_design_question_generation.txt`。
+- **问题生成**：`src/engine/generators/qa_rule/question_generator.py` 使用 `configs/prompts/qa_rule/gen_q_user.txt`。
+- **设计问题生成**：`src/engine/generators/arch_design/question_generator.py` 使用 `configs/prompts/arch_design/gen_q_user.txt`。
 - **覆盖分布提示**：prompt 已新增 `{coverage_bucket}` / `{coverage_intent}` 占位符，但缺少更细粒度的语义约束。
 
 ### 1.2 缺口与风险
@@ -136,13 +136,13 @@ Bucket/Intent 抽取 → Prompt 语义约束增强 → LLM 生成 → 现有解�
 ```yaml
 prompts:
   question_answer:
-    question_generation: "configs/prompts/question_answer/auto_question_generation.txt"
-    coverage_generation: "configs/prompts/question_answer/coverage_question_generation.txt"
+    question_generation: "configs/prompts/qa_rule/gen_q_user.txt"
+    coverage_generation: "configs/prompts/qa_rule/gen_q_user.txt"
     coverage:
       constraint_strength: "hybrid"  # strong | weak | hybrid
-  design_questions_generation: "configs/prompts/design/auto_design_question_generation.txt"
+  design_questions_generation: "configs/prompts/arch_design/gen_q_user.txt"
   design:
-    coverage_generation: "configs/prompts/design/coverage_design_question_generation.txt"
+    coverage_generation: "configs/prompts/arch_design/gen_q_user.txt"
   design_questions:
     coverage:
       constraint_strength: "hybrid"

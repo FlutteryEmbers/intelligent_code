@@ -30,6 +30,9 @@ class DesignGenerationStep(BaseStep):
     
     def execute(self) -> dict:
         """Execute design generation with optional auto design questions."""
+        config_instance = Config()
+        config_instance.reload(self.args.config)
+
         auto_enabled = not self.args.skip_question_answer
         use_auto_design_questions = auto_enabled and not self.args.skip_auto_design_questions
         design_questions_config = self.config.get("design_questions", {})
@@ -47,7 +50,7 @@ class DesignGenerationStep(BaseStep):
             self.logger.info("=" * 70)
             
             try:
-                question_gen = DesignQuestionGenerator(Config())
+                question_gen = DesignQuestionGenerator(config_instance)
                 design_question_dicts = question_gen.generate_from_repo(
                     symbols_path=self.paths["symbols_jsonl"],
                     repo_commit=self.repo_commit
@@ -77,7 +80,7 @@ class DesignGenerationStep(BaseStep):
         self.logger.info(" Step 3b: Generating Design Samples")
         self.logger.info("=" * 70)
         
-        design_gen = DesignGenerator(Config())
+        design_gen = DesignGenerator(config_instance)
         
         # Use auto-generated design questions or default
         if custom_design_questions:

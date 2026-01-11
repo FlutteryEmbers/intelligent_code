@@ -29,7 +29,7 @@
 | `evidence_refs` | 与问题生成直接相关的证据。 |
 
 ## dict `DesignQuestion`
-> 定义位置: `src/engine/auto_design_question_generator.py` (非 Pydantic Model)
+> 定义位置: `src/engine/generators/arch_design/question_generator.py` (非 Pydantic Model)
 
 用于架构设计生成模块的输入对象。
 

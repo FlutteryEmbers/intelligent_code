@@ -11,7 +11,7 @@
   - `src/pipeline/steps/question_type_report.py`
   - `src/pipeline/steps/merge.py`
   - `src/pipeline/steps/export.py`
-  - `data_validator/render_reports.py`
+  - `tools/render_reports.py`
   - `configs/launch.yaml`
 
 - **执行准则 (Business Rules)**：
@@ -64,4 +64,4 @@ flowchart TD
 ## 💡 开发者笔记
 
 - regression 当前是 warn-only，不会中断流水线。
-- `data_validator/render_reports.py` 可将报表转为图形，适合面向业务方展示。
+- `tools/render_reports.py` 可将报表转为图形，适合面向业务方展示。

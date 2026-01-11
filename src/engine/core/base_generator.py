@@ -61,6 +61,22 @@ class BaseGenerator:
         logger.warning(f"Template '{template_name}' not found in {base_dir}")
         return ""
 
+    def _resolve_template_name(self, template_path: Optional[str]) -> Optional[str]:
+        """
+        Resolve a configured template path to a template name within configs/prompts/{scenario}/.
+        """
+        if not template_path:
+            return None
+        if "/" not in template_path and "\\" not in template_path:
+            return template_path
+        name = Path(template_path).stem
+        base_dir = Path("configs/prompts") / self.scenario
+        for ext in (".txt", ".yaml"):
+            if (base_dir / f"{name}{ext}").exists():
+                return name
+        logger.warning("Template path not found under %s: %s", base_dir, template_path)
+        return None
+
     def _get_common_json_rules(self) -> str:
         """获取通用的 JSON 格式规则"""
         return self._load_template("json_rules", scenario="common")

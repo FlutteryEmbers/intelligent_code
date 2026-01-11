@@ -21,7 +21,7 @@
 
 - `docs/pipeline/05-validation-step.md`
 - `src/pipeline/steps/validation.py`
-- `src/utils/validator.py`
+- `src/utils/data/validator.py`
 - `src/pipeline/steps/merge.py`（Auto QA 输入选择逻辑）
 
 ### 主要问题
@@ -161,7 +161,7 @@
 
 - `src/pipeline/orchestrator.py`：新增 clean 工件路径映射，确保下游能发现 clean。
 - `configs/launch.yaml`：新增 `artifacts.qa_clean_jsonl`、`artifacts.design_clean_jsonl`；在 `quality` 中引入 gate 行为字段。
-- `src/utils/validator.py`：生成并写入 `quality`，产出 clean 与 rejected。
+- `src/utils/data/validator.py`：生成并写入 `quality`，产出 clean 与 rejected。
 - `src/pipeline/steps/validation.py`：写 clean/rejected/report 的路径统一走 artifacts。
 - `src/pipeline/steps/merge.py`：优先读 clean，并按 `quality.gate_mode` 控制 fallback。
 - `docs/pipeline/*` 与 `docs/guides/*`：工件路径与 gate 行为说明同步更新。
@@ -186,7 +186,7 @@
    - 在 Orchestrator 的 `self.paths` 增加 `clean/qa_clean_jsonl`、`clean/design_clean_jsonl`
    - 在 `configs/launch.yaml` 的 `artifacts` 增加 `qa_clean_jsonl`、`design_clean_jsonl`
 2) **扩展 validate_dataset 输出**
-   - 在 `src/utils/validator.py` 增加 `clean_path` 输出，并把 `quality` 写回样本（写入 clean）
+   - 在 `src/utils/data/validator.py` 增加 `clean_path` 输出，并把 `quality` 写回样本（写入 clean）
    - commit 不一致只写 warning（不作为 hard gate）
 3) **ValidationStep 覆盖 Auto QA**
    - 与 `MergeStep` 对齐：优先 `artifacts.auto_qa_raw_jsonl`，兼容 legacy `qa_raw.jsonl`

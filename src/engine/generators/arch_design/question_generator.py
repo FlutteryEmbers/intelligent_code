@@ -102,9 +102,15 @@ class DesignQuestionGenerator(BaseGenerator):
             constraint_strength, constraint_rules = build_constraint_rules(self.coverage_cfg.constraint_strength, coverage_bucket)
 
             # 4. 组装提示词
+            template_name = (
+                getattr(self.coverage_cfg, 'template_name', None)
+                or self._resolve_template_name(self.config.get("design_questions.prompts.coverage_generation"))
+                or self._resolve_template_name(self.config.get("design_questions.prompts.question_generation"))
+                or "gen_q_user"
+            )
             system_prompt = self._build_composed_system_prompt()
             user_prompt = self._build_composed_user_prompt(
-                "gen_q_user",
+                template_name,
                 max_design_questions=batch_size, 
                 min_evidence_refs=1,
                 context=context,

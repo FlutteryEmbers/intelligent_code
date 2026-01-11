@@ -158,15 +158,15 @@ class AnswerGenerator(BaseGenerator):
         # DEBUG: Log profile structure
         try:
             profile = self._get_language_profile()
-            logger.info(f"DEBUG: Profile type: {type(profile)}")
+            logger.debug("Profile type: %s", type(profile))
             if isinstance(profile, dict):
-                logger.info(f"DEBUG: Profile keys: {list(profile.keys())}")
+                logger.debug("Profile keys: %s", list(profile.keys()))
                 qa_section = profile.get('qa')
-                logger.info(f"DEBUG: 'qa' section type: {type(qa_section)}")
+                logger.debug("'qa' section type: %s", type(qa_section))
                 ag_section = profile.get('answer_generation')
-                logger.info(f"DEBUG: 'answer_generation' section type: {type(ag_section)}")
+                logger.debug("'answer_generation' section type: %s", type(ag_section))
         except Exception as e:
-            logger.error(f"DEBUG: Failed to inspect profile: {e}")
+            logger.error("Failed to inspect profile: %s", e)
         
         context_parts = []
         available_evidence = []
@@ -204,7 +204,7 @@ class AnswerGenerator(BaseGenerator):
         if negative_type:
             user_prompt = self._inject_negative_rules(user_prompt, negative_type)
             
-        logger.info(f"DEBUG: Generated {len(available_evidence)} available evidence items for prompt.")
+        logger.debug("Generated %s available evidence items for prompt.", len(available_evidence))
         # logger.info(f"DEBUG: FULL PROMPT:\n{user_prompt}") # Uncomment for deep debugging
 
         # 4. LLM 调用
@@ -220,10 +220,10 @@ class AnswerGenerator(BaseGenerator):
             thought_data = {}
         # 确保 evidence_refs 是对象列表，并进行纠错
         raw_refs = thought_data.get("evidence_refs", [])
-        logger.info(f"DEBUG: Raw LLM evidence_refs: {raw_refs}")
+        logger.debug("Raw LLM evidence_refs: %s", raw_refs)
         
         evidence_refs = self._correct_evidence_refs(raw_refs, relevant_symbols)
-        logger.info(f"DEBUG: Corrected evidence_refs: {evidence_refs}")
+        logger.debug("Corrected evidence_refs: %s", evidence_refs)
         
         thought_data["evidence_refs"] = evidence_refs
         
@@ -359,7 +359,11 @@ class AnswerGenerator(BaseGenerator):
         # it is logically safe to assume that single symbol was the evidence used.
         if not corrected and len(symbols) == 1:
             s = symbols[0]
-            logger.info(f"DEBUG: No valid refs found from LLM (Raw: {raw_refs}), but only 1 available symbol ({s.symbol_id}). Auto-filling.")
+            logger.debug(
+                "No valid refs found from LLM (Raw: %s), but only 1 available symbol (%s). Auto-filling.",
+                raw_refs,
+                s.symbol_id,
+            )
             return [EvidenceRef(
                 symbol_id=normalize_path_separators(s.symbol_id),
                 file_path=normalize_path_separators(s.file_path),

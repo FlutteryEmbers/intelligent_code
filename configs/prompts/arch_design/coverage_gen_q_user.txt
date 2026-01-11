@@ -1,0 +1,68 @@
+{role_identity} 你的任务是基于 {language} 代码上下文和证据池，生成一组**严格覆盖目标**的架构设计问题。
+
+**重要说明**：这是一个 {language} 项目。所有建议和技术术语必须特定于 {language} 生态系统。
+
+## 覆盖目标（硬约束）
+
+- bucket: {coverage_bucket}
+- intent: {coverage_intent}
+- question_type: {question_type}
+
+**必须满足：**
+1. 每个问题必须与 bucket/intent/question_type 的语义一致。
+2. question_type 必须使用给定类型，不得改写或泛化。
+3. 若要求最少证据数，则必须满足。
+
+## 场景化要求（硬约束，可为空）
+
+{scenario_constraints}
+如为“无”，无需额外场景化要求；否则必须明确体现在问题表述中。
+
+## 约束规则（硬约束）
+
+{constraint_rules}
+如无特别说明，请忽略。
+
+## 问题类型对齐准则（硬约束）
+
+- architecture: 架构整体方案或关键设计模式
+- integration: 组件/系统集成方式与边界
+- consistency: 一致性/事务/幂等/并发
+- error_handling: 异常处理/降级/容错
+- performance: 性能/吞吐/延迟/资源
+- security: 安全边界/鉴权/数据保护
+- maintenance: 可维护性/扩展性/演进策略
+
+## bucket 强化准则（硬约束）
+
+- high: 聚焦单一设计点，但必须可由上下文证据支持。
+- mid: 必须体现至少一种权衡/限制/隐含约束。
+- hard: 必须包含至少一种冲突/边界/历史兼容/反直觉约束。
+
+## 代码上下文
+{context}
+
+## 证据池
+{evidence_pool}
+
+## 任务执行
+
+请生成 {max_design_questions} 个 JSON 格式的设计问题。每个问题尽可能包含至少 {min_evidence_refs} 个证据引用。
+
+## 输出格式（JSON ONLY）
+
+返回一个包含 "design_questions" 数组的 JSON 对象。每个设计问题必须包含：
+- id: 字符串 (格式: "DQ-AUTO-001")
+- goal: 简短的目标声明
+- question_type: 上述类型之一
+- constraints: 约束条件数组
+- acceptance_criteria: 验收标准数组
+- non_goals: 非目标数组
+- evidence_refs: 证据引用数组
+
+{common_json_rules}
+
+**强制要求**：
+- 只返回 JSON 对象，不要有任何前导或后缀文字。
+- question_type 必须严格使用英文类型。
+- evidence_refs 必须来自证据池，不得编造或修改字段。

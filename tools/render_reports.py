@@ -7,7 +7,7 @@ from pathlib import Path
 try:
     import yaml
 except ImportError as exc:
-    raise SystemExit("Missing PyYAML. Install via `pip install -r data_validator/requirements.txt`.") from exc
+    raise SystemExit("Missing PyYAML. Install via `pip install -r requirements.txt`.") from exc
 
 try:
     import matplotlib
@@ -15,7 +15,7 @@ try:
     import matplotlib.pyplot as plt
     from matplotlib import font_manager
 except ImportError as exc:
-    raise SystemExit("Missing matplotlib. Install via `pip install -r data_validator/requirements.txt`.") from exc
+    raise SystemExit("Missing matplotlib. Install via `pip install -r requirements.txt`.") from exc
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -521,7 +521,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Render report charts from pipeline reports")
     parser.add_argument("--config", default="configs/launch.yaml", help="Path to launch.yaml")
     parser.add_argument("--reports-dir", default=None, help="Override reports directory")
-    parser.add_argument("--output-dir", default="data_validator/results", help="Output directory for charts")
+    parser.add_argument("--output-dir", default="tools/results", help="Output directory for charts")
     args = parser.parse_args()
 
     config_path = _resolve_path(REPO_ROOT, args.config)

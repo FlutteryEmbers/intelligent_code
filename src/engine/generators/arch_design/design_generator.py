@@ -64,7 +64,7 @@ class DesignQuestion:
 def load_design_questions_config(config_path: str | Path | None = None) -> List[DesignQuestion]:
     """从 YAML 加载设计问题"""
     if config_path is None:
-        config_path = Path("configs/design_questions.yaml")
+        config_path = Path("configs/user_inputs/design_questions.yaml")
     else:
         config_path = Path(config_path)
     

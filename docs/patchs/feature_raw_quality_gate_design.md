@@ -21,7 +21,7 @@
 
 - `docs/pipeline/05-validation-step.md`
 - `src/pipeline/steps/validation.py`
-- `src/utils/validator.py`
+- `src/utils/data/validator.py`
 - `src/pipeline/steps/merge.py`（Auto QA 输入选择逻辑）
 
 ### 主要问题
@@ -155,7 +155,7 @@
    - 在 Orchestrator 的 `self.paths` 增加 `clean/qa_clean_jsonl`、`clean/design_clean_jsonl`
    - 在 `configs/launch.yaml:artifacts` 增加对应 clean 路径，确保下游读取一致
 2) **扩展 validate_dataset 输出**
-   - 在 `src/utils/validator.py` 增加 `clean_path` 输出，并把 `quality` 写回样本（写入 clean）
+   - 在 `src/utils/data/validator.py` 增加 `clean_path` 输出，并把 `quality` 写回样本（写入 clean）
 3) **ValidationStep 覆盖 Auto QA**
    - 与 `MergeStep` 对齐：优先 `artifacts.auto_qa_raw_jsonl`，兼容 legacy `qa_raw.jsonl`
 4) **MergeStep 优先消费 clean**

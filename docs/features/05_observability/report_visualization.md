@@ -6,15 +6,15 @@
 ## 📋 运作基石（必要元数据）
 
 - **涉及领地 (Code Context)**：
-  - `data_validator/render_reports.py`
-  - `data_validator/README.md`
+  - `tools/render_reports.py`
+  - `tools/README.md`
   - `configs/launch.yaml`
   - `data/reports/*`
 
 - **执行准则 (Business Rules)**：
   - 读取质量、分布、检索、去重等报表并生成图表。
   - 当报表与实际 clean 数据不一致时直接报错。
-  - 输出目录固定在 `data_validator/results/`（按类别分组）。
+  - 默认输出目录为 `tools/results/`（按类别分组，可通过 CLI 覆盖）。
 
 - **参考证据**：
   - `coverage_report.json`、`question_type_report.json`、`qa_quality.json`、`design_quality.json` 等。
@@ -26,7 +26,7 @@
 | `output.reports_dir` | 报表目录 | 指向报表根目录 | data/reports |
 | `artifacts.coverage_report_json` | 分布报表路径 | 覆盖分布图来源 | 默认即可 |
 | `artifacts.question_type_report_json` | 类型报表路径 | 类型分布图来源 | 默认即可 |
-| CLI: `--output-dir` | 图表输出目录 | 自定义图表输出 | data_validator/results |
+| CLI: `--output-dir` | 图表输出目录 | 自定义图表输出 | tools/results |
 
 ## 🛠️ 它是如何工作的（逻辑流向）
 

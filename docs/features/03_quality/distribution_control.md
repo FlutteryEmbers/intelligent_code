@@ -6,14 +6,14 @@
 ## 📋 运作基石（必要元数据）
 
 - **涉及领地 (Code Context)**：
-  - `src/engine/auto_question_generator.py`
-  - `src/engine/auto_design_question_generator.py`
+  - `src/engine/generators/qa_rule/question_generator.py`
+  - `src/engine/generators/arch_design/question_generator.py`
   - `src/pipeline/steps/coverage_tagger.py`
   - `src/pipeline/steps/coverage_sampler.py`
   - `src/pipeline/steps/question_type_report.py`
   - `configs/launch.yaml`
-  - `configs/user_inputs/qa_scenario_templates.yaml`
-  - `configs/user_inputs/design_scenario_templates.yaml`
+  - `configs/prompts/qa_rule/scenario_rules.yaml`
+  - `configs/prompts/arch_design/scenario_rules.yaml`
 
 - **执行准则 (Business Rules)**：
   - 难度配额由 `targets` 控制（默认 80/15/5），抽样时按“难度档”分层。

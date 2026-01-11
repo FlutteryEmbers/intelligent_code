@@ -81,10 +81,10 @@ class Retriever:
             logger.warning(f"Embeddings file missing: {self.embeddings_path}. Falling back to keyword search.")
             # Use Keyword Search (BM25-lite) as fallback
             retrieved_symbols = keyword_search(
-                query=query, 
-                symbols=symbols, 
+                query=query,
+                symbols=symbols,
                 top_k=k,
-                language_profile=self.profile.profile_data if hasattr(self.profile, 'profile_data') else None
+                language_profile=getattr(self.profile, "data", None)
             )
             
             # Final safety net: if keyword search fails (empty query?), fallback to first k
@@ -139,10 +139,10 @@ class Retriever:
                 if layer_candidates:
                     # 使用 Keyword Search 在该层级中找到最相关的一个 (而不是直接取第一个)
                     best_candidates = keyword_search(
-                        query=query, 
-                        symbols=layer_candidates, 
+                        query=query,
+                        symbols=layer_candidates,
                         top_k=1,
-                        language_profile=self.profile.profile_data if hasattr(self.profile, 'profile_data') else None
+                        language_profile=getattr(self.profile, "data", None)
                     )
                     
                     candidate = best_candidates[0] if best_candidates else layer_candidates[0]

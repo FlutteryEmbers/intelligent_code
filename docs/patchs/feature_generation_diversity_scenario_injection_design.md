@@ -6,8 +6,8 @@
 
 ## 1. 现状审计（Audit）
 
-- 现有生成侧已支持 bucket/intent 抽样（`auto_question_generator.py` / `auto_design_question_generator.py`）。
-- prompt 中列出 question_type，但**没有配额控制与采样逻辑**（`configs/prompts/*/auto_*_generation.txt`、`coverage_*_generation.txt`）。
+- 现有生成侧已支持 bucket/intent 抽样（`src/engine/generators/qa_rule/question_generator.py` / `src/engine/generators/arch_design/question_generator.py`）。
+- prompt 中列出 question_type，但**没有配额控制与采样逻辑**（`configs/prompts/qa_rule/gen_q_user.txt`、`configs/prompts/arch_design/gen_q_user.txt`）。
 - 现有逻辑未明确“模糊/指代问”比例，场景化注入不足。
 - 分布闭环依赖 `coverage` 标签，**无法保证 question_type 多样性**。
 
@@ -58,7 +58,7 @@ question_answer:
     scenario_injection:
       mode: "ratio"          # off | ratio
       fuzzy_ratio: 0.2       # 模糊/指代问比例
-      templates_path: "configs/user_inputs/qa_scenario_templates.yaml"
+      templates_path: "configs/prompts/qa_rule/scenario_rules.yaml"
 
 design_questions:
   coverage:
@@ -75,7 +75,7 @@ design_questions:
     scenario_injection:
       mode: "ratio"
       fuzzy_ratio: 0.15
-      templates_path: "configs/user_inputs/design_scenario_templates.yaml"
+      templates_path: "configs/prompts/arch_design/scenario_rules.yaml"
 ```
 
 **旧逻辑兼容：**
@@ -90,7 +90,7 @@ design_questions:
    在 `configs/launch.yaml` 写入 `diversity` 与 `scenario_injection`，并使用推荐配额与比例。
 
 2) **生成侧抽样逻辑**  
-   在 `auto_question_generator` / `auto_design_question_generator` 中新增 question_type 抽样与场景模板拼接。
+   在 `src/engine/generators/qa_rule/question_generator.py` / `src/engine/generators/arch_design/question_generator.py` 中新增 question_type 抽样与场景模板拼接。
 
 3) **提示词扩展**  
    在 `prompts.*` 中增加“question_type/场景要求”段落，确保 LLM 输出匹配。
@@ -123,8 +123,8 @@ design_questions:
 ## 7. 影响范围（代码/配置）
 
 - **配置**：`configs/launch.yaml`（不新增顶层模块）
-- **生成逻辑**：`src/engine/auto_question_generator.py`、`src/engine/auto_design_question_generator.py`
-- **prompt**：`configs/prompts/question_answer/*`、`configs/prompts/design/*`
+- **生成逻辑**：`src/engine/generators/qa_rule/question_generator.py`、`src/engine/generators/arch_design/question_generator.py`
+- **prompt**：`configs/prompts/qa_rule/*`、`configs/prompts/arch_design/*`
 - **报告**：`coverage_report` 不变，但可新增 question_type 统计（可选）
 
 ---
@@ -132,6 +132,6 @@ design_questions:
 ## 8. 必要实施清单（最小改动）
 
 1) `configs/launch.yaml` 增加 `diversity` 与 `scenario_injection` 配置。  
-2) `src/engine/auto_question_generator.py` 与 `src/engine/auto_design_question_generator.py` 实现 question_type 抽样与场景注入。  
-3) 新增 `configs/user_inputs/*_scenario_templates.yaml`（最小模板集合）。  
+2) `src/engine/generators/qa_rule/question_generator.py` 与 `src/engine/generators/arch_design/question_generator.py` 实现 question_type 抽样与场景注入。  
+3) 新增 `configs/prompts/*/scenario_rules.yaml`（最小模板集合）。  
 4) 更新 `configs/prompts/*` 的生成提示，要求输出 `question_type` 与场景化约束。  

@@ -179,13 +179,13 @@ artifacts:
 - **prompt 强约束**：即使标签已抽取，仍需在 prompt 中明确 bucket/intent 与样式要求，避免“标签对但内容跑偏”。
 
 ### 7.2 需要改动/新增的 prompt
-  - `configs/prompts/question_answer/auto_question_generation.txt`
+  - `configs/prompts/qa_rule/gen_q_user.txt`
     - 增加 bucket/intent 指令 + 80/15/5 约束提示
-  - `configs/prompts/design/auto_design_question_generation.txt`
+  - `configs/prompts/arch_design/gen_q_user.txt`
     - 增加 bucket/intent 指令 + Design 样式约束
-  - `configs/prompts/question_answer/qa_system_prompt.txt`
+  - `configs/prompts/qa_rule/system.txt`
     - 增加 coverage 标签的输出要求或引用来源
-  - `configs/prompts/design/design_user_prompt.txt`
+  - `configs/prompts/arch_design/gen_s_user.txt`
     - 增加“证据闭合/多证据覆盖”的要求
 
 ### 7.3 取舍方案（按改动范围）
@@ -197,7 +197,7 @@ artifacts:
 ### 7.4 涉及改动范围（代码/配置）
 
 - 配置：`configs/launch.yaml` 的 `prompts.*` 路径（如新增覆盖专用 prompt）
-- 生成器：`src/engine/auto_question_generator.py`、`src/engine/auto_design_question_generator.py`
+- 生成器：`src/engine/generators/qa_rule/question_generator.py`、`src/engine/generators/arch_design/question_generator.py`
 - 文档：覆盖策略与 prompt 说明同步更新
 
 ---

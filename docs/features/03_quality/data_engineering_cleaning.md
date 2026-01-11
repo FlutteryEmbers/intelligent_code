@@ -6,7 +6,7 @@
 ## 📋 运作基石（必要元数据）
 
 - **涉及领地 (Code Context)**：
-  - `src/utils/validator.py`
+  - `src/utils/data/validator.py`
   - `src/pipeline/steps/deduplication.py`
   - `src/utils/dedup.py`
   - `src/pipeline/steps/secrets_scan.py`

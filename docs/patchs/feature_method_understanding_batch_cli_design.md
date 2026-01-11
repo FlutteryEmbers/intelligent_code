@@ -8,7 +8,7 @@
 
 ### 1.1 当前逻辑分布
 - 入口：`src/pipeline/steps/method_understanding.py`
-- 生成器：`src/engine/auto_method_understander.py`
+- 生成器：`src/engine/generators/method_profile/understander.py`
 - 配置读取：
   - `method_understanding.max_methods`
   - `core.max_context_chars`（全局统一）
@@ -48,7 +48,7 @@ method_understanding:
   enabled: true
   max_methods: 300
   prompts:
-    generation: "configs/prompts/method_understanding/auto_method_understanding.txt"
+    generation: "configs/prompts/method_profile/user.txt"
   batching:
     enabled: false
     batch_size: 50

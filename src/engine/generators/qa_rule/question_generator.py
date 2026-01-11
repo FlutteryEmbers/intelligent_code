@@ -29,7 +29,7 @@ def load_user_questions_config(
 ) -> List[QuestionSample]:
     """从 YAML 读取用户提供的问题列表"""
     if config_path is None:
-        config_path = Path("configs/user_questions.yaml")
+        config_path = Path("configs/user_inputs/user_questions.yaml")
     else:
         config_path = Path(config_path)
 
@@ -220,7 +220,12 @@ class QuestionGenerator(BaseGenerator):
         
         # 3. 组装提示词
         system_prompt = self._build_composed_system_prompt()
-        template_name = getattr(self.coverage_cfg, 'template_name', None) or "gen_q_user"
+        template_name = (
+            getattr(self.coverage_cfg, 'template_name', None)
+            or self._resolve_template_name(self.config.get("question_answer.prompts.coverage_generation"))
+            or self._resolve_template_name(self.config.get("question_answer.prompts.question_generation"))
+            or "gen_q_user"
+        )
         user_prompt = self._build_composed_user_prompt(
             template_name,
             method_profile=profile.model_dump_json(indent=2),

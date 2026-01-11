@@ -8,7 +8,7 @@
 
 ### 1.1 现有逻辑分布
 
-- **问题生成**：`AutoQuestionGenerator`/`AutoDesignQuestionGenerator` 仅生成正向样本。
+- **问题生成**：`QuestionGenerator`/`DesignQuestionGenerator` 仅生成正向样本。
 - **答案生成**：`AnswerGenerator`/`DesignGenerator` 使用统一 prompt，未区分负样本行为。
 - **质量校验**：`validator.py` 以 evidence_refs 一致性为硬条件，不支持“无证据的拒答”。
 - **分布控制**：`CoverageTaggerStep`/`CoverageSamplerStep` 只控制 bucket/intent，不控制正负比例。
@@ -73,7 +73,7 @@ Question/Design 生成 → Negative Sampling（同阶段注入） → Answer/Des
 
 ### Phase 2（生成侧注入）
 
-- 在 `AutoQuestionGenerator`/`AutoDesignQuestionGenerator` 内按 `negative_ratio` 采样。
+- 在 `QuestionGenerator`/`DesignQuestionGenerator` 内按 `negative_ratio` 采样。
 - 对负样本追加 `quality.coverage.polarity=negative` 与 `negative_type` 标签。
 - Answer/Design 生成时根据 `negative_type` 添加“拒答/纠偏/澄清”规则段（prompt 内注入，不新增 prompt 文件）。
 

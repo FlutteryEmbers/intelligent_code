@@ -18,14 +18,14 @@ core:
   seed: 42
   retrieval_top_k: 6
   max_context_chars: 14000
-  max_items: 50
-  architecture_constraints_path: "configs/user_inputs/architecture_constraints.yaml"
+  max_items: 1000
+  architecture_constraints_path: "configs/prompts/common/arch_constraints.yaml"
 
 method_understanding:
   enabled: true
-  max_methods: 5
+  max_methods: 200
   prompts:
-    generation: "configs/prompts/method_understanding/auto_method_understanding.txt"
+    generation: "configs/prompts/method_profile/user.txt"
   batching:
     enabled: true
     batch_size: 50
@@ -40,9 +40,9 @@ question_answer:
   user_questions_path: "configs/user_inputs/user_questions.yaml"
   build_embeddings_in_user_mode: true
   prompts:
-    question_generation: "configs/prompts/question_answer/auto_question_generation.txt"
-    coverage_generation: "configs/prompts/question_answer/coverage_question_generation.txt"
-    answer_generation: "configs/prompts/question_answer/auto_answer_generation.txt"
+    question_generation: "configs/prompts/qa_rule/gen_q_user.txt"
+    coverage_generation: "configs/prompts/qa_rule/gen_q_user.txt"
+    answer_generation: "configs/prompts/qa_rule/gen_a_user.txt"
   constraints:
     enable_counterexample: true
     enable_arch_constraints: true
@@ -84,7 +84,7 @@ question_answer:
     scenario_injection:
       mode: "ratio"      # off | ratio
       fuzzy_ratio: 0.2
-      templates_path: "configs/user_inputs/qa_scenario_templates.yaml"
+      templates_path: "configs/prompts/qa_rule/scenario_rules.yaml"
     targets: {high: 0.8, mid: 0.15, hard: 0.05}
     intent_targets:
       how_to: 0.2
@@ -115,10 +115,10 @@ design_questions:
     diversity_hint: true
   user_questions_path: "configs/user_inputs/design_questions.yaml"
   prompts:
-    question_generation: "configs/prompts/design/auto_design_question_generation.txt"
-    coverage_generation: "configs/prompts/design/coverage_design_question_generation.txt"
-    system_prompt: "configs/prompts/design/design_system_prompt.txt"
-    user_prompt: "configs/prompts/design/design_user_prompt.txt"
+    question_generation: "configs/prompts/arch_design/gen_q_user.txt"
+    coverage_generation: "configs/prompts/arch_design/gen_q_user.txt"
+    system_prompt: "configs/prompts/arch_design/system.txt"
+    user_prompt: "configs/prompts/arch_design/gen_s_user.txt"
   constraints:
     enable_counterexample: true
     enable_arch_constraints: true
@@ -155,7 +155,7 @@ design_questions:
     scenario_injection:
       mode: "ratio"
       fuzzy_ratio: 0.15
-      templates_path: "configs/user_inputs/design_scenario_templates.yaml"
+      templates_path: "configs/prompts/arch_design/scenario_rules.yaml"
     targets: {high: 0.8, mid: 0.15, hard: 0.05}
     labeler: "rule"
     # templates_path: "configs/user_inputs/design_templates.yaml"

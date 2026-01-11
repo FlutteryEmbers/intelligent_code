@@ -129,10 +129,10 @@ wrong_premise:
 | `llm_client.py` | `core/llm_client.py` | LLM 基本调用与封装 | 移入核心包 |
 | (新文件) | `core/base_generator.py` | 提供提示词加载、批处理逻辑基类 | 核心基类 |
 | (提取自各 Generator) | `rag/retriever.py` | 上下文搜索、关键词打分、层级平衡 | RAG 专用模块 |
-| `auto_question_generator.py` | `generators/qa_rule/question_gen.py` | QA 场景：自动出题逻辑 | 对齐 `qa_rule` schema |
-| `answer_generator.py` | `generators/qa_rule/answer_gen.py` | QA 场景：自动回答逻辑 | 对齐 `qa_rule` schema |
-| `auto_design_question_generator.py` | `generators/arch_design/question_gen.py` | 架构场景：设计问题生成 | 对齐 `arch_design` schema |
-| `design_generator.py` | `generators/arch_design/solution_gen.py` | 架构场景：方案实现生成 | 对齐 `arch_design` schema |
+| `auto_question_generator.py` | `generators/qa_rule/question_generator.py` | QA 场景：自动出题逻辑 | 对齐 `qa_rule` schema |
+| `answer_generator.py` | `generators/qa_rule/answer_generator.py` | QA 场景：自动回答逻辑 | 对齐 `qa_rule` schema |
+| `auto_design_question_generator.py` | `generators/arch_design/question_generator.py` | 架构场景：设计问题生成 | 对齐 `arch_design` schema |
+| `design_generator.py` | `generators/arch_design/design_generator.py` | 架构场景：方案实现生成 | 对齐 `arch_design` schema |
 | `auto_method_understander.py` | `generators/method_profile/understander.py` | 基础能力：方法级特征提取 | 对齐 `method_profile` schema |
 
 ---

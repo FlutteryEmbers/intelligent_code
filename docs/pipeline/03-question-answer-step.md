@@ -175,7 +175,7 @@ flowchart TD
 
 备注：
 
-- `qa_system_prompt.txt` / `qa_user_prompt.txt` 当前未在代码中加载。
+- 旧版 `qa_system_prompt.txt` / `qa_user_prompt.txt` 已由 `configs/prompts/qa_rule/system.txt` 与 `configs/prompts/qa_rule/gen_a_user.txt` 替代。
 
 ---
 

@@ -76,8 +76,8 @@ quality:
 ## 6. 影响范围（代码/配置）
 
 - **配置**：`configs/launch.yaml`（扩展 quality.trace_rules）
-- **Prompt**：`configs/prompts/question_answer/*`、`configs/prompts/design/*`
-- **校验**：`src/utils/validator.py`（新增一致性校验）
+- **Prompt**：`configs/prompts/qa_rule/*`、`configs/prompts/arch_design/*`
+- **校验**：`src/utils/data/validator.py`（新增一致性校验）
 - **报告**：`qa_quality.json` / `design_quality.json` 新增 trace 统计字段（可选）
 
 ---

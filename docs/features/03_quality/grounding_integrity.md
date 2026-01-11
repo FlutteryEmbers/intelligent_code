@@ -8,13 +8,13 @@
 - **涉及领地 (Code Context)**：
   - `src/parser/java_parser.py`
   - `src/parser/python_parser.py`
-  - `src/engine/answer_generator.py`
-  - `src/engine/design_generator.py`
-  - `src/utils/validator.py`
-  - `src/utils/call_chain.py`
+  - `src/engine/generators/qa_rule/answer_generator.py`
+  - `src/engine/generators/arch_design/design_generator.py`
+  - `src/utils/data/validator.py`
+  - `src/utils/retrieval/call_chain.py`
   - `configs/launch.yaml`
-  - `configs/prompts/question_answer/auto_answer_generation.txt`
-  - `configs/prompts/design/design_user_prompt.txt`
+  - `configs/prompts/qa_rule/gen_a_user.txt`
+  - `configs/prompts/arch_design/gen_s_user.txt`
 
 - **执行准则 (Business Rules)**：
   - 每条样本必须携带 `evidence_refs`，且 **symbol_id / file_path / source_hash / line_range** 必须与 `symbols.jsonl` 一致。

@@ -6,9 +6,9 @@
 ## 📋 运作基石（必要元数据）
 
 - **涉及领地 (Code Context)**：
-  - `src/engine/answer_generator.py`
-  - `src/engine/design_generator.py`
-  - `src/utils/validator.py`
+  - `src/engine/generators/qa_rule/answer_generator.py`
+  - `src/engine/generators/arch_design/design_generator.py`
+  - `src/utils/data/validator.py`
   - `configs/launch.yaml`
 
 - **执行准则 (Business Rules)**：

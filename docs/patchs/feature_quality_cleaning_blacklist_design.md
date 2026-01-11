@@ -9,7 +9,7 @@
 ### 1.1 现有逻辑分布
 
 - **Secrets 过滤**：`src/pipeline/steps/secrets_scan.py` 支持 drop/sanitize。
-- **长度约束**：`src/utils/validator.py` 通过 `quality.*` 产生 warning，可选 fail-on-warnings。
+- **长度约束**：`src/utils/data/validator.py` 通过 `quality.*` 产生 warning，可选 fail-on-warnings。
 - **去重**：`src/pipeline/steps/deduplication.py` 使用 SimHash。
 
 ### 1.2 缺口与冗余

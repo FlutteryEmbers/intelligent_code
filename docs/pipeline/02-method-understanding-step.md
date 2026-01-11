@@ -80,7 +80,7 @@ flowchart LR
 ## Coupling Points
 
 - QuestionAnswerStep：依赖 `method_profiles.jsonl` 构建 embeddings 与自动问题
-- DesignGenerationStep：当 `design_questions.use_method_profiles=true` 时，用 profiles 增强 auto design questions
+- DesignGenerationStep：当 `design_questions.use_method_profiles=true` 时，会生成 profiles 供 embeddings 构建与检索使用
 
 ---
 

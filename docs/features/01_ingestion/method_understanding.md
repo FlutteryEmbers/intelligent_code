@@ -7,9 +7,10 @@
 
 - **涉及领地 (Code Context)**：
   - `src/pipeline/steps/method_understanding.py`
-  - `src/engine/auto_method_understander.py`
+  - `src/engine/generators/method_profile/understander.py`
   - `configs/launch.yaml`
-  - `configs/prompts/method_understanding/auto_method_understanding.txt`
+  - `configs/prompts/method_profile/system.txt`
+  - `configs/prompts/method_profile/user.txt`
   - `configs/language/*`（业务标记规则）
 
 - **执行准则 (Business Rules)**：
@@ -39,13 +40,13 @@
 
 ## Prompt 说明（模板角色）
 
-### 模板：`configs/prompts/method_understanding/auto_method_understanding.txt`
+### 模板：`configs/prompts/method_profile/system.txt` + `configs/prompts/method_profile/user.txt`
 
 #### 🌟 核心概念
 > 就像给每个方法写“工作简历”一样，让后续问答与设计有统一的事实底稿。
 
 #### 📋 运作基石（元数据与规则）
-- **存放位置 (Loading Point)**：`configs/prompts/method_understanding/auto_method_understanding.txt`
+- **存放位置 (Loading Point)**：`configs/prompts/method_profile/system.txt`、`configs/prompts/method_profile/user.txt`
 - **工序位置 (Step)**：MethodUnderstandingStep（方法理解阶段）
 - **变量注入**：`symbol_id`、`file_path`、`qualified_name`、`annotations`、`javadoc`、`source_code`、`start_line`、`end_line`、`source_hash`、`repo_commit`
 - **核心准则**：
@@ -110,38 +111,24 @@ flowchart TD
 
 ### 1. 在 QA 任务中：核心驱动者
 
-在 `QA` 流程中，`MethodProfile` 是生成问答对的**核心与起点**。整个 `auto_question_generator`（自动问题生成器）完全依赖 `method_profiles.jsonl` 文件中的结构化摘要来构思问题。
+在 `QA` 流程中，`MethodProfile` 是生成问答对的**核心与起点**。整个 `QuestionGenerator`（`src/engine/generators/qa_rule/question_generator.py`）完全依赖 `method_profiles.jsonl` 文件中的结构化摘要来构思问题。
 
 - **角色定位**：事实的源头 (Source of Truth)。
-- **工作方式**：遍历每个 `MethodProfile`，并依据其 `summary`、`business_rules` 等字段，结合预设的模板（`qa_scenario_templates.yaml`）来生成具体、有针对性的问题。
+- **工作方式**：遍历每个 `MethodProfile`，并依据其 `summary`、`business_rules` 等字段，结合预设的模板（`configs/prompts/qa_rule/scenario_rules.yaml`）来生成具体、有针对性的问题。
 - **重要性**：**核心依赖**。如果缺少 `MethodProfile`，QA 生成步骤将无法进行。
 
 ### 2. 在 Design 任务中：可选的上下文增强器
 
-相比之下，在 `Design` 流程中，`MethodProfile` 的角色要次要得多，其主要作用是在生成**设计问题**的阶段（`DesignQuestionGenerator`）提供辅助性的上下文，并且**此功能默认关闭**。
+相比之下，在 `Design` 流程中，`MethodProfile` 的角色要次要得多，其主要作用是**为检索阶段提供语义索引**，而不是直接参与设计问题生成。
 
-- **角色定位**：可选的上下文补充材料 (Optional Context Enhancer)。
-- **事实引用**:
-  - **代码**: 在 `src/engine/auto_design_question_generator.py` 中，配置项 `self.use_method_profiles` 由 `design_questions.use_method_profiles` 控制，其**默认为 `False`**。
+- **角色定位**：检索索引的语义来源 (Embedding Source)。
+- **事实引用**：
+  - `DesignQuestionGenerator`（`src/engine/generators/arch_design/question_generator.py`）当前仅基于 `CodeSymbol` 采样上下文，不读取 `MethodProfile`。
+  - `design_questions.use_method_profiles` 目前用于决定是否在前置步骤生成 `method_profiles.jsonl`（见 `src/pipeline/steps/question_answer.py`）。
 
-#### 启用后的工作方式
+#### 核心要点：不参与设计问题与最终方案生成
 
-当在配置中将 `use_method_profiles` 设置为 `True` 时，会发生以下情况：
-
-1.  **加载摘要**: `DesignQuestionGenerator` 会读取 `method_profiles.jsonl` 文件。
-2.  **拼接上下文**: 它会将 `MethodProfile` 中的核心信息（如方法名、`summary`、`business_rules`）提取并整合为一段文本。
-3.  **增强 Prompt**: 这段由 `MethodProfile` 摘要组成的文本，会被附加到由真实源码构成的主上下文之后，一同发送给 LLM，用于生成设计问题。
-    > **比喻**：这就像出题老师在构思一个复杂的设计题目前，除了翻阅代码库的“蓝图”（源码），还会额外看一眼“关键模块功能简介”（MethodProfile 摘要），以获得更深刻的洞察力。
-
-#### 目的：生成更高质量的设计问题
-
-提供这份“高级参考资料”的目的是帮助负责出题的 LLM 对代码库的能力有更丰富、更语义化的理解。有了这份摘要，LLM 不仅能看到代码的“形”，还能理解其“神”（业务逻辑），从而可能构思出更贴近真实业务痛点、更有价值的宏观设计问题。
-
-#### 核心要点：不参与最终方案设计
-
-最重要的一点是，`MethodProfile` 的作用**仅限于辅助生成设计问题**。
-
-在工作流的第二阶段，即 `DesignGenerator`（负责生成最终设计方案），系统**完全不会加载或使用 `MethodProfile`**。负责设计最终方案的 LLM，其唯一的“事实来源”是 `DesignQuestion` 本身，以及通过 RAG 重新检索到的真实代码原文。
+`MethodProfile` 当前**不参与**设计问题生成与最终方案生成。负责设计方案的 LLM 仅使用 `DesignQuestion` 与 RAG 检索得到的源码上下文。
 
 ### 总结
 

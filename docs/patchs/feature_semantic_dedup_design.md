@@ -83,7 +83,7 @@ dedup:
 ## 6. 影响范围（代码/配置）
 
 - **配置**：`configs/launch.yaml`（扩展 dedup）
-- **去重逻辑**：`src/pipeline/steps/deduplication.py`、`src/utils/vector_index.py`（或新增 util）
+- **去重逻辑**：`src/pipeline/steps/deduplication.py`、`src/utils/retrieval/vector_index.py`（或新增 util）
 - **报告**：`data/reports/dedup_mapping.json` 扩展语义去重统计
 
 ---

@@ -1,0 +1,90 @@
+{role_identity} 你的任务是基于给定 {language} 函数/方法的深度理解（MethodProfile），生成多样化且**严格覆盖目标**的业务问题，用于训练代码理解模型。
+
+## 输入信息
+
+**Method Profile**:
+```json
+{method_profile}
+```
+
+**方法源码**:
+```
+{source_code}
+```
+
+## 覆盖目标（硬约束）
+
+- bucket: {coverage_bucket}
+- intent: {coverage_intent}
+- question_type: {question_type}
+
+**必须满足：**
+1. 每个问题必须与 bucket/intent/question_type 的语义一致。
+2. difficulty 必须与 bucket 对齐：high→easy，mid→medium，hard→hard（如冲突，以 bucket 为准）。
+3. question_type 必须使用给定类型，不得改写或泛化。
+
+## 场景化要求（硬约束，可为空）
+
+{scenario_constraints}
+如为“无”，无需额外场景化要求；否则必须明确体现在问题表述中。
+
+## 约束规则（硬约束）
+
+{constraint_rules}
+如无特别说明，请忽略。
+
+## 问题类型对齐准则（硬约束）
+
+- `how_to`: 必须体现调用/步骤/使用流程
+- `config`: 必须涉及配置项/开关/默认值影响
+- `flow`: 必须包含流程节点或状态流转
+- `auth`: 必须涉及权限/鉴权/访问控制
+- `error`: 必须涉及异常路径/错误处理
+- `deploy`: 必须涉及部署/发布/迁移
+- `impact`: 必须涉及变更影响/兼容性风险
+- `perf`: 必须涉及性能/吞吐/延迟或资源
+- `consistency`: 必须涉及一致性/事务/并发
+- `compatibility`: 必须涉及历史兼容/老版本约束
+- `edge`: 必须涉及边界条件/极端场景
+
+## bucket 强化准则（硬约束）
+
+- high: 可以聚焦单一规则或局部逻辑，但必须可由源码直接支持。
+- mid: 必须体现至少一种权衡/限制/隐含约束。
+- hard: 必须包含至少一种冲突/边界/历史兼容/反直觉约束。
+
+## 任务要求
+
+生成 **恰好 {questions_per_method} 个** 业务问题，要求：
+
+1. **多样化**: 在 question_type 约束下保持表述与角度多样
+2. **针对性**: 每个问题必须针对该方法的具体行为或风险
+3. **深度**: 禁止“这个方法做什么”类浅层问题
+4. **业务视角**: 强调业务规则、架构边界、风险控制
+
+## 输出格式（JSON ONLY）
+
+你必须输出一个 JSON 对象，包含 `questions` 数组（长度恰好为 {questions_per_method}）：
+
+```json
+{{
+  "questions": [
+    {{
+      "question": "该方法的事务边界如何定义？在什么情况下会回滚？",
+      "question_type": "consistency",
+      "difficulty": "medium",
+      "evidence_refs": [{{ "symbol_id": "...", "file_path": "...", "start_line": 10, "end_line": 20, "source_hash": "..." }}],
+      "repo_commit": "{repo_commit}"
+    }}
+  ]
+}}
+```
+
+{common_json_rules}
+
+**强制要求**：
+- questions 数组长度必须恰好等于 {questions_per_method}。
+- 每个问题的 evidence_refs 必须从提供的信息中精确复制。
+- 不得输出任何额外字段或解释性文本。
+
+现在为上面给定的方法生成 {questions_per_method} 个问题：

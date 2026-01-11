@@ -9,7 +9,7 @@
 ### 1.1 现有逻辑分布
 
 - **数据结构**：`src/utils/schemas.py` 定义 `ReasoningTrace`（observations/inferences/evidence_refs/assumptions）。
-- **校验入口**：`src/utils/validator.py` 仅验证 evidence_refs 一致性与 schema 通过，不校验 trace 结构质量。
+- **校验入口**：`src/utils/data/validator.py` 仅验证 evidence_refs 一致性与 schema 通过，不校验 trace 结构质量。
 - **Prompt 约束**：当前 prompt 未强制 trace 的结构化输出与字段一致性。
 
 ### 1.2 冗余与耦合

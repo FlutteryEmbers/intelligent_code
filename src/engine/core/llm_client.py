@@ -15,6 +15,7 @@ from pydantic import ValidationError
 from src.schemas import TrainingSample
 from src.utils.core.config import Config
 from src.utils.core.logger import get_logger
+from src.utils.io.file_ops import load_prompt_template
 
 
 logger = get_logger(__name__)
@@ -312,22 +313,8 @@ JSON Schema:
 
 def _build_test_sample_prompt() -> tuple[str, str]:
     """构建测试用的提示词"""
-    system_prompt = """你是一个 Java 代码分析专家。
-根据给定的代码片段，生成一个训练样本用于 Qwen2.5 模型微调。"""
-    
-    user_prompt = """请分析以下 Java 代码：
-
-```java
-public class Calculator {
-    public int add(int a, int b) {
-        return a + b;
-    }
-}
-```
-
-生成一个 QA 类型的训练样本，问题是"这个类的功能是什么？"
-"""
-    
+    system_prompt = load_prompt_template("configs/prompts/test/sample_system.txt")
+    user_prompt = load_prompt_template("configs/prompts/test/sample_user.txt")
     return system_prompt, user_prompt
 
 

@@ -29,7 +29,7 @@
 
 # 关键字段的正确值
 
-相关组件证据：
+相关组件证据（必须引用，且不可修改元数据）：
 {service_evidence}
 
 # 输出要求
@@ -63,12 +63,13 @@
 }}
 ```
 
-⚠️ **注意**：`scenario`、`instruction`、`context`、`repo_commit` 会由系统自动填充，你**不要输出这些字段**。
+⚠️ **注意**：你**只输出** `answer` 与 `thought`，不要输出其他字段。
 
 **⚠️ 重要提醒**：
 1. ❌ 不要修改 evidence_refs 中的原始元数据 - 必须从输入中精确复制。
-2. answer 必须严格按照 6 个章节组织内容。
-3. answer 的关键结论必须能在 observations/inferences 中找到支撑。
+2. ✅ evidence_refs 必须至少包含 1 条（推荐 2 条），为空会被直接拒绝。
+3. answer 必须严格按照 6 个章节组织内容。
+4. answer 的关键结论必须能在 observations/inferences 中找到支撑。
 
 {common_json_rules}
 

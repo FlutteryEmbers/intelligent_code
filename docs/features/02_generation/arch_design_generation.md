@@ -8,12 +8,12 @@
 
 - **涉及领地 (Code Context)**：
   - `src/pipeline/steps/design_generation.py`
-  - `src/engine/auto_design_question_generator.py`
-  - `src/engine/design_generator.py`
+  - `src/engine/generators/arch_design/question_generator.py`
+  - `src/engine/generators/arch_design/design_generator.py`
   - `configs/launch.yaml`
   - `configs/user_inputs/design_questions.yaml`
-  - `configs/prompts/design/*`
-  - `configs/user_inputs/design_scenario_templates.yaml`
+  - `configs/prompts/arch_design/*`
+  - `configs/prompts/arch_design/scenario_rules.yaml`
 
 - **执行准则 (Business Rules)**：
   - Auto 模式会从代码符号中筛选候选，生成设计问题；失败时回退到用户问题。
@@ -32,8 +32,8 @@
 | :--- | :--- | :--- | :--- |
 | `design_questions.max_questions` | 设计问题上限 | 控制总体规模 | 30 |
 | `design_questions.user_questions_path` | 用户设计问题入口 | 回退时使用 | 默认即可 |
-| `design_questions.use_method_profiles` | 方案增强 | 是否使用方法说明书 | true |
-| `design_questions.profiles_top_k` | 方案增强数量 | 引用多少条方法摘要 | 20 |
+| `design_questions.use_method_profiles` | 检索增强 | 是否生成 MethodProfile 以构建 embeddings | true |
+| `design_questions.profiles_top_k` | 检索增强数量 | embeddings 生成采样上限 | 20 |
 | `design_questions.min_evidence_refs` | 最少证据数 | 设计样本证据下限 | 2 |
 | `design_questions.batching.batch_size` | 批量生成 | 单个 batch 的目标生成数 | 5 |
 | `design_questions.batching.num_batches` | 批次数上限 | 最多发起多少个 batch | 50 |
@@ -59,7 +59,7 @@
 
 ## Prompt 说明（模板角色）
 
-### 模板：`configs/prompts/design/auto_design_question_generation.txt` / `coverage_design_question_generation.txt`
+### 模板：`configs/prompts/arch_design/gen_q_user.txt`
 
 #### 🌟 核心概念 (出题)
 
@@ -67,7 +67,7 @@
 
 #### 📋 运作基石 (出题)
 
-- **存放位置**：`configs/prompts/design/auto_design_question_generation.txt`（基础）/ `coverage_design_question_generation.txt`（带覆盖约束）
+- **存放位置**：`configs/prompts/arch_design/gen_q_user.txt`
 - **工序位置**：DesignGenerationStep → DesignQuestionGenerator（Step 3a）
 - **变量注入**：`language`、`coverage_bucket/intent/question_type`、`constraint_strength/constraint_rules`、`scenario_constraints`、`context`、`evidence_pool`、`max_design_questions`、`min_evidence_refs`
 - **推理模式**：覆盖约束驱动的结构化出题
@@ -81,8 +81,12 @@
 | 配置参数 | 业务直观名称 | 调节它的效果 |
 | :--- | :--- | :--- |
 | `design_questions.prompts.question_generation` | 设计出题模板 | 控制问题结构 |
-| `design_questions.prompts.coverage_generation` | 覆盖出题模板 | 启用覆盖约束 |
+| `design_questions.prompts.coverage_generation` | 覆盖出题模板 | 复用出题模板 |
+| `design_questions.coverage.template_name` | 覆盖模板名 | 仅文件名（不含扩展名），优先级最高 |
 | `design_questions.coverage.*` | 覆盖与场景规则 | 控制 bucket/intent/场景注入 |
+
+**模板选择优先级**：`design_questions.coverage.template_name` → `design_questions.prompts.coverage_generation` → `design_questions.prompts.question_generation` → `gen_q_user`。  
+需要更严格的覆盖模板时，可使用 `configs/prompts/arch_design/coverage_gen_q_user.txt`，并通过以上任一配置指向或命名。
 
 #### 🛠️ 逻辑流向图 (出题流程)
 
@@ -101,7 +105,7 @@ flowchart TD
 
 ---
 
-### 模板：`configs/prompts/design/design_system_prompt.txt` + `design_user_prompt.txt`
+### 模板：`configs/prompts/arch_design/system.txt` + `configs/prompts/arch_design/gen_s_user.txt`
 
 #### 🌟 核心概念 (回答)
 
@@ -109,7 +113,7 @@ flowchart TD
 
 #### 📋 运作基石 (回答)
 
-- **存放位置**：`configs/prompts/design/design_system_prompt.txt`、`configs/prompts/design/design_user_prompt.txt`
+- **存放位置**：`configs/prompts/arch_design/system.txt`、`configs/prompts/arch_design/gen_s_user.txt`
 - **工序位置**：DesignGenerationStep → DesignGenerator（Step 3b）
 - **变量注入**：`design_question_id/goal/constraints/acceptance_criteria/non_goals`、`context`、`architecture_constraints`、`counterexample_guidance`、`controller_symbol_id`、`service_evidence`、`repo_commit`
 - **推理模式**：证据锚定的结构化设计方案
@@ -166,15 +170,15 @@ flowchart TD
 获得全面的上下文证据后，系统进入“架构师”角色，开始撰写设计方案。这个过程同样受到“Prompt 合同”和“代码校验”的双重保障。
 
 1. **事前约束 (Prompt 合同)**：
-    - **角色扮演**: `configs/prompts/design/design_system_prompt.txt` 首先会赋予 LLM 一个“资深软件架构师”的角色，并设定好输出的结构化格式（例如，必须包含“方案概述”、“风险分析”等六大章节）。
-    - **证据注入**: `configs/prompts/design/design_user_prompt.txt` 则会将具体的设计问题 `{design_question}`、检索到的上下文 `{context}`、架构约束 `{architecture_constraints}` 等一并提供给 LLM。
+    - **角色扮演**: `configs/prompts/arch_design/system.txt` 首先会赋予 LLM 一个“资深软件架构师”的角色，并设定好输出的结构化格式（例如，必须包含“方案概述”、“风险分析”等六大章节）。
+    - **证据注入**: `configs/prompts/arch_design/gen_s_user.txt` 则会将具体的设计问题 `{design_question}`、检索到的上下文 `{context}`、架构约束 `{architecture_constraints}` 等一并提供给 LLM。
     - **强制引用**: Prompt 明确要求，在 `thought`（思考过程）中，必须引用在 `{context}` 中出现的 `evidence_refs`，确保所有设计决策都有据可依。
 
 2. **事后验证 (代码校验)**：
-    - **结构监察**: `DesignGenerator` 在收到 LLM 的回复后，会立刻用 `_validate_sample` 方法进行检查。
+    - **结构监察**: 设计输出会先通过 schema 解析，并由 Validation 步骤执行证据与结构校验。
     - **证据有效性**: 校验 `thought.evidence_refs` 中的引用是否真实存在于原始的证据池中。
     - **内容完整性**: 检查 `answer` 文本中是否包含了所有被要求的章节标题。
-    - **失败品回收**: 任何无法通过校验的设计方案都会被视为不合格，记录到 `design_rejected.jsonl` 文件中，并被**彻底丢弃**。
+    - **失败品回收**: 任何无法通过校验的设计方案都会被记录到 `design_rejected.jsonl` 文件中，并被**彻底丢弃**。
 
 通过这个 RAG 闭环，系统不仅生成了一份设计文档，更确保了这份文档是**基于现有代码、遵循架构约束、且思考过程透明可追溯的**高质量产出。`MethodProfile` 在此流程中起到了至关重要的作用，它既是 RAG 检索阶段的核心“导航仪”，也为 LLM 在生成阶段提供了超越原始代码的“语义洞察力”。
 

@@ -36,7 +36,7 @@ Prompt 生成（加入反例&约束段） → LLM 输出 → Validator（可选�
 
 ```yaml
 core:
-  architecture_constraints_path: "configs/user_inputs/architecture_constraints.yaml"
+  architecture_constraints_path: "configs/prompts/common/arch_constraints.yaml"
 
 question_answer:
   constraints:
@@ -86,6 +86,6 @@ design_questions:
 
 ## 6. 影响范围（代码/配置）
 
-- **配置**：`configs/launch.yaml`、`configs/user_inputs/architecture_constraints.yaml`
-- **Prompt**：`configs/prompts/question_answer/*`、`configs/prompts/design/*`
-- **校验（可选）**：`src/utils/validator.py`
+- **配置**：`configs/launch.yaml`、`configs/prompts/common/arch_constraints.yaml`
+- **Prompt**：`configs/prompts/qa_rule/*`、`configs/prompts/arch_design/*`
+- **校验（可选）**：`src/utils/data/validator.py`

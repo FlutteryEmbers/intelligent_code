@@ -8,13 +8,13 @@
 
 - **涉及领地 (Code Context)**：
   - `src/pipeline/steps/question_answer.py`
-  - `src/engine/auto_question_generator.py`
-  - `src/engine/answer_generator.py`
-  - `src/utils/vector_index.py`
+  - `src/engine/generators/qa_rule/question_generator.py`
+  - `src/engine/generators/qa_rule/answer_generator.py`
+  - `src/utils/retrieval/vector_index.py`
   - `configs/launch.yaml`
   - `configs/user_inputs/user_questions.yaml`
-  - `configs/prompts/question_answer/*`
-  - `configs/user_inputs/qa_scenario_templates.yaml`
+  - `configs/prompts/qa_rule/*`
+  - `configs/prompts/qa_rule/scenario_rules.yaml`
 
 - **执行准则 (Business Rules)**：
   - Auto 模式：先产出问题，再检索证据生成回答。
@@ -50,7 +50,7 @@
 
 ## Prompt 说明（模板角色）
 
-### 模板：`configs/prompts/question_answer/auto_question_generation.txt` / `coverage_question_generation.txt`
+### 模板：`configs/prompts/qa_rule/gen_q_user.txt`
 
 #### 🌟 核心概念 (出题)
 >
@@ -58,8 +58,8 @@
 
 #### 📋 运作基石 (出题规则)
 
-- **存放位置**：`configs/prompts/question_answer/auto_question_generation.txt`（基础）/ `coverage_question_generation.txt`（带覆盖约束）
-- **工序位置**：QuestionAnswerStep → AutoQuestionGenerator（问题生成）
+- **存放位置**：`configs/prompts/qa_rule/gen_q_user.txt`
+- **工序位置**：QuestionAnswerStep → QuestionGenerator（问题生成）
 - **变量注入**：`method_profile`、`source_code`、`questions_per_method`、`coverage_bucket`、`coverage_intent`、`question_type`、`scenario_constraints`、`constraint_strength`、`constraint_rules`、`symbol_id/file_path/start_line/end_line/source_hash`、`repo_commit`
 - **推理模式**：约束驱动的结构化出题（配额 + 证据对齐）
 - **核心准则**：
@@ -73,8 +73,12 @@
 | 配置参数 | 业务直观名称 | 调节它的效果 |
 | :--- | :--- | :--- |
 | `question_answer.prompts.question_generation` | 基础出题模板 | 控制问题结构 |
-| `question_answer.prompts.coverage_generation` | 覆盖出题模板 | 启用覆盖约束 |
+| `question_answer.prompts.coverage_generation` | 覆盖出题模板 | 复用出题模板 |
+| `question_answer.coverage.template_name` | 覆盖模板名 | 仅文件名（不含扩展名），优先级最高 |
 | `question_answer.coverage.*` | 覆盖与场景规则 | 决定 bucket/intent/场景注入 |
+
+**模板选择优先级**：`question_answer.coverage.template_name` → `question_answer.prompts.coverage_generation` → `question_answer.prompts.question_generation` → `gen_q_user`。  
+需要更严格的覆盖模板时，可使用 `configs/prompts/qa_rule/coverage_gen_q_user.txt`，并通过以上任一配置指向或命名。
 
 #### 🛠️ 逻辑流向图 (出题流程)
 
@@ -93,7 +97,7 @@ flowchart TD
 
 ---
 
-### 模板：`configs/prompts/question_answer/auto_answer_generation.txt`
+### 模板：`configs/prompts/qa_rule/gen_a_user.txt`
 
 #### 🌟 核心概念 (回答)
 >
@@ -101,7 +105,7 @@ flowchart TD
 
 #### 📋 运作基石 (回答规则)
 
-- **存放位置**：`configs/prompts/question_answer/auto_answer_generation.txt`
+- **存放位置**：`configs/prompts/qa_rule/gen_a_user.txt`
 - **工序位置**：QuestionAnswerStep → AnswerGenerator（回答生成）
 - **变量注入**：`question`、`context`、`available_evidence_refs`、`format_constraints`、`common_mistakes_examples`、`architecture_constraints`、`counterexample_guidance`
 - **推理模式**：证据锚定的结构化回答（observations/inferences/assumptions）
@@ -136,23 +140,23 @@ flowchart TD
 
 1. **静态解析，建立索引 (`CodeSymbol`)**
     - **过程**：首先，系统通过静态分析（非 LLM）扫描整个代码库，将每个类、方法等解析成一个结构化的 `CodeSymbol` 对象，并建立索引。
-    - **证据**：此过程由 `src/parser/` 中的解析器完成，其数据结构在 `src/utils/schemas.py` 中定义，并被 `docs/SCHEMAS.md` 详细记录。
+    - **证据**：此过程由 `src/parser/` 中的解析器完成，其数据结构在 `src/schemas/` 中定义，并被 `docs/schemas/` 详细记录。
 
 2. **LLM 生成方法摘要 (`MethodProfile`)**
     - **过程**：对于解析出的关键方法，系统调用一个 LLM，让其扮演“代码分析专家”，为方法生成一份结构化的“摘要”（`MethodProfile`），其中包含业务规则、依赖关系等深度语义。
-    - **证据**：`src/engine/auto_method_understander.py` 使用 `auto_method_understanding.txt` 这个 Prompt 来完成此任务。
+    - **证据**：`src/engine/generators/method_profile/understander.py` 使用 `configs/prompts/method_profile/system.txt` 与 `configs/prompts/method_profile/user.txt` 完成此任务。
 
 3. **基于摘要生成问题 (`Question-First`)**
     - **过程**：系统利用上一步生成的 `MethodProfile`（摘要），再次调用 LLM，让其扮演“技术培训专家”，围绕摘要中的要点生成多样化、有深度且分布可控的问题。
-    - **证据**：`src/engine/auto_question_generator.py` 使用 `auto_question_generation.txt` Prompt，其中 `MethodProfile` 是关键输入。
+    - **证据**：`src/engine/generators/qa_rule/question_generator.py` 使用 `configs/prompts/qa_rule/gen_q_user.txt` 模板，其中 `MethodProfile` 是关键输入。
 
 4. **RAG 检索上下文 (`Context`)**
     - **过程**：在回答问题时，系统**不会**使用之前的摘要。相反，它会启动一个 RAG（检索增强生成）流程，根据问题，通过直接证据、向量搜索和调用链分析等方式，从代码库中重新检索最相关的**源码原文**，拼接成上下文。
-    - **证据**：`src/engine/answer_generator.py` 中复杂的检索逻辑，它为“开卷考试”准备了最精确的“开卷材料”。
+    - **证据**：`src/engine/generators/qa_rule/answer_generator.py` 中复杂的检索逻辑，它为“开卷考试”准备了最精确的“开卷材料”。
 
 5. **基于证据生成答案 (`Evidence-Based Answers`)**
     - **过程**：最后，系统将问题和检索到的源码上下文一起交给 LLM，并用一份极其严格的 Prompt “合同”来强迫它必须基于源码回答，且在结构化的 `thought`（思考过程）中引用具体的代码证据（`evidence_refs`）。
-    - **证据**：`auto_answer_generation.txt` Prompt 强制要求答案必须引用证据。同时，`answer_generator.py` 的代码会对 LLM 的输出进行严格校验，不合规的回答会被直接丢弃。
+    - **证据**：`configs/prompts/qa_rule/gen_a_user.txt` 模板强制要求答案必须引用证据。同时，`src/engine/generators/qa_rule/answer_generator.py` 的代码会对 LLM 的输出进行严格校验，不合规的回答会被直接丢弃。
 
 6. **自动化质量门禁 (`Quality Gates`)**
     - **过程**：在流程的每一步，系统都会进行自动化校验。例如，答案是否引用了有效的证据、JSON 格式是否正确等。不符合质量要求的样本会被拒绝，并记录在案。
@@ -177,7 +181,7 @@ flowchart TD
 这是整个流程的精髓，系统通过“Prompt 合同”和“代码校验”双重保险，强迫 LLM 必须忠于证据。
 
 1. **事前约束 (Prompt 合同)**：
-    - **严格的输入**：`configs/prompts/question_answer/auto_answer_generation.txt` 这个 Prompt 会清晰地将问题 `{question}`、检索到的源码 `{context}`、以及一个**明确的可用证据清单** `{available_evidence_refs}` 提供给 LLM。
+    - **严格的输入**：`configs/prompts/qa_rule/gen_a_user.txt` 这个 Prompt 会清晰地将问题 `{question}`、检索到的源码 `{context}`、以及一个**明确的可用证据清单** `{available_evidence_refs}` 提供给 LLM。
     - **明确的命令**：Prompt 中用加粗等方式反复强调，`thought.evidence_refs` **必须**从 `{available_evidence_refs}` 列表中选择，并且如果证据不足，**必须**在回答中明说，禁止捏造。
     - **结构化思考**：Prompt 强制 LLM 输出 `thought` 对象，包含 `observations` (观察)、`inferences` (推断)等，迫使其先进行基于证据的分析，再得出结论。
 
@@ -207,7 +211,7 @@ flowchart TD
 
 备注：
 
-- `qa_system_prompt.txt` / `qa_user_prompt.txt` 当前未在代码中加载，属于历史模板。
+- 旧版 `qa_system_prompt.txt` / `qa_user_prompt.txt` 已被 `configs/prompts/qa_rule/system.txt` 与 `configs/prompts/qa_rule/gen_a_user.txt` 替代。
 
 ## 🛠️ 它是如何工作的（逻辑流向）
 

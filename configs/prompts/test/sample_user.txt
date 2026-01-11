@@ -1,0 +1,11 @@
+请分析以下 Java 代码：
+
+```java
+public class Calculator {
+    public int add(int a, int b) {
+        return a + b;
+    }
+}
+```
+
+生成一个 QA 类型的训练样本，问题是"这个类的功能是什么？"

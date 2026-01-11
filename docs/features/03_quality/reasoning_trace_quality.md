@@ -6,13 +6,13 @@
 ## 📋 运作基石（必要元数据）
 
 - **涉及领地 (Code Context)**：
-  - `src/utils/validator.py`
-  - `src/engine/answer_generator.py`
-  - `src/engine/design_generator.py`
+  - `src/utils/data/validator.py`
+  - `src/engine/generators/qa_rule/answer_generator.py`
+  - `src/engine/generators/arch_design/design_generator.py`
   - `configs/launch.yaml`
-  - `configs/prompts/question_answer/auto_answer_generation.txt`
-  - `configs/prompts/design/design_user_prompt.txt`
-  - `configs/user_inputs/architecture_constraints.yaml`
+  - `configs/prompts/qa_rule/gen_a_user.txt`
+  - `configs/prompts/arch_design/gen_s_user.txt`
+  - `configs/prompts/common/arch_constraints.yaml`
 
 - **执行准则 (Business Rules)**：
   - 输出必须包含结构化“推理记录”（observations / inferences / assumptions / evidence_refs）。
