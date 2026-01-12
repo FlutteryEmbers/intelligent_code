@@ -1,6 +1,7 @@
 # 报表可视化与审计
 
 ## 🌟 核心概念：像“业务仪表盘”一样
+>
 > 就像看图表就能理解经营状况，系统会把报表转成图形，并在不一致时直接提示。
 
 ## 📋 运作基石（必要元数据）
@@ -36,18 +37,36 @@
 
 ## 🛠️ 它是如何工作的（逻辑流向）
 
+### 1. 报表生成 (Generation)
+
+- **QuestionTypeReportStep** (`src/pipeline/steps/question_type_report.py`):
+  - 读取 `qa_clean.jsonl` 和 `design_clean.jsonl`。
+  - 调用 `compute_distribution` 计算各维度分布。
+  - 检查 Regression：对比 `targets` 和实际分布，超过 `max_delta` 则记录 Warnings。
+  - 输出 `question_type_report.json`。
+
+### 2. 可视化与校验 (Visualization & Audit)
+
+- **render_reports** (`tools/render_reports.py`):
+  - 读取上述生成的 JSON 报表。
+  - 再次统计磁盘上的 clean 数据，确保报表与数据一致（防止报表造假或过时）。
+  - 调用 `matplotlib` / `pandas` 生成饼图或柱状图。
+
 ```mermaid
 flowchart TD
-  A[data/reports/*.json] --> B[render_reports]
-  B --> C[生成图表]
-  B --> D[对比 clean 数据]
-  D --> E{一致?}
-  E -- 否 --> F[报错提示]
-  E -- 是 --> G[输出 results]
+  Data["Clean Data"] --> Step["QuestionTypeReportStep"]
+  Step --> Report["question_type_report.json"]
+  
+  Report --> Tool["render_reports.py"]
+  Data --> Tool
+  
+  Tool --> Check{"数据一致性校验"}
+  Check -- Pass --> Charts["生成图表 (assets)"]
+  Check -- Fail --> Error["报错退出"]
 
-  subgraph 业务规则
-    D --> D1[分布一致性校验]
-    C --> C1[分类输出图表]
+  subgraph Code Evidence
+    Step -.-> |src/pipeline/steps/question_type_report.py| gen["compute_distribution"]
+    Tool -.-> |tools/render_reports.py| viz["validate_consistency"]
   end
 ```
 

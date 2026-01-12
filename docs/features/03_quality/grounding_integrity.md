@@ -69,16 +69,16 @@
 
 ```mermaid
 flowchart TD
-  A[LLM 输出 JSON] --> B[AnswerGenerator.\n_correct_evidence_refs]
-  B --> |纠错与补全| C[Standardized Evidence]
-  C --> D[Validator.\nvalidate_sample_obj]
-  D --> E{一致性检查}
-  E -- Pass --> F[进入 Clean 集]
-  E -- Fail --> G[Reject 并记录原因]
+  A["LLM 输出 JSON"] --> B["AnswerGenerator.\n_correct_evidence_refs"]
+  B --> |纠错与补全| C["Standardized Evidence"]
+  C --> D["Validator.\nvalidate_sample_obj"]
+  D --> E{"一致性检查"}
+  E -- Pass --> F["进入 Clean 集"]
+  E -- Fail --> G["Reject 并记录原因"]
 
   subgraph Code Logic
-    B -.-> |Re-hydration| H[自动修正行号/Hash]
-    E -.-> |Hash check| I[Source Hash 比对]
+    B -.-> |Re-hydration| H["自动修正行号/Hash"]
+    E -.-> |Hash check| I["Source Hash 比对"]
   end
 ```
 

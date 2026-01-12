@@ -67,15 +67,15 @@
 
 ```mermaid
 flowchart TD
-  A[Prompt Template] --> |强制结构| B[LLM 生成 Thought]
-  B --> C{Validator 校验}
-  C --> |Check Structure| D[Observations/Inferences 非空?]
-  C --> |Check Alignment| E[Trace 包含 Answer 关键词?]
-  D & E -- Yes --> F[High Quality Trace]
-  D & E -- No --> G[Quality Warning]
+  A["Prompt Template"] --> |强制结构| B["LLM 生成 Thought"]
+  B --> C{"Validator 校验"}
+  C --> |Check Structure| D["Observations/Inferences 非空?"]
+  C --> |Check Alignment| E["Trace 包含 Answer 关键词?"]
+  D & E -- Yes --> F["High Quality Trace"]
+  D & E -- No --> G["Quality Warning"]
 
   subgraph Code Evidence
-    C -.-> |src/utils/data/validator.py| val[validate_sample_obj]
+    C -.-> |src/utils/data/validator.py| val["validate_sample_obj"]
   end
 ```
 

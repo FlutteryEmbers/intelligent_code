@@ -84,14 +84,14 @@
 
 ```mermaid
 flowchart TD
-  A[原始样本流] --> B[CoverageTagger]
-  B --> C{打标逻辑}
-  C --> |infer_intent| D[意图标签]
-  C --> |infer_module_span| E[跨度标签]
-  D & E --> F[难度 Bucket]
-  F --> G[CoverageSampler]
-  G --> H{按 Targets 抽样}
-  H --> I[最终训练集]
+  A["原始样本流"] --> B["CoverageTagger"]
+  B --> C{"打标逻辑"}
+  C --> |infer_intent| D["意图标签"]
+  C --> |infer_module_span| E["跨度标签"]
+  D & E --> F["难度 Bucket"]
+  F --> G["CoverageSampler"]
+  G --> H{"按 Targets 抽样"}
+  H --> I["最终训练集"]
 
   subgraph Code Evidence
     B -.-> |src/pipeline/steps/coverage_tagger.py| tagger

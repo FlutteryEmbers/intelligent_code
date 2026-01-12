@@ -58,15 +58,15 @@
 
 ```mermaid
 flowchart TD
-  A[所有样本] --> B{样本量 < 3?}
-  B -- Yes --> C[全量 Train]
-  B -- No --> D[按 Package 分组]
-  D --> E[随机分配 Group]
-  E --> F[Train / Val / Test Sets]
+  A["所有样本"] --> B{"样本量 < 3?"}
+  B -- Yes --> C["全量 Train"]
+  B -- No --> D["按 Package 分组"]
+  D --> E["随机分配 Group"]
+  E --> F["Train / Val / Test Sets"]
 
   subgraph Code Evidence
-    D -.-> |src/utils/data/splitter.py| group[group_split_samples]
-    E -.-> |seed| rng[Random Seed]
+    D -.-> |src/utils/data/splitter.py| group["group_split_samples"]
+    E -.-> |seed| rng["Random Seed"]
   end
 ```
 

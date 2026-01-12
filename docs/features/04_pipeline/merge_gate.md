@@ -53,18 +53,18 @@ Merge Step (`src/pipeline/steps/merge.py`) 是连接“生成/校验”与“后
 
 ```mermaid
 flowchart TD
-  A[开始合并] --> B{Clean 存在?}
-  B -- Yes --> C[加载 Clean]
-  B -- No --> D{Gate Mode?}
-  D -- Gate --> E[Error: 门禁拦截]
-  D -- Report --> F{Allow Fallback?}
-  F -- Yes --> G[Warn: 加载 Raw]
+  A["开始合并"] --> B{"Clean 存在?"}
+  B -- Yes --> C["加载 Clean"]
+  B -- No --> D{"Gate Mode?"}
+  D -- Gate --> E["Error: 门禁拦截"]
+  D -- Report --> F{"Allow Fallback?"}
+  F -- Yes --> G["Warn: 加载 Raw"]
   F -- No --> E
-  C & G --> H[写出为 all_raw.jsonl]
+  C & G --> H["写出为 all_raw.jsonl"]
 
   subgraph Code Evidence
-    B -.-> |src/pipeline/steps/merge.py| logic[Check Paths]
-    D -.-> |quality.gate_mode| config[Config Check]
+    B -.-> |src/pipeline/steps/merge.py| logic["Check Paths"]
+    D -.-> |quality.gate_mode| config["Config Check"]
   end
 ```
 

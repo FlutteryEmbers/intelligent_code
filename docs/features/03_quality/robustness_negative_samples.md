@@ -59,17 +59,17 @@
 
 ```mermaid
 flowchart TD
-  A[开始生成] --> B{Sample Ratio < 0.1?}
-  B -- No --> C[正常正向流程]
-  B -- Yes --> D[选定负向类型 (e.g. 证据不足)]
-  D --> E[加载 negative_rules.yaml]
-  E --> F[Inject Rules to Prompt]
-  F --> G[LLM 生成拒绝回答]
-  G --> H[Validator 豁免证据检查]
+  A["开始生成"] --> B{"Sample Ratio < 0.1?"}
+  B -- No --> C["正常正向流程"]
+  B -- Yes --> D["选定负向类型 (e.g. 证据不足)"]
+  D --> E["加载 negative_rules.yaml"]
+  E --> F["Inject Rules to Prompt"]
+  F --> G["LLM 生成拒绝回答"]
+  G --> H["Validator 豁免证据检查"]
 
   subgraph Code Evidence
-    B -.-> |AnswerGenerator.py| sample[_sample_negative_type]
-    F -.-> |AnswerGenerator.py| inject[_inject_negative_rules]
+    B -.-> |AnswerGenerator.py| sample["_sample_negative_type"]
+    F -.-> |AnswerGenerator.py| inject["_inject_negative_rules"]
   end
 ```
 

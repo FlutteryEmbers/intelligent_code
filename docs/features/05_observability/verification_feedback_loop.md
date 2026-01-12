@@ -1,6 +1,7 @@
 # 验证与闭环（Verification & Feedback）
 
 ## 🌟 核心概念：像“仪表盘+回访”一样
+>
 > 就像运营要看数据报表、再决定下一步动作，系统会输出质量与分布报表，并对偏差做提示。
 
 ## 📋 运作基石（必要元数据）
@@ -19,7 +20,7 @@
   - Merge 在 gate/report 模式间切换：gate 强制使用 clean。
   - Coverage 报表输出难度/意图/模块跨度分布。
   - Question type 报表输出类型分布，并在偏差过大时告警（warn-only）。
-  - Export 会输出整体数据统计（`dataset_stats.json`）。 
+  - Export 会输出整体数据统计（`dataset_stats.json`）。
 
 - **参考证据**：
   - `data/reports/*` 是审计依据（quality/coverage/question_type/dedup 等）。
@@ -40,19 +41,24 @@
 
 ## 🛠️ 它是如何工作的（逻辑流向）
 
+### 1. 闭环反馈 (Feedback Loop)
+
+- **Validation**: 剔除低质数据，确保输入给 Report 的是 Clean 数据。
+- **Distribution Check**: `QuestionTypeReportStep` 计算分布后，立即与 `configs` 中的 `targets` 对比。
+- **Regression Alert**: 如果 `actual_ratio` 与 `target` 偏差超过 `max_delta` (默认 0.1)，Logger 输出警告，提示需调整采样率或 Prompt。
+
 ```mermaid
 flowchart TD
-  A[Validation 质量校验] --> B[clean 分支]
-  B --> C[CoverageSampler 分布报表]
-  C --> D[QuestionTypeReport 类型报表]
-  D --> E[Merge 合并]
-  E --> F[Export 统计输出]
-  C --> G[report 可视化]
-  D --> G
-
-  subgraph 业务规则
-    A --> A1[gate/report 模式]
-    D --> D1[偏差超阈值告警]
+  A["Validation 质量校验"] --> B["Clean Data"]
+  B --> C["Coverage/Type Report"]
+  C --> D{"Regression Check"}
+  D -- Gap > Delta --> E["Warning: 分布偏差"]
+  D -- Gap <= Delta --> F["Pass"]
+  E & F --> G["Merge & Export"]
+  
+  subgraph Code Evidence
+     C -.-> |src/utils/data/coverage.py| dist["compute_distribution"]
+     D -.-> |src/pipeline/steps/question_type_report.py| check["_compare_targets"]
   end
 ```
 

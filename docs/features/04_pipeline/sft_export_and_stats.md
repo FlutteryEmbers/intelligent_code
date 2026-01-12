@@ -59,17 +59,17 @@
 
 ```mermaid
 flowchart TD
-  A[Split 结果: *.jsonl] --> B{非空检查}
-  B -- Empty --> C[跳过]
-  B -- Has Data --> D[export_sft_jsonl]
-  D --> E[映射字段为 SFT 格式]
-  E --> F[写出 *_sft.jsonl]
-  F --> G[export_statistics]
-  G --> H[dataset_stats.json]
+  A["Split 结果: *.jsonl"] --> B{"非空检查"}
+  B -- Empty --> C["跳过"]
+  B -- Has Data --> D["export_sft_jsonl"]
+  D --> E["映射字段为 SFT 格式"]
+  E --> F["写出 *_sft.jsonl"]
+  F --> G["export_statistics"]
+  G --> H["dataset_stats.json"]
 
   subgraph Code Evidence
-    D -.-> |src/utils/exporters.py| convert[Mapping Logic]
-    G -.-> |src/pipeline/steps/export.py| stats[Stats Calculation]
+    D -.-> |src/utils/exporters.py| convert["Mapping Logic"]
+    G -.-> |src/pipeline/steps/export.py| stats["Stats Calculation"]
   end
 ```
 

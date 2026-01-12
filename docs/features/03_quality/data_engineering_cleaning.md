@@ -72,15 +72,15 @@
 
 ```mermaid
 flowchart TD
-  A[所有样本] --> B{SimHash 去重}
-  B --> C{语义去重 (可选)}
-  C --> D{Secrets 扫描}
-  D -- 命中 --> E[DROP / REDACT]
-  D -- 未命中 --> F[Clean 集合]
+  A["所有样本"] --> B{"SimHash 去重"}
+  B --> C{"语义去重 (可选)"}
+  C --> D{"Secrets 扫描"}
+  D -- 命中 --> E["DROP / REDACT"]
+  D -- 未命中 --> F["Clean 集合"]
   
   subgraph Code Evidence
-    B -.-> |src/utils/dedup.py| dedup_code[dedup_jsonl_by_simhash]
-    D -.-> |src/utils/safety.py| safety_code[scan_secrets]
+    B -.-> |src/utils/dedup.py| dedup_code["dedup_jsonl_by_simhash"]
+    D -.-> |src/utils/safety.py| safety_code["scan_secrets"]
   end
 ```
 

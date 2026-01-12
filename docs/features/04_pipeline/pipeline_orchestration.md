@@ -57,21 +57,21 @@
 
 ```mermaid
 flowchart TD
-  A[Pipeline.run 循环] --> B[取下一个 Step]
-  B --> C{should_skip?}
-  C -- Yes --> D[Result: skipped]
-  C -- No --> E[Step.run -> execute]
-  E --> F{Success?}
-  F -- Yes --> G[Result: success data]
-  F -- No --> H[Result: error info]
-  D & G & H --> I[更新 Summary]
-  I --> J{还有 Step?}
+  A["Pipeline.run 循环"] --> B["取下一个 Step"]
+  B --> C{"should_skip?"}
+  C -- Yes --> D["Result: skipped"]
+  C -- No --> E["Step.run -> execute"]
+  E --> F{"Success?"}
+  F -- Yes --> G["Result: success data"]
+  F -- No --> H["Result: error info"]
+  D & G & H --> I["更新 Summary"]
+  I --> J{"还有 Step?"}
   J -- Yes --> B
-  J -- No --> K[写出 pipeline_summary.json]
+  J -- No --> K["写出 pipeline_summary.json"]
 
   subgraph Code Evidence
-    B -.-> |src/pipeline/orchestrator.py| steps[Step List]
-    C -.-> |src/pipeline/base_step.py| skip[should_skip]
+    B -.-> |src/pipeline/orchestrator.py| steps["Step List"]
+    C -.-> |src/pipeline/base_step.py| skip["should_skip"]
   end
 ```
 
